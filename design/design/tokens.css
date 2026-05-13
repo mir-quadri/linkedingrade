@@ -1,0 +1,76 @@
+/* ─────────────────────────────────────────────────────────
+ * LinkedInGrade — design tokens
+ * Drop this into your global CSS, or translate to your
+ * framework's token system (Tailwind theme.extend, etc.)
+ * ───────────────────────────────────────────────────────── */
+
+:root {
+  /* COLOR — light mode */
+  --bg:           #FAFAF7;  /* page background, warm paper */
+  --surface:      #FFFFFF;  /* card / report background */
+  --surface-sub:  #F2F2EC;  /* inset / header strip */
+  --text:         #0E0E0C;  /* primary text */
+  --text-2:       #4A4A45;  /* secondary / body */
+  --text-3:       #8A8A82;  /* muted / labels */
+  --border:       rgba(14, 14, 12, 0.09);   /* hairline */
+  --border-2:     rgba(14, 14, 12, 0.18);   /* strong */
+
+  /* BRAND — fixed across modes */
+  --navy:         #0F2138;  /* the seal */
+  --accent:       #C8102E;  /* the punctuation */
+
+  /* STATES */
+  --warning:      #B8730B;  /* amber, grade C */
+  --danger:       #A8190A;  /* deep red, grade D/F */
+  --success:      #2D5A3F;  /* deep forest, grade A */
+
+  /* RADIUS */
+  --r-sm: 4px;   /* buttons, inputs, tags */
+  --r-md: 8px;   /* nested boxes */
+  --r-lg: 14px;  /* cards, modals, audit report */
+
+  /* SPACING — 4px base, geometric */
+  --s-1:  4px;
+  --s-2:  8px;
+  --s-3:  12px;
+  --s-4:  16px;
+  --s-6:  24px;
+  --s-8:  32px;
+  --s-12: 48px;
+  --s-16: 64px;
+  --s-24: 96px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg:          #0B0B09;
+    --surface:     #141413;
+    --surface-sub: #1B1B19;
+    --text:        #F1F0EA;
+    --text-2:      #B5B4AB;
+    --text-3:      #76756D;
+    --border:      rgba(241, 240, 234, 0.08);
+    --border-2:    rgba(241, 240, 234, 0.18);
+
+    /* Brand mark colors do NOT change in dark mode.
+     * The seal is always navy; the accent is always red. */
+
+    --warning:     #E8A547;
+    --danger:      #FF6359;
+    --success:     #6FBA8A;
+  }
+}
+
+/* Manual theme overrides (data-theme="dark" / "light") */
+:root[data-theme="dark"] {
+  --bg: #0B0B09; --surface: #141413; --surface-sub: #1B1B19;
+  --text: #F1F0EA; --text-2: #B5B4AB; --text-3: #76756D;
+  --border: rgba(241,240,234,.08); --border-2: rgba(241,240,234,.18);
+  --warning: #E8A547; --danger: #FF6359; --success: #6FBA8A;
+}
+:root[data-theme="light"] {
+  --bg: #FAFAF7; --surface: #FFFFFF; --surface-sub: #F2F2EC;
+  --text: #0E0E0C; --text-2: #4A4A45; --text-3: #8A8A82;
+  --border: rgba(14,14,12,.09); --border-2: rgba(14,14,12,.18);
+  --warning: #B8730B; --danger: #A8190A; --success: #2D5A3F;
+}
