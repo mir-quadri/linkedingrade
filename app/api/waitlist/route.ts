@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const KIT_TIMEOUT_MS = 10_000;
+const KIT_BASE_URL = "https://api.kit.com/v4";
 
 const INVALID_EMAIL_ERROR = "That doesn't look like a valid email.";
 const SERVER_CONFIG_ERROR = "Server config issue. Try again later.";
@@ -40,24 +41,30 @@ export async function POST(request: Request) {
   const timeout = setTimeout(() => controller.abort(), KIT_TIMEOUT_MS);
 
   try {
-    const response = await fetch(
-      `https://api.kit.com/v4/forms/${encodeURIComponent(formId)}/subscribers`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Accept: "application/json",
-          "X-Kit-Api-Key": apiKey,
-        },
-        body: JSON.stringify({ email_address: email }),
-        signal: controller.signal,
-      },
+    const createResp = await kitFetch(
+      `${KIT_BASE_URL}/subscribers`,
+      apiKey,
+      { email_address: email },
+      controller.signal,
     );
-
-    if (!response.ok) {
-      const body = await response.text().catch(() => "");
+    if (!createResp.ok) {
+      const body = await createResp.text().catch(() => "");
       console.error(
-        `[waitlist] kit error status=${response.status} body=${body}`,
+        `[waitlist] kit create-subscriber error status=${createResp.status} body=${body}`,
+      );
+      return NextResponse.json({ error: GENERIC_KIT_ERROR }, { status: 500 });
+    }
+
+    const attachResp = await kitFetch(
+      `${KIT_BASE_URL}/forms/${encodeURIComponent(formId)}/subscribers`,
+      apiKey,
+      { email_address: email },
+      controller.signal,
+    );
+    if (!attachResp.ok) {
+      const body = await attachResp.text().catch(() => "");
+      console.error(
+        `[waitlist] kit attach-to-form error status=${attachResp.status} body=${body}`,
       );
       return NextResponse.json({ error: GENERIC_KIT_ERROR }, { status: 500 });
     }
@@ -71,4 +78,22 @@ export async function POST(request: Request) {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+function kitFetch(
+  url: string,
+  apiKey: string,
+  body: Record<string, unknown>,
+  signal: AbortSignal,
+) {
+  return fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+      "X-Kit-Api-Key": apiKey,
+    },
+    body: JSON.stringify(body),
+    signal,
+  });
 }
