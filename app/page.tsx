@@ -1,45 +1,48 @@
+import Link from "next/link";
+
+import AuditPreviewCard from "./components/AuditPreviewCard";
+import AuditReportCard from "./components/AuditReportCard";
+import BrandLockup from "./components/BrandLockup";
+import Logo from "./components/Logo";
+import PricingTier, { type Feature } from "./components/PricingTier";
+import ThemeToggle from "./components/ThemeToggle";
 import WaitlistForm from "./components/WaitlistForm";
+import Wordmark from "./components/Wordmark";
 
 export default function Page() {
   return (
     <>
       <Nav />
       <Hero />
-      <Problem />
-      <HowItWorks />
-      <Rubric />
-      <WhoItsFor />
+      <SampleAudit />
+      <WhyExtension />
+      <BuiltFor />
       <Pricing />
-      <Faq />
-      <FinalCta />
-      <SiteFooter />
+      <FinalCTA />
+      <Footer />
     </>
-  );
-}
-
-function Brand() {
-  return (
-    <a href="#top" className="brand">
-      <span className="brand-word">linkedingrade</span>
-      <span className="brand-est">— EST. 2026</span>
-    </a>
   );
 }
 
 function Nav() {
   return (
-    <nav className="top">
-      <div className="container nav-inner">
-        <Brand />
-        <div className="nav-links">
-          <a href="#rubric">The rubric</a>
-          <a href="#how">How it works</a>
-          <a href="#pricing">Pricing</a>
-          <a href="#faq">FAQ</a>
+    <nav className="nav" aria-label="Primary">
+      <div className="container-x nav-row">
+        <Link href="/" aria-label="LinkedInGrade home">
+          <BrandLockup size={24} fontSize={17} />
+        </Link>
+        <div className="nav-links" role="navigation">
+          <Link href="#sample">Sample</Link>
+          <Link href="#how">How it works</Link>
+          <Link href="#audiences">Built for</Link>
+          <Link href="#pricing">Pricing</Link>
         </div>
-        <a href="#waitlist" className="nav-cta">
-          Get early access
-        </a>
+        <div className="nav-cta">
+          <ThemeToggle />
+          <Link href="#cta" className="btn btn-primary">
+            Install free
+          </Link>
+        </div>
       </div>
     </nav>
   );
@@ -47,197 +50,419 @@ function Nav() {
 
 function Hero() {
   return (
-    <section className="hero" id="top">
-      <div className="container">
-        <div className="hero-masthead">
+    <header className="hero">
+      <div className="container-x">
+        <div className="hero-meta">
           <span>
             <strong>VOL. 01</strong>&nbsp;&nbsp;NO. 01
           </span>
           <span>LAUNCH ISSUE · 2026</span>
           <span>THE PROFILE, GRADED</span>
         </div>
-
         <div className="hero-grid">
           <div>
             <h1>
-              Find out what a senior recruiter <em>actually</em> thinks of your
-              profile.
+              Every LinkedIn profile
+              <br />
+              gets a grade<em>.</em>
             </h1>
             <p className="lede">
-              A 30-second extension audits any LinkedIn profile against{" "}
-              <b>the rubric senior recruiters use</b>. Letter grade, 12 sections
-              rated, before/after rewrites you can copy. No hedging. No
-              horoscopes.
+              A 30-second Chrome extension audits any profile and returns a{" "}
+              <b>6-page report</b> — letter grade A through F, recruiter heat
+              map, before/after rewrites, and a priority action plan.{" "}
+              <b>No hedging, no horoscopes.</b> Brutal where it matters,
+              specific everywhere.
             </p>
 
-            <WaitlistForm id="waitlist" />
-            <div className="hero-meta">
-              <span>Free for first audit</span>
-              <span>No card required</span>
-              <span>Chrome &amp; Edge</span>
+            <WaitlistForm
+              buttonLabel="Audit my profile →"
+              fineprint={[
+                "Free for 1 audit · no card",
+                "Chrome & Edge",
+                "SOC 2 in progress",
+              ]}
+            />
+
+            <div className="proof-strip">
+              <div className="proof-cell">
+                <span className="num">
+                  31<span style={{ color: "var(--accent)" }}>s</span>
+                </span>
+                <span className="lbl">Median audit</span>
+              </div>
+              <div className="proof-cell">
+                <span className="num">6</span>
+                <span className="lbl">Page report</span>
+              </div>
+              <div className="proof-cell">
+                <span className="num">
+                  A<span style={{ color: "var(--accent)" }}>+</span> – F
+                </span>
+                <span className="lbl">Letter grade</span>
+              </div>
+              <div className="proof-cell">
+                <span className="num">Beta</span>
+                <span className="lbl">Q2 · 2026</span>
+              </div>
             </div>
           </div>
 
-          <SampleAudit />
+          <AuditPreviewCard />
         </div>
       </div>
-    </section>
+    </header>
   );
 }
 
 function SampleAudit() {
   return (
-    <div className="sample" aria-label="Sample audit (anonymized)">
-      <div className="sample-head">
-        <span className="label">Sample audit</span>
-        <span className="live">Anonymized</span>
-      </div>
-      <div className="sample-body">
-        <div className="donut" role="img" aria-label="Score 73 out of 100, grade B">
-          <svg width="124" height="124" viewBox="0 0 124 124" aria-hidden="true">
-            <circle
-              cx="62"
-              cy="62"
-              r="52"
-              fill="none"
-              stroke="var(--surface-sub)"
-              strokeWidth="8"
-            />
-            <circle
-              cx="62"
-              cy="62"
-              r="52"
-              fill="none"
-              stroke="var(--text)"
-              strokeWidth="8"
-              strokeDasharray="326.7"
-              strokeDashoffset="86.6"
-              strokeLinecap="round"
-            />
-          </svg>
-          <div className="grade" aria-hidden="true">
-            B
-          </div>
-          <div className="score" aria-hidden="true">
-            73 / 100
-          </div>
+    <section className="s" id="sample">
+      <div className="container-x">
+        <div className="section-head">
+          <div className="section-num">§ 01 — SAMPLE</div>
+          <h2>
+            One real audit, redacted. The kind you&apos;d{" "}
+            <em>actually pay for.</em>
+          </h2>
+          <p className="deck">
+            No screenshots of dashboards we wish existed. This is a sample
+            report on a working VP profile, with the name and employer scrubbed.
+            The scoring rubric is the same one we&apos;d run on yours.
+          </p>
         </div>
-        <div className="subject">
-          <div className="name">Subject · anonymized</div>
-          <div className="role">VP, Engineering · top-3 US bank</div>
-          <div className="tags">
-            <span className="tag">12y exp</span>
-            <span className="tag">NYC</span>
-            <span className="tag">CMU &apos;15</span>
-            <span className="tag flag">Photo dated</span>
+
+        <div className="feature-audit">
+          <div
+            style={{ display: "flex", flexDirection: "column", gap: 18 }}
+          >
+            <h3
+              style={{
+                margin: 0,
+                fontSize: 28,
+                letterSpacing: "-0.02em",
+                lineHeight: 1.15,
+                fontWeight: 500,
+              }}
+            >
+              The grade is the headline. Everything else is evidence.
+            </h3>
+            <p
+              style={{
+                margin: 0,
+                color: "var(--text-2)",
+                maxWidth: "46ch",
+              }}
+            >
+              Six sections. Each scored on its own rubric, calibrated to the
+              frameworks senior recruiters and hiring managers use. Each
+              cross-checked against the population of profiles at the same
+              seniority, function, and industry — so a B+ for a senior VP means
+              something different than a B+ for a graduate analyst.
+            </p>
+            <div
+              style={{
+                borderLeft: "2px solid var(--accent)",
+                padding: "6px 0 6px 16px",
+                fontSize: 20,
+                lineHeight: 1.35,
+                letterSpacing: "-0.01em",
+                color: "var(--text)",
+                margin: "8px 0",
+              }}
+            >
+              &ldquo;The recruiter heat map is what made me pay. I could see
+              exactly which two lines a sourcer would stop scrolling on.&rdquo;
+              <cite
+                className="font-mono"
+                style={{
+                  display: "block",
+                  fontStyle: "normal",
+                  fontSize: 11,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  color: "var(--text-3)",
+                  marginTop: 8,
+                }}
+              >
+                — Beta user, Series C founder
+              </cite>
+            </div>
+            <p
+              style={{
+                margin: 0,
+                color: "var(--text-2)",
+                maxWidth: "46ch",
+              }}
+            >
+              The 6-page PDF includes line-by-line rewrites for the About and
+              top three Experience entries, the exact phrasing flagged as
+              cliché, and the three highest-leverage fixes ranked by
+              minutes-to-implement.
+            </p>
+            <div style={{ display: "flex", gap: 10, marginTop: 8, flexWrap: "wrap" }}>
+              <Link href="#cta" className="btn btn-primary">
+                Run yours
+              </Link>
+              <Link href="#sample-pdf" className="btn btn-ghost">
+                View full PDF →
+              </Link>
+            </div>
           </div>
+
+          <AuditReportCard />
         </div>
       </div>
-      <div className="sample-rows">
-        <SampleRow k="Headline" w="88%" tone="good" grade="B+" />
-        <SampleRow k="About" w="48%" tone="warn" grade="C" />
-        <SampleRow k="Experience" w="72%" grade="B" />
-        <SampleRow k="Skills" w="90%" tone="good" grade="A–" />
-        <SampleRow k="Activity" w="24%" tone="bad" grade="D" />
-        <SampleRow k="Photo" w="78%" grade="B+" />
-      </div>
-      <div className="sample-foot">
-        <span>
-          Recruiter signal · <b>73 / 100</b>
-        </span>
-        <span>
-          Sample · <b>not real data</b>
-        </span>
-      </div>
-    </div>
+    </section>
   );
 }
 
-function SampleRow({
-  k,
-  w,
-  tone,
-  grade,
-}: {
-  k: string;
-  w: string;
-  tone?: "good" | "warn" | "bad";
-  grade: string;
-}) {
-  const cls = tone ?? "";
+function WhyExtension() {
   return (
-    <div className="row">
-      <span className="k">{k}</span>
-      <span className="bar">
-        <i className={cls} style={{ width: w }} />
-      </span>
-      <span className={`g ${cls}`.trim()}>{grade}</span>
-    </div>
-  );
-}
-
-function Problem() {
-  return (
-    <section className="sec" id="problem">
-      <div className="container">
-        <div className="sec-meta">
-          <span>01 — The problem</span>
-          <span>WHY YOUR PROFILE IS UNDER-PERFORMING</span>
+    <section className="s" id="how">
+      <div className="container-x">
+        <div className="section-head">
+          <div className="section-num">§ 02 — METHOD</div>
+          <h2>
+            Why a Chrome extension, and not{" "}
+            <em>&ldquo;just ask ChatGPT.&rdquo;</em>
+          </h2>
+          <p className="deck">
+            A general-purpose LLM is a brilliant intern with no glasses. It
+            can&apos;t see the page, can&apos;t compare you to a population, and
+            can&apos;t reproduce its own answer twice. The audit is built around
+            the three things ChatGPT can&apos;t do.
+          </p>
         </div>
 
-        <div className="problem-grid">
-          <div>
-            <h2>
-              Most LinkedIn profiles fail. Not because the people are bad —
-              because the <em>profile</em> is.
-            </h2>
-            <p className="dek">
-              Six seconds. That&apos;s how long a senior recruiter spends
-              scanning a profile before deciding to keep reading or close the
-              tab. Most profiles fail in that window — not for lack of
-              credentials, but because the credentials were written for the
-              writer, not the reader.
+        <div className="tri">
+          <div className="tri-col">
+            <div
+              className="font-mono"
+              style={{
+                fontSize: 11,
+                letterSpacing: "0.08em",
+                color: "var(--accent)",
+                textTransform: "uppercase",
+                marginBottom: 24,
+              }}
+            >
+              01 / VISIBILITY
+            </div>
+            <h3
+              style={{
+                fontSize: 22,
+                letterSpacing: "-0.02em",
+                lineHeight: 1.2,
+                margin: "0 0 12px",
+                fontWeight: 500,
+                textWrap: "balance",
+              }}
+            >
+              It reads the live page. The actual one.
+            </h3>
+            <p
+              style={{
+                color: "var(--text-2)",
+                fontSize: 14.5,
+                lineHeight: 1.55,
+                margin: 0,
+                maxWidth: "38ch",
+              }}
+            >
+              Activity history, endorsement freshness, banner-image composition,
+              posting cadence, mutual-connection signal — none of which you can
+              paste into a chat window without flattening it to text and losing
+              the signal.
             </p>
-          </div>
-          <div>
-            <p className="pull">
-              &ldquo;Your profile is your only durable career artifact. The job
-              you&apos;re applying to today didn&apos;t exist 5 years ago.{" "}
-              <em>The profile that gets you there has to.</em>&rdquo;
-            </p>
-            <div className="stat-grid">
-              <div className="stat-cell">
-                <div className="num">6 sec</div>
-                <div className="lbl">
-                  Typical time a recruiter spends scanning a profile before
-                  deciding to keep reading <span className="sup">¹</span>
-                </div>
-              </div>
-              <div className="stat-cell">
-                <div className="num">12</div>
-                <div className="lbl">
-                  Sections of a profile that get graded. Most people have never
-                  been told what they are.
-                </div>
-              </div>
-              <div className="stat-cell">
-                <div className="num">A–F</div>
-                <div className="lbl">
-                  Letter grades, the same scale used everywhere from school to
-                  credit. Unambiguous on purpose.
-                </div>
-              </div>
-              <div className="stat-cell">
-                <div className="num">30 sec</div>
-                <div className="lbl">
-                  From clicking the extension to a full PDF report. The opposite
-                  of a coaching session.
-                </div>
+            <div style={{ marginTop: 28 }}>
+              <div
+                className="font-mono"
+                style={{
+                  fontSize: 12,
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: 14,
+                }}
+              >
+                <DiagBox label="ChatGPT, paste" value="~18 fields" tone="bad" />
+                <DiagBox label="linkedingrade" value="147 fields" tone="good" />
               </div>
             </div>
-            <p className="stat-footnote">
-              ¹ Industry-cited average. Your recruiter may differ.
+          </div>
+
+          <div className="tri-col">
+            <div
+              className="font-mono"
+              style={{
+                fontSize: 11,
+                letterSpacing: "0.08em",
+                color: "var(--accent)",
+                textTransform: "uppercase",
+                marginBottom: 24,
+              }}
+            >
+              02 / RUBRIC
+            </div>
+            <h3
+              style={{
+                fontSize: 22,
+                letterSpacing: "-0.02em",
+                lineHeight: 1.2,
+                margin: "0 0 12px",
+                fontWeight: 500,
+                textWrap: "balance",
+              }}
+            >
+              One fixed rubric. Same input, same grade. Always.
+            </h3>
+            <p
+              style={{
+                color: "var(--text-2)",
+                fontSize: 14.5,
+                lineHeight: 1.55,
+                margin: 0,
+                maxWidth: "38ch",
+              }}
+            >
+              Six sections, 38 weighted signals, calibrated to the frameworks
+              senior recruiters and hiring managers use. Re-run the same profile
+              a year from now and you&apos;ll get a grade that&apos;s directly
+              comparable. Ask GPT twice and you&apos;ll get two different
+              answers.
             </p>
+            <div style={{ marginTop: 28 }}>
+              <div
+                className="font-mono"
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 8,
+                  fontSize: 11.5,
+                  color: "var(--text-2)",
+                }}
+              >
+                {[
+                  ["Headline", "14%"],
+                  ["About", "22%"],
+                  ["Experience", "28%"],
+                  ["Skills", "12%"],
+                  ["Activity", "16%"],
+                  ["Photo", "08%"],
+                ].map(([k, v]) => (
+                  <div
+                    key={k}
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr auto",
+                      gap: 8,
+                      padding: "6px 10px",
+                      border: "1px solid var(--border)",
+                      borderRadius: "var(--r-sm)",
+                    }}
+                  >
+                    <b
+                      style={{
+                        fontWeight: 500,
+                        color: "var(--text)",
+                        letterSpacing: "-0.01em",
+                      }}
+                    >
+                      {k}
+                    </b>
+                    <span>{v}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="tri-col">
+            <div
+              className="font-mono"
+              style={{
+                fontSize: 11,
+                letterSpacing: "0.08em",
+                color: "var(--accent)",
+                textTransform: "uppercase",
+                marginBottom: 24,
+              }}
+            >
+              03 / SPEED
+            </div>
+            <h3
+              style={{
+                fontSize: 22,
+                letterSpacing: "-0.02em",
+                lineHeight: 1.2,
+                margin: "0 0 12px",
+                fontWeight: 500,
+                textWrap: "balance",
+              }}
+            >
+              30 seconds, in-context. No tab, no prompt.
+            </h3>
+            <p
+              style={{
+                color: "var(--text-2)",
+                fontSize: 14.5,
+                lineHeight: 1.55,
+                margin: 0,
+                maxWidth: "38ch",
+              }}
+            >
+              Pin the extension, hit any profile, click once. A 6-page PDF lands
+              in your downloads before you&apos;d have finished typing the
+              system prompt. Built for the cadence of an actual job search or an
+              actual sourcing day.
+            </p>
+            <div
+              className="font-mono"
+              style={{
+                marginTop: 28,
+                display: "flex",
+                flexDirection: "column",
+                gap: 6,
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 42,
+                  letterSpacing: "-0.04em",
+                  color: "var(--text)",
+                  fontWeight: 500,
+                  lineHeight: 1,
+                }}
+              >
+                <span style={{ color: "var(--accent)" }}>31</span>s
+              </div>
+              <div
+                style={{
+                  fontSize: 11,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  color: "var(--text-3)",
+                }}
+              >
+                target median, click to PDF
+              </div>
+              <div
+                style={{
+                  marginTop: 16,
+                  borderTop: "1px solid var(--border)",
+                  paddingTop: 12,
+                  display: "flex",
+                  justifyContent: "space-between",
+                  fontSize: 11.5,
+                  color: "var(--text-2)",
+                  gap: 12,
+                }}
+              >
+                <span>vs. ChatGPT paste-and-pray</span>
+                <s style={{ color: "var(--text-3)", textDecoration: "line-through" }}>
+                  ~ 6 min
+                </s>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -245,215 +470,200 @@ function Problem() {
   );
 }
 
-function HowItWorks() {
-  return (
-    <section className="sec" id="how">
-      <div className="container">
-        <div className="sec-meta">
-          <span>02 — How it works</span>
-          <span>FROM CLICK TO GRADE IN 30 SECONDS</span>
-        </div>
-
-        <h2 style={{ marginBottom: 48 }}>
-          Open any profile. Click once. Get the verdict.
-        </h2>
-
-        <div className="steps">
-          <Step
-            num="STEP 01"
-            title="Open any LinkedIn profile"
-            body="Yours. A peer's. Your competitor's. A candidate you're sourcing. Anyone's. The extension lives in your browser, ready when you are."
-          />
-          <Step
-            num="STEP 02"
-            title="One click runs the rubric"
-            body="12 sections graded against a framework calibrated to senior-recruiter standards. Letter grade per section, weighted into one composite score."
-          />
-          <Step
-            num="STEP 03"
-            title="Read the report. Make the fixes."
-            body="A 6-page PDF with element ratings, before/after rewrites you can copy, and a prioritized action plan ranked by recruiter signal lift."
-          />
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function Step({
-  num,
-  title,
-  body,
+function DiagBox({
+  label,
+  value,
+  tone,
 }: {
-  num: string;
-  title: string;
-  body: string;
+  label: string;
+  value: string;
+  tone?: "good" | "bad";
 }) {
+  const valueColor =
+    tone === "good" ? "var(--success)" : tone === "bad" ? "var(--accent)" : "var(--text)";
   return (
-    <div className="step">
-      <div className="num">{num}</div>
-      <h3>{title}</h3>
-      <p>{body}</p>
+    <div
+      style={{
+        border: "1px solid var(--border)",
+        borderRadius: "var(--r-sm)",
+        padding: 12,
+      }}
+    >
+      <div
+        style={{
+          fontSize: 10.5,
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+          color: "var(--text-3)",
+          marginBottom: 8,
+        }}
+      >
+        {label}
+      </div>
+      <div
+        style={{
+          fontSize: 18,
+          letterSpacing: "-0.02em",
+          color: valueColor,
+          fontWeight: 500,
+        }}
+      >
+        {value}
+      </div>
     </div>
   );
 }
 
-function Rubric() {
-  const items: { k: string; v: string; d: string }[] = [
+function BuiltFor() {
+  const rows: {
+    idx: string;
+    persona: string;
+    who: string;
+    title: string;
+    body: string;
+    stats: [string, string][];
+  }[] = [
     {
-      k: "01 · HEADLINE",
-      v: "Promise & proof",
-      d: "Does it state your real title, name a credible domain, and survive mobile truncation at 70 characters?",
+      idx: "I.",
+      persona: "SEEKER",
+      who: "Mid-to-senior · $100k+ roles",
+      title: "Reverse-engineer the profiles you compete with.",
+      body:
+        "Audit your own profile first — fix it. Then run the same audit on three people who got the job you wanted. The gap between their grade and yours is your roadmap. No coach required. No 90-minute call.",
+      stats: [
+        ["Target fixes / report", "11 – 14"],
+        ["Typical grade jump, 30d", "C+ → B+"],
+        ["Cost vs. coach", "−$300/hr"],
+      ],
     },
     {
-      k: "02 · ABOUT",
-      v: "Hook, range, CTA",
-      d: "Three jobs in three paragraphs. Most profiles fail one. Many fail all three.",
+      idx: "II.",
+      persona: "COACH",
+      who: "Career coach · solo & boutique",
+      title: "White-label deliverables in minutes, not hours.",
+      body:
+        "Generate a branded PDF for any client in 30 seconds. Your logo, your colors, your prose where it counts. Charge for the diagnosis and spend the session on the work that actually requires you — story, positioning, judgement calls.",
+      stats: [
+        ["Time per client report", "2 min"],
+        ["White-label PDF", "included"],
+        ["Bulk pricing", "50/mo"],
+      ],
     },
     {
-      k: "03 · FEATURED",
-      v: "Proof on the shelf",
-      d: "Is your best work visible without scrolling? Or is your shelf empty?",
-    },
-    {
-      k: "04 · EXPERIENCE",
-      v: "Outcomes > titles",
-      d: "Years described in lines, not lines described in years. The most-skimmed section gets the most-skipped writing.",
-    },
-    {
-      k: "05 · SKILLS",
-      v: "Top-3 alignment",
-      d: "The top three skills are what the algorithm and the recruiter both see first. Most people pick wrong.",
-    },
-    {
-      k: "06 · PHOTO",
-      v: "Framing & recency",
-      d: "Not whether you look good — whether you look like the role you're targeting, recently enough to be current.",
-    },
-    {
-      k: "07 · BANNER",
-      v: "Signal density",
-      d: "Most banners are wallpaper. The best are billboards. Yours is probably the first.",
-    },
-    {
-      k: "08 · ACTIVITY",
-      v: "Cadence & depth",
-      d: "Recruiters check your recent activity. They will see exactly what you've left them.",
-    },
-    {
-      k: "09 · RECOMMENDATIONS",
-      v: "Volume & recency",
-      d: "Tie-breaker for senior roles. Three from the last 18 months beats fifteen from a decade ago.",
-    },
-    {
-      k: "10 · CERTIFICATIONS",
-      v: "Relevance & ordering",
-      d: "The wrong cert dilutes credibility. The right cert in the wrong order does the same.",
-    },
-    {
-      k: "11 · KEYWORDS",
-      v: "15 must-haves",
-      d: "Per role family. What the algorithm filters on. What you almost certainly don't have all of.",
-    },
-    {
-      k: "12 · BUZZWORDS",
-      v: "AI-flavor density",
-      d: "“Results-driven leader passionate about scalable solutions.” Recruiters can taste ChatGPT-default in three words.",
+      idx: "III.",
+      persona: "SOURCER",
+      who: "Recruiter · BD · founder · sales",
+      title: "Pre-call signal quality, at the rate of your inbox.",
+      body:
+        "Audit any candidate or prospect from their profile page. Use the recruiter heat map and grade as a sanity check before you put a name on a shortlist or open with a cold pitch. Audit history is portable to your ATS or CRM.",
+      stats: [
+        ["Audit limit / mo", "500"],
+        ["CSV export", "included"],
+        ["API access", "Team plan"],
+      ],
     },
   ];
 
   return (
-    <section className="sec" id="rubric">
-      <div className="container">
-        <div className="sec-meta">
-          <span>03 — The rubric</span>
-          <span>WHAT GETS GRADED, AND WHY</span>
+    <section className="s" id="audiences">
+      <div className="container-x">
+        <div className="section-head">
+          <div className="section-num">§ 03 — AUDIENCE</div>
+          <h2>
+            Built for people who&apos;d rather be told{" "}
+            <em>specifically</em>.
+          </h2>
+          <p className="deck">
+            Three groups we built the audit for. The use-cases share a spine:
+            time-pressed professionals who treat their LinkedIn presence like a
+            working asset, not a vanity board.
+          </p>
         </div>
 
-        <h2>Twelve sections. Five grade tiers. One opinion, defended.</h2>
-        <p className="dek">
-          Most &ldquo;AI profile tools&rdquo; are a wrapper around a generic LLM
-          prompt. linkedingrade grades against{" "}
-          <b>The Profile Rubric&trade;</b> — a published framework calibrated to
-          the standards senior recruiters and hiring managers apply when they
-          scan a profile. Each section has explicit criteria, examples, and
-          weight.
-        </p>
-
-        <div className="rubric-grid">
-          {items.map((item) => (
-            <div className="rubric-cell" key={item.k}>
-              <div className="k">{item.k}</div>
-              <div className="v">{item.v}</div>
-              <div className="d">{item.d}</div>
-            </div>
+        <div>
+          {rows.map((r) => (
+            <article key={r.persona} className="aud-row">
+              <div
+                className="font-mono"
+                style={{
+                  fontSize: 11,
+                  letterSpacing: "0.1em",
+                  color: "var(--text-3)",
+                  textTransform: "uppercase",
+                  paddingTop: 4,
+                }}
+              >
+                <b style={{ color: "var(--accent)", fontWeight: 500 }}>{r.idx}</b>{" "}
+                {r.persona}
+              </div>
+              <div>
+                <div
+                  className="font-mono"
+                  style={{
+                    fontSize: 13.5,
+                    color: "var(--text-3)",
+                    letterSpacing: "0.04em",
+                    textTransform: "uppercase",
+                    marginBottom: 14,
+                  }}
+                >
+                  {r.who}
+                </div>
+                <h3
+                  style={{
+                    margin: "0 0 8px",
+                    fontSize: 26,
+                    letterSpacing: "-0.02em",
+                    lineHeight: 1.15,
+                    fontWeight: 500,
+                  }}
+                >
+                  {r.title}
+                </h3>
+              </div>
+              <p
+                style={{
+                  margin: 0,
+                  color: "var(--text-2)",
+                  fontSize: 15,
+                  lineHeight: 1.55,
+                  maxWidth: "44ch",
+                }}
+              >
+                {r.body}
+              </p>
+              <div
+                style={{ display: "flex", flexDirection: "column", gap: 8 }}
+              >
+                {r.stats.map(([k, v]) => (
+                  <div
+                    key={k}
+                    className="font-mono"
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns: "1fr auto",
+                      gap: 10,
+                      fontSize: 11.5,
+                      color: "var(--text-2)",
+                      borderTop: "1px solid var(--border)",
+                      paddingTop: 8,
+                    }}
+                  >
+                    <span>{k}</span>
+                    <b
+                      style={{
+                        color: "var(--text)",
+                        fontWeight: 500,
+                        textAlign: "right",
+                      }}
+                    >
+                      {v}
+                    </b>
+                  </div>
+                ))}
+              </div>
+            </article>
           ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function WhoItsFor() {
-  return (
-    <section className="sec" id="who">
-      <div className="container">
-        <div className="sec-meta">
-          <span>04 — Built for</span>
-          <span>WHO USES THIS, AND WHY THEY KEEP USING IT</span>
-        </div>
-
-        <h2 style={{ marginBottom: 48 }}>
-          Built first for the job seeker who refuses to guess.
-        </h2>
-
-        <div className="who">
-          <div className="who-main">
-            <span className="badge">Primary user</span>
-            <h3>The senior professional in active transition</h3>
-            <p>
-              You&apos;re mid-career or above, targeting $120k+ roles, and you
-              know your profile matters more than your resume — because every
-              interesting opportunity now starts on LinkedIn. You don&apos;t
-              want a &ldquo;career coach&rdquo; telling you you&apos;re amazing.
-              You want the honest read.
-            </p>
-            <ul className="who-list">
-              <li>Audit your own profile. Get the score. Make the rewrites.</li>
-              <li>
-                Audit five competitor profiles. Reverse-engineer what works in
-                your role.
-              </li>
-              <li>Re-audit weekly as you make changes. Track the score rise.</li>
-              <li>
-                Export the PDF. Share it with your trusted advisor for second
-                opinions.
-              </li>
-            </ul>
-          </div>
-
-          <div className="who-side">
-            <h4>Also useful for</h4>
-            <div className="other">
-              <div className="t">Career coaches &amp; resume writers</div>
-              <div className="d">
-                White-label the audit. Onboard a client in 5 minutes instead of
-                45.
-              </div>
-            </div>
-            <div className="other">
-              <div className="t">Recruiters &amp; sourcers</div>
-              <div className="d">
-                Screen profile signal quality at scale. See past the buzzwords.
-              </div>
-            </div>
-            <div className="other">
-              <div className="t">Sales &amp; partnerships</div>
-              <div className="d">
-                Audit prospects as a credibility-building cold outreach hook.
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </section>
@@ -461,202 +671,244 @@ function WhoItsFor() {
 }
 
 function Pricing() {
-  return (
-    <section className="sec" id="pricing">
-      <div className="container">
-        <div className="sec-meta">
-          <span>05 — Pricing</span>
-          <span>SIMPLE AT LAUNCH, FAIR FOREVER</span>
-        </div>
-
-        <h2>Pay for the audit, not the platform.</h2>
-        <p className="dek">
-          Free for your first audit. Pay-as-you-go credits if you audit
-          occasionally. Subscription if you audit constantly. No long-term
-          contracts, no enterprise sales call required.
-        </p>
-
-        <div className="price-grid">
-          <Plan name="Free" price="$0" period="forever">
-            <li>
-              <b>1 audit</b> on your own profile
-            </li>
-            <li>Watermarked PDF</li>
-            <li>The full rubric, the real grade</li>
-          </Plan>
-          <Plan name="Credits" price="$29" period="one-time">
-            <li>
-              <b>20 audits</b>, no expiry
-            </li>
-            <li>Clean PDF, no watermark</li>
-            <li>For one-time job-hunt sprints</li>
-          </Plan>
-          <Plan
-            name="Pro"
-            price="$19"
-            period="per month"
-            featured
-            popularLabel="Most popular"
-          >
-            <li>
-              <b>25 audits</b> / month
-            </li>
-            <li>Audit history, re-audit tracking</li>
-            <li>Best for active job hunts</li>
-          </Plan>
-          <Plan name="Business" price="$49" period="per month">
-            <li>
-              <b>100 audits</b> / month
-            </li>
-            <li>White-label PDF, your branding</li>
-            <li>For coaches &amp; recruiters</li>
-          </Plan>
-        </div>
-
-        <p className="price-note">
-          First 100 waitlist members lock in{" "}
-          <b>50% off Pro for life</b>.
-        </p>
-      </div>
-    </section>
-  );
-}
-
-function Plan({
-  name,
-  price,
-  period,
-  featured,
-  popularLabel,
-  children,
-}: {
-  name: string;
-  price: string;
-  period: string;
-  featured?: boolean;
-  popularLabel?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className={`plan${featured ? " feat" : ""}`}>
-      {popularLabel && <span className="pop">{popularLabel}</span>}
-      <div className="name">{name}</div>
-      <div className="price">{price}</div>
-      <div className="period">{period}</div>
-      <ul>{children}</ul>
-    </div>
-  );
-}
-
-function Faq() {
-  const items: { q: string; a: string }[] = [
-    {
-      q: "Can I just do this in ChatGPT?",
-      a: "You can. You'd take screenshots, paste them in, write a 600-word prompt, hope the model holds the rubric consistently, and get text back. We compressed twelve minutes of that into thirty seconds, and the output is a designed PDF you'd be proud to share — not a chat transcript.",
-    },
-    {
-      q: "Is this just a wrapper on Claude or GPT?",
-      a: "The intelligence layer uses frontier models, like every serious AI product today. The defensible thing is everything around it — The Profile Rubric, the calibration to recruiter standards, the format, and the workflow. Models are commodities; opinions aren't.",
-    },
-    {
-      q: "Will this get me banned from LinkedIn?",
-      a: "No. The extension reads only the profile you're actively viewing in your own browser session — like a screen reader, not a scraper. No bulk crawling, no data resale, no auto-messaging. Same posture as every legitimate Chrome extension in this space.",
-    },
-    {
-      q: "What about my privacy?",
-      a: "Profile data is processed in-memory for the duration of the audit, then discarded. We don't store the profiles we audit. We don't sell or share any data. Your audit history is yours, deletable any time.",
-    },
-    {
-      q: "How accurate is the grade?",
-      a: "The rubric is calibrated to the frameworks senior recruiters and hiring managers use when scanning profiles. The grade is a strong signal of how a real recruiter would read your profile — not a guarantee of outcome. We grade what's gradeable, name what isn't, and tell you when we're uncertain.",
-    },
-    {
-      q: "When does the extension launch?",
-      a: "Public beta opens in Q2 2026. Waitlist members get first access plus a permanent 50% discount on Pro. We'll ship when it's better than the alternatives, not when the calendar says we should.",
-    },
+  const free: Feature[] = [
+    { label: (<><b>1</b> audit · ever</>) },
+    { label: "6-page PDF · watermark" },
+    { label: "Grade + heat map" },
+    { label: "No before/after rewrites", excluded: true },
+    { label: "No history, no exports", excluded: true },
+  ];
+  const pro: Feature[] = [
+    { label: (<><b>Unlimited</b> audits</>) },
+    { label: "Full 6-page PDF, no watermark" },
+    { label: (<><b>Before/after</b> rewrites</>) },
+    { label: "Audit history · 12 months" },
+    { label: "CSV export" },
+  ];
+  const coach: Feature[] = [
+    { label: (<><b>50</b> audits / month</>) },
+    { label: (<><b>White-label</b> PDF · your brand</>) },
+    { label: "Client folders & share links" },
+    { label: "Bulk CSV import" },
+    { label: "Priority email support" },
+  ];
+  const team: Feature[] = [
+    { label: (<><b>500</b> audits / month</>) },
+    { label: (<><b>API</b> & ATS / CRM webhooks</>) },
+    { label: "Seats · 5 included" },
+    { label: "SSO · SOC 2 (in progress)" },
+    { label: "Slack & CSM support" },
   ];
 
   return (
-    <section className="sec" id="faq">
-      <div className="container">
-        <div className="sec-meta">
-          <span>06 — Honest questions</span>
-          <span>WHAT WE GET ASKED, ANSWERED STRAIGHT</span>
+    <section className="s" id="pricing">
+      <div className="container-x">
+        <div className="section-head">
+          <div className="section-num">§ 04 — PRICING</div>
+          <h2>
+            Four prices. <em>One product.</em> Cancel in two clicks.
+          </h2>
+          <p className="deck">
+            No trial, no card on file for the free audit. The paid plans differ
+            on volume and exports, not on the quality of the audit. Whichever
+            tier you&apos;re on, you get the same rubric and the same 6-page
+            report.
+          </p>
         </div>
 
-        <h2 style={{ marginBottom: 48 }}>
-          Things people ask before they install.
-        </h2>
-
-        <div className="faq">
-          {items.map((item) => (
-            <div className="faq-item" key={item.q}>
-              <h4>{item.q}</h4>
-              <p>{item.a}</p>
-            </div>
-          ))}
+        <div className="price-grid">
+          <PricingTier
+            tier="Tier 00 · Free"
+            name="Single audit"
+            price="$0"
+            per="/ one-time"
+            blurb="One audit on any profile, full PDF, watermarked. For the curious."
+            features={free}
+            ctaLabel="Install free"
+          />
+          <PricingTier
+            featured
+            tier="Tier 01 · Pro"
+            name="Pro"
+            price="$19"
+            per="/ month"
+            blurb="Unlimited audits for one person. The job-search and self-improvement plan."
+            features={pro}
+            ctaLabel="Start Pro"
+          />
+          <PricingTier
+            tier="Tier 02 · Coach"
+            name="Coach"
+            price="$49"
+            per="/ month"
+            blurb="For solo coaches and small career-services teams. White-label, batch-ready."
+            features={coach}
+            ctaLabel="Start Coach"
+          />
+          <PricingTier
+            tier="Tier 03 · Team"
+            name="Team"
+            price="$149"
+            per="/ month"
+            blurb="Sourcers, recruiters, BD. Volume, API, and audit-trail portability."
+            features={team}
+            ctaLabel="Talk to sales"
+          />
         </div>
       </div>
     </section>
   );
 }
 
-function FinalCta() {
+function FinalCTA() {
   return (
-    <section className="final">
-      <div className="container">
-        <div className="final-grid">
-          <div>
-            <h2>Find out what your profile is worth.</h2>
-            <p>
-              Free first audit. No card. Watermarked PDF you can read in five
-              minutes and act on in thirty. The honest grade — yours when we
-              launch.
-            </p>
+    <section className="cta-final" id="cta">
+      <div className="container-x cta-final-grid">
+        <div>
+          <div className="meta-line">
+            <span>§ 05 — ACTION</span>
+            <span>30 SECONDS · CHROME / EDGE · FREE</span>
           </div>
-          <WaitlistForm id="cta-waitlist" buttonLabel="Reserve my spot" />
+          <h2>
+            Find out what your profile is <em>actually</em> worth.
+          </h2>
+          <p>
+            Free for your first audit. No card. No tab-switching. The PDF lands
+            in your downloads before your coffee.
+          </p>
         </div>
+        <WaitlistForm
+          buttonLabel="Install & audit →"
+          fineprint={["Chrome & Edge", "No card required", "2-click uninstall"]}
+        />
       </div>
     </section>
   );
 }
 
-function SiteFooter() {
+function Footer() {
   return (
-    <footer className="site">
-      <div className="container">
-        <div className="foot-top">
+    <footer style={{ padding: "64px 0 56px" }}>
+      <div className="container-x">
+        <div className="foot-grid">
           <div>
-            <Brand />
-            <p className="foot-mission">
-              The honest grade on your LinkedIn profile. Built because telling
-              people they&apos;re &ldquo;doing great&rdquo; wasn&apos;t helping
-              anyone.
+            <Link
+              href="/"
+              aria-label="LinkedInGrade home"
+              style={{ display: "inline-flex" }}
+            >
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 9,
+                  fontSize: 17,
+                  fontWeight: 600,
+                  letterSpacing: "-0.025em",
+                }}
+              >
+                <Logo size={22} />
+                <Wordmark />
+              </span>
+            </Link>
+            <p
+              style={{
+                color: "var(--text-2)",
+                fontSize: 13.5,
+                maxWidth: "34ch",
+                margin: "8px 0 0",
+                lineHeight: 1.5,
+              }}
+            >
+              The honest LinkedIn audit. 30-second Chrome extension, 6-page
+              report, real letter grade. Independent and not affiliated with
+              LinkedIn Corp.
             </p>
           </div>
-          <div className="foot-links">
-            <div className="foot-col">
-              <h5>Product</h5>
-              <a href="#how">How it works</a>
-              <a href="#rubric">The rubric</a>
-              <a href="#pricing">Pricing</a>
-              <a href="#faq">FAQ</a>
-            </div>
-            <div className="foot-col">
-              <h5>Company</h5>
-              <span className="foot-soon">About</span>
-              <span className="foot-soon">Editorial standards</span>
-              <span className="foot-soon">Privacy</span>
-              <span className="foot-soon">Contact</span>
-            </div>
-          </div>
+          <FooterCol
+            title="Product"
+            links={[
+              ["Sample audit", "#sample"],
+              ["How it works", "#how"],
+              ["Pricing", "#pricing"],
+              ["Changelog", "#"],
+            ]}
+          />
+          <FooterCol
+            title="Use cases"
+            links={[
+              ["For job seekers", "#audiences"],
+              ["For coaches", "#audiences"],
+              ["For recruiters", "#audiences"],
+              ["For sales", "#audiences"],
+            ]}
+          />
+          <FooterCol
+            title="Company"
+            links={[
+              ["Method", "#"],
+              ["Privacy", "#"],
+              ["Terms", "#"],
+              ["Contact", "mailto:hi@linkedingrade.com"],
+            ]}
+          />
         </div>
         <div className="foot-meta">
           <span>© 2026 LINKEDINGRADE</span>
-          <span>SET IN FRAUNCES, GEIST &amp; GEIST MONO</span>
+          <span>SET IN GEIST &amp; GEIST MONO</span>
           <span>VOL. 01 · NO. 01 · LAUNCH</span>
         </div>
       </div>
     </footer>
+  );
+}
+
+function FooterCol({
+  title,
+  links,
+}: {
+  title: string;
+  links: [string, string][];
+}) {
+  return (
+    <div>
+      <h5
+        className="font-mono"
+        style={{
+          margin: "0 0 14px",
+          fontSize: 10.5,
+          letterSpacing: "0.1em",
+          textTransform: "uppercase",
+          color: "var(--text-3)",
+          fontWeight: 500,
+        }}
+      >
+        {title}
+      </h5>
+      <ul
+        style={{
+          margin: 0,
+          padding: 0,
+          listStyle: "none",
+          display: "flex",
+          flexDirection: "column",
+          gap: 8,
+        }}
+      >
+        {links.map(([label, href]) => (
+          <li key={label}>
+            <Link
+              href={href}
+              style={{
+                color: "var(--text-2)",
+                fontSize: 14,
+              }}
+            >
+              {label}
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
