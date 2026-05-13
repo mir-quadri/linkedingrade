@@ -8,9 +8,13 @@ export default function ThemeToggle() {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    const saved = localStorage.getItem(KEY);
-    if (saved === "light" || saved === "dark") {
-      document.documentElement.dataset.theme = saved;
+    try {
+      const saved = localStorage.getItem(KEY);
+      if (saved === "light" || saved === "dark") {
+        document.documentElement.dataset.theme = saved;
+      }
+    } catch {
+      // storage blocked (privacy mode / iframe sandbox) — fall back to system pref
     }
     setMounted(true);
   }, []);

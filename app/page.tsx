@@ -203,8 +203,8 @@ function SampleAudit() {
               <Link href="#cta" className="btn btn-primary">
                 Run yours
               </Link>
-              <Link href="#sample-pdf" className="btn btn-ghost">
-                View full PDF →
+              <Link href="#pricing" className="btn btn-ghost">
+                See pricing →
               </Link>
             </div>
           </div>
