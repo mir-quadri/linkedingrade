@@ -1058,6 +1058,14 @@ footer.site {
   color: var(--text);
 }
 
+.foot-col .foot-soon {
+  display: block;
+  font-size: 13px;
+  color: var(--text-3);
+  padding: 4px 0;
+  cursor: default;
+}
+
 .foot-meta {
   display: flex;
   justify-content: space-between;

@@ -644,10 +644,10 @@ function SiteFooter() {
             </div>
             <div className="foot-col">
               <h5>Company</h5>
-              <a href="#">About</a>
-              <a href="#">Editorial standards</a>
-              <a href="#">Privacy</a>
-              <a href="#">Contact</a>
+              <span className="foot-soon">About</span>
+              <span className="foot-soon">Editorial standards</span>
+              <span className="foot-soon">Privacy</span>
+              <span className="foot-soon">Contact</span>
             </div>
           </div>
         </div>
