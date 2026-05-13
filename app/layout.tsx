@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist } from "next/font/google";
+import { Geist, Geist_Mono, Fraunces } from "next/font/google";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -7,9 +7,23 @@ const geistSans = Geist({
   subsets: ["latin"],
 });
 
-const title = "linkedingrade — AI LinkedIn profile audits in 30 seconds";
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+  weight: ["400", "500"],
+});
+
+const fraunces = Fraunces({
+  variable: "--font-fraunces",
+  subsets: ["latin"],
+  weight: "variable",
+  style: ["normal", "italic"],
+  axes: ["opsz"],
+});
+
+const title = "linkedingrade — the honest grade on your LinkedIn profile";
 const description =
-  "Chrome extension that grades any LinkedIn profile and shows you exactly what to fix. 6-page PDF report. Free to start.";
+  "A 30-second audit by the rubric calibrated to senior-recruiter standards. Letter grade, 12 sections rated, before/after rewrites. The profile, graded.";
 
 export const metadata: Metadata = {
   title,
@@ -35,7 +49,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} antialiased bg-neutral-50 text-neutral-900 dark:bg-neutral-950 dark:text-neutral-50`}
+        className={`${geistSans.variable} ${geistMono.variable} ${fraunces.variable} antialiased`}
       >
         {children}
       </body>
