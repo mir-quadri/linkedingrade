@@ -1,2 +1,4 @@
 # linkedingrade
-Chrome extension that audits LinkedIn profiles in 30 seconds
+
+Marketing site for linkedingrade.com — a Chrome extension that audits any LinkedIn profile in 30 seconds.
+Built with Next.js 15, TypeScript, and Tailwind CSS.
