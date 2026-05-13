@@ -1,0 +1,646 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LinkedInGrade — identity (final)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#F4F2EC;
+  --surface:#FFFFFF;
+  --surface-sub:#EAE7DD;
+  --text:#0B1426;
+  --text-2:#3F4A5F;
+  --text-3:#8A8F9A;
+  --border:rgba(11,20,38,.10);
+  --border-2:rgba(11,20,38,.20);
+  --navy:#0F2138;
+  --accent:#C8102E;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:"Geist",system-ui,sans-serif;-webkit-font-smoothing:antialiased;letter-spacing:-0.005em}
+.container{max-width:1240px;margin:0 auto;padding:0 24px}
+.mono{font-family:"Geist Mono",monospace}
+.label{font-family:"Geist Mono",monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-3)}
+a{color:inherit}
+
+/* nav */
+.nav{position:sticky;top:0;background:color-mix(in oklab,var(--bg) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--border);z-index:40}
+.nav-row{display:flex;justify-content:space-between;align-items:center;height:60px;font-family:"Geist Mono",monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3);gap:16px;flex-wrap:wrap}
+.nav-row a{color:var(--text-3);padding:6px 10px}
+.nav-row a:hover{color:var(--text)}
+.nav-row .home{display:inline-flex;align-items:center;gap:9px;color:var(--text);font-family:"Geist";font-size:15px;font-weight:700;letter-spacing:-0.025em;text-transform:none}
+
+/* masthead */
+.masthead{padding:64px 0 32px;border-bottom:1px solid var(--text)}
+.masthead .top{display:flex;justify-content:space-between;border-top:1px solid var(--text);padding-top:14px;margin-bottom:32px;font-family:"Geist Mono",monospace;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3);flex-wrap:wrap;gap:8px}
+.masthead .top b{color:var(--text);font-weight:500}
+.masthead h1{margin:0;font-size:clamp(48px,7vw,104px);line-height:.92;letter-spacing:-0.04em;font-weight:600;text-wrap:balance}
+.masthead h1 em{font-style:normal;color:var(--accent)}
+.masthead .deck{margin-top:20px;font-size:17px;line-height:1.55;max-width:64ch;color:var(--text-2)}
+.masthead .approval{margin-top:32px;display:inline-flex;align-items:center;gap:10px;font-family:"Geist Mono",monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);border:1px solid var(--accent);padding:8px 12px;border-radius:4px}
+.masthead .approval i{width:8px;height:8px;background:var(--accent);display:inline-block}
+
+/* sections */
+section{padding:80px 0;border-bottom:1px solid var(--border)}
+.s-head{display:grid;grid-template-columns:1fr;gap:18px;margin-bottom:40px}
+@media (min-width:900px){.s-head{grid-template-columns:120px 1fr 1fr;gap:32px}}
+.s-num{font-family:"Geist Mono",monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-3);padding-top:8px;border-top:1px solid var(--text);width:96px;height:fit-content}
+.s-head h2{margin:0;font-size:clamp(28px,3.6vw,44px);line-height:1.05;letter-spacing:-0.025em;font-weight:600;text-wrap:balance}
+.s-head h2 em{font-style:normal;color:var(--accent)}
+.s-head p{margin:0;color:var(--text-2);font-size:15.5px;line-height:1.55;max-width:54ch}
+
+/* HERO LOCKUP STAGE */
+.hero-stage{background:var(--navy);padding:104px 32px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:36px;min-height:480px}
+@media (max-width:600px){.hero-stage{padding:64px 20px}}
+.lockup{display:inline-flex;align-items:center;gap:24px}
+.lockup .word{font-family:"Geist",sans-serif;font-weight:700;letter-spacing:-0.035em;color:#fff;line-height:1}
+.hero-stage .lockup .word{font-size:clamp(40px,6.5vw,84px)}
+.hero-stage .label-line{font-family:"Geist Mono",monospace;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.45)}
+.alt-stage{background:var(--bg);padding:96px 32px;display:flex;flex-direction:column;align-items:center;gap:32px;min-height:420px;justify-content:center;border-top:1px solid var(--border)}
+@media (max-width:600px){.alt-stage{padding:64px 20px}}
+.alt-stage .word{color:var(--navy)}
+.alt-stage .label-line{font-family:"Geist Mono",monospace;font-size:11px;letter-spacing:.2em;text-transform:uppercase;color:var(--text-3)}
+
+/* mark + spec */
+.mark-grid{display:grid;grid-template-columns:1fr;gap:24px}
+@media (min-width:900px){.mark-grid{grid-template-columns:1.1fr .9fr;gap:32px;align-items:stretch}}
+.mark-anatomy{background:var(--surface);border:1px solid var(--border-2);padding:48px;display:flex;align-items:center;justify-content:center;min-height:460px;position:relative}
+.mark-anatomy svg.grid{position:absolute;inset:48px;pointer-events:none;opacity:.16}
+.mark-spec{background:var(--surface);border:1px solid var(--border-2);padding:32px}
+.mark-spec h3{margin:0 0 18px;font-size:22px;letter-spacing:-0.02em;font-weight:600}
+.mark-spec .row{display:grid;grid-template-columns:140px 1fr;gap:16px;padding:12px 0;border-top:1px solid var(--border);font-size:14px;align-items:start}
+.mark-spec .row:first-of-type{border-top:none}
+.mark-spec .row .k{font-family:"Geist Mono",monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3);padding-top:2px}
+.mark-spec .row .v{color:var(--text);line-height:1.55}
+.mark-spec .row .v b{color:var(--text);font-weight:600}
+.mark-spec .row .v code{font-family:"Geist Mono",monospace;font-size:13px;background:var(--surface-sub);padding:2px 6px;border-radius:3px}
+
+/* sizes */
+.sizes{margin-top:24px;background:var(--surface);border:1px solid var(--border-2);padding:48px 32px;display:flex;align-items:flex-end;gap:48px;flex-wrap:wrap;justify-content:center}
+.sizes .b{display:flex;flex-direction:column;align-items:center;gap:10px}
+.sizes .b .lbl{font-family:"Geist Mono",monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3)}
+
+/* variants */
+.variants{margin-top:24px;display:grid;grid-template-columns:1fr;gap:0;border:1px solid var(--border-2)}
+@media (min-width:700px){.variants{grid-template-columns:repeat(4,1fr)}}
+.variant{padding:48px 24px;display:flex;flex-direction:column;align-items:center;gap:14px;border-top:1px solid var(--border)}
+@media (min-width:700px){.variant{border-top:none;border-left:1px solid var(--border)}.variant:first-child{border-left:none}}
+.variant .nm{font-family:"Geist Mono",monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3);margin-top:auto;text-align:center;max-width:24ch}
+.variant.on-navy{background:var(--navy)}
+.variant.on-navy .nm{color:rgba(255,255,255,.5)}
+.variant.on-white{background:#fff}
+.variant.on-red{background:var(--accent)}
+.variant.on-red .nm{color:rgba(255,255,255,.7)}
+.variant.on-black{background:#0B0B09}
+.variant.on-black .nm{color:rgba(255,255,255,.5)}
+
+/* wordmark stage */
+.wordmark-stage{background:var(--surface);border:1px solid var(--border-2);padding:80px 40px;display:flex;flex-direction:column;align-items:center;gap:24px;text-align:center}
+.wordmark-stage .word-big{font-family:"Geist",sans-serif;font-size:clamp(48px,9vw,128px);font-weight:700;letter-spacing:-0.04em;color:var(--navy);line-height:1}
+.wordmark-stage .tick{display:inline-block;width:8px;height:8px;background:var(--accent);vertical-align:baseline;margin-left:2px}
+.kerning-callouts{margin-top:18px;font-family:"Geist Mono",monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3);display:flex;gap:24px;flex-wrap:wrap;justify-content:center}
+.kerning-callouts b{color:var(--text);font-weight:500}
+
+/* lockups */
+.lockups-grid{display:grid;grid-template-columns:1fr;gap:24px}
+@media (min-width:900px){.lockups-grid{grid-template-columns:repeat(3,1fr)}}
+.lockup-card{background:var(--surface);border:1px solid var(--border-2);min-height:280px;display:flex;flex-direction:column}
+.lockup-card .frame{flex:1;display:flex;align-items:center;justify-content:center;padding:40px 24px}
+.lockup-card .ft{padding:14px 18px;border-top:1px solid var(--border);font-family:"Geist Mono",monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3);display:flex;justify-content:space-between}
+.lockup-card .ft b{color:var(--text);font-weight:500}
+.lockup-card.dark{background:var(--navy)}
+.lockup-card.dark .ft{color:rgba(255,255,255,.5);border-top-color:rgba(255,255,255,.15)}
+.lockup-card.dark .ft b{color:#fff}
+.lockup-h .word{color:var(--navy);font-size:36px;font-weight:700;letter-spacing:-0.035em}
+.lockup-h.dark .word{color:#fff}
+.lockup-v{display:flex;flex-direction:column;align-items:center;gap:14px}
+.lockup-v .word{color:var(--navy);font-family:Geist;font-weight:700;letter-spacing:-0.035em;font-size:28px;line-height:1}
+.lockup-v.dark .word{color:#fff}
+
+/* apps */
+.apps-grid{display:grid;grid-template-columns:1fr;gap:24px}
+@media (min-width:700px){.apps-grid{grid-template-columns:1fr 1fr}}
+@media (min-width:1100px){.apps-grid{grid-template-columns:repeat(3,1fr)}}
+.app-card{background:var(--surface);border:1px solid var(--border-2);overflow:hidden}
+.app-card .stage{padding:32px;display:flex;align-items:center;justify-content:center;min-height:240px;background:var(--surface-sub)}
+.app-card .ft{padding:14px 18px;border-top:1px solid var(--border);font-family:"Geist Mono",monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3);display:flex;justify-content:space-between}
+.app-card .ft b{color:var(--text);font-weight:500}
+
+.tabmock{width:100%;max-width:340px;background:#dcdbd5;border-radius:8px 8px 0 0;padding:8px;display:flex;align-items:center;gap:6px}
+.tabmock .tab{flex:1;background:#fff;border-radius:6px 6px 0 0;padding:8px 10px;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-2);max-width:240px;white-space:nowrap;overflow:hidden}
+.tabmock .url{margin-top:6px;width:100%;background:#fff;border-radius:6px;padding:8px 12px;font-size:12px;color:var(--text-2);font-family:"Geist Mono",monospace}
+
+.phonemock{width:240px;background:#0B0B09;border-radius:34px;padding:18px;display:flex;flex-direction:column;align-items:center;gap:12px;border:1px solid rgba(255,255,255,.1)}
+.phonemock .icons{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;width:100%}
+.phonemock .ic{width:44px;height:44px;border-radius:10px;background:#1B1B19}
+.phonemock .nm{font-family:Geist,sans-serif;font-size:10px;color:#fff;opacity:.7;text-align:center;width:100%}
+
+.bizcard{width:280px;height:160px;background:var(--navy);padding:18px;display:flex;flex-direction:column;justify-content:space-between;color:#fff;position:relative;overflow:hidden}
+.bizcard .top{display:flex;align-items:center;gap:10px}
+.bizcard .top .word{font-family:Geist;font-weight:700;letter-spacing:-0.03em;font-size:18px}
+.bizcard .bottom{font-family:"Geist Mono",monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.6);display:flex;justify-content:space-between;border-top:1px solid rgba(255,255,255,.18);padding-top:8px}
+.bizcard .name{font-family:Geist;font-size:14px;font-weight:500}
+.bizcard .name span{color:rgba(255,255,255,.6);font-weight:400;display:block;font-size:11px;margin-top:2px}
+.bizcard::after{content:"";position:absolute;bottom:0;right:0;width:32px;height:32px;background:var(--accent)}
+
+.signage{width:100%;max-width:360px;aspect-ratio:16/9;background:linear-gradient(0deg,#3a4660 0%,#0F2138 70%);position:relative;display:flex;align-items:center;justify-content:center;border:1px solid var(--border)}
+.signage .l{display:flex;align-items:center;gap:14px}
+.signage .l .word{color:#fff;font-family:Geist;font-weight:700;letter-spacing:-0.035em;font-size:28px}
+
+.tshirt{width:240px;height:240px;background:#0B0B09;border-radius:12px;display:flex;align-items:center;justify-content:center;position:relative}
+.tshirt::before{content:"BACK · EMBROIDERED";position:absolute;top:12px;left:50%;transform:translateX(-50%);font-family:"Geist Mono",monospace;font-size:9px;letter-spacing:.12em;color:rgba(255,255,255,.4)}
+
+.og-prev{width:100%;max-width:380px;aspect-ratio:1200/630;background:var(--navy);padding:18px 24px;display:flex;flex-direction:column;justify-content:space-between;border:1px solid var(--border);position:relative;overflow:hidden}
+.og-prev .h-rule-top{height:1px;background:var(--accent);position:absolute;top:14px;left:24px;right:24px}
+.og-prev .h-rule-bot{height:1px;background:rgba(255,255,255,.18);position:absolute;bottom:14px;left:24px;right:24px}
+.og-prev .top-meta{display:flex;justify-content:space-between;font-family:"Geist Mono",monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.4);margin-top:8px}
+.og-prev .top-meta b{color:#fff;font-weight:500}
+.og-prev .main{display:flex;align-items:center;justify-content:space-between;gap:14px}
+.og-prev .main .left{flex:1}
+.og-prev .main .left .h{font-family:Geist;font-size:20px;font-weight:600;letter-spacing:-0.025em;color:#fff;line-height:1.05}
+.og-prev .main .left .sub{font-family:"Geist Mono",monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-top:6px}
+.og-prev .main .grade-big{font-family:Geist;font-size:88px;font-weight:600;letter-spacing:-0.07em;color:#fff;line-height:.85;display:inline-flex;align-items:flex-start}
+.og-prev .main .grade-big sup{font-size:32px;color:var(--accent);margin-top:5px}
+.og-prev .bottom-meta{display:flex;justify-content:space-between;font-family:"Geist Mono",monospace;font-size:8px;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.4);margin-bottom:8px}
+.og-prev .bottom-meta b{color:var(--accent);font-weight:500}
+
+/* rationale */
+.rec{margin-top:32px;background:var(--surface);border:1px solid var(--text);padding:32px;display:grid;grid-template-columns:1fr;gap:18px}
+@media (min-width:900px){.rec{grid-template-columns:200px 1fr;gap:32px}}
+.rec .hd{font-family:"Geist Mono",monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);border-bottom:1px solid var(--accent);padding-bottom:8px;align-self:start;height:fit-content}
+.rec h3{margin:0 0 12px;font-size:24px;letter-spacing:-0.02em;line-height:1.2;font-weight:600}
+.rec p{margin:0 0 10px;color:var(--text-2);font-size:15px;line-height:1.6;max-width:68ch}
+.rec p b{color:var(--text);font-weight:600}
+
+/* color/type spec */
+.spec-grid{background:var(--surface);border:1px solid var(--border-2);padding:32px;display:grid;grid-template-columns:1fr;gap:32px}
+.colorrow{display:flex;flex-wrap:wrap;gap:10px;margin-top:8px}
+.colorchip{display:inline-flex;align-items:center;gap:10px;border:1px solid var(--border-2);padding:6px 12px 6px 6px;border-radius:4px;font-family:"Geist Mono",monospace;font-size:12px;color:var(--text-2)}
+.colorchip i{width:24px;height:24px;border-radius:2px;flex:none;border:1px solid rgba(0,0,0,.08)}
+.colorchip b{color:var(--text);font-weight:500;letter-spacing:.04em}
+
+/* don'ts */
+.dont-grid{display:grid;grid-template-columns:1fr;gap:18px;margin-top:8px}
+@media (min-width:700px){.dont-grid{grid-template-columns:repeat(3,1fr)}}
+.dont{background:var(--surface);border:1px solid var(--border-2);padding:24px;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center;position:relative}
+.dont .lbl{font-family:"Geist Mono",monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);font-weight:500}
+.dont .desc{font-size:13px;color:var(--text-2);line-height:1.5}
+.dont .cross{position:absolute;top:14px;right:14px;color:var(--accent);font-family:Geist;font-weight:700;font-size:18px}
+
+footer{padding:48px 0 56px}
+.foot-meta{display:flex;justify-content:space-between;font-family:"Geist Mono",monospace;font-size:11px;letter-spacing:.06em;color:var(--text-3);text-transform:uppercase;border-top:1px solid var(--text);padding-top:14px;flex-wrap:wrap;gap:12px}
+</style>
+</head>
+<body>
+
+<!-- ─── THE STAMP MARK · reusable symbol ─── -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <!-- Primary mark: navy rounded square with a single red corner block -->
+    <symbol id="stamp" viewBox="0 0 100 100">
+      <rect width="100" height="100" rx="6" fill="#0F2138"/>
+      <path d="M 64 64 L 100 64 L 100 94 A 6 6 0 0 1 94 100 L 64 100 Z" fill="#C8102E"/>
+    </symbol>
+    <!-- Reversed: white seal with red corner (for on-dark contexts) -->
+    <symbol id="stamp-rev" viewBox="0 0 100 100">
+      <rect width="100" height="100" rx="6" fill="#FFFFFF"/>
+      <path d="M 64 64 L 100 64 L 100 94 A 6 6 0 0 1 94 100 L 64 100 Z" fill="#C8102E"/>
+    </symbol>
+    <!-- Mono / single-color (no red) -->
+    <symbol id="stamp-mono" viewBox="0 0 100 100">
+      <rect width="100" height="100" rx="6" fill="currentColor"/>
+      <path d="M 64 64 L 100 64 L 100 94 A 6 6 0 0 1 94 100 L 64 100 Z" fill="rgba(255,255,255,.25)"/>
+    </symbol>
+    <!-- Outline -->
+    <symbol id="stamp-outline" viewBox="0 0 100 100">
+      <rect x="2" y="2" width="96" height="96" rx="6" fill="none" stroke="currentColor" stroke-width="3"/>
+      <path d="M 64 64 L 96 64 L 96 94 A 4 4 0 0 1 92 98 L 64 98 Z" fill="currentColor"/>
+    </symbol>
+    <!-- Red stamp (red seal with navy corner) -->
+    <symbol id="stamp-red" viewBox="0 0 100 100">
+      <rect width="100" height="100" rx="6" fill="#C8102E"/>
+      <path d="M 64 64 L 100 64 L 100 94 A 6 6 0 0 1 94 100 L 64 100 Z" fill="#0F2138"/>
+    </symbol>
+    <pattern id="grid8" width="10" height="10" patternUnits="userSpaceOnUse">
+      <path d="M 10 0 L 0 0 0 10" fill="none" stroke="#C8102E" stroke-width="0.25"/>
+    </pattern>
+  </defs>
+</svg>
+
+<!-- nav -->
+<nav class="nav">
+  <div class="container nav-row">
+    <a href="LinkedInGrade Identity.html" class="home">
+      <svg width="22" height="22" viewBox="0 0 100 100"><use href="#stamp"/></svg>
+      <span>LinkedInGrade<span style="color:var(--accent)">.</span></span>
+    </a>
+    <div>
+      <a href="#mark">Mark</a>
+      <a href="#wordmark">Wordmark</a>
+      <a href="#lockups">Lockups</a>
+      <a href="#apps">In use</a>
+      <a href="#donts">Don'ts</a>
+      <a href="Landing Page.html" style="border:1px solid var(--border-2);border-radius:4px;color:var(--text)">Landing →</a>
+    </div>
+  </div>
+</nav>
+
+<!-- masthead -->
+<header class="masthead">
+  <div class="container">
+    <div class="top">
+      <span><b>IDENTITY · FINAL</b></span>
+      <span>13 MAY 2026</span>
+      <span>APPROVED · THE STAMP</span>
+    </div>
+    <h1>The Stamp.<br>One name, one <em>seal.</em></h1>
+    <p class="deck">A navy rounded square with a single red corner block. No letterform, no monogram, no risk of collision with anyone else's brand. The mark reads the same way the product works — something graded, stamped, approved. This is the final mark.</p>
+    <span class="approval"><i></i> APPROVED BY OWNER · 13 MAY 2026</span>
+  </div>
+</header>
+
+<!-- hero on navy -->
+<div class="hero-stage">
+  <div class="label-line">PRIMARY LOCKUP · ON NAVY</div>
+  <div class="lockup">
+    <svg width="108" height="108" viewBox="0 0 100 100"><use href="#stamp-rev"/></svg>
+    <span class="word">LinkedInGrade</span>
+  </div>
+  <div class="label-line">— THE HONEST LINKEDIN AUDIT —</div>
+</div>
+
+<!-- hero on paper -->
+<div class="alt-stage">
+  <div class="label-line">PRIMARY LOCKUP · ON PAPER</div>
+  <div class="lockup">
+    <svg width="108" height="108" viewBox="0 0 100 100"><use href="#stamp"/></svg>
+    <span class="word">LinkedInGrade</span>
+  </div>
+  <div class="label-line">— THE HONEST LINKEDIN AUDIT —</div>
+</div>
+
+<!-- §1 THE MARK -->
+<section id="mark">
+  <div class="container">
+    <div class="s-head">
+      <div class="s-num">§ 01 — THE MARK</div>
+      <h2>Two shapes. <em>Two colors.</em> One idea.</h2>
+      <p>A navy rounded square anchored by a red block in the bottom-right corner. The red block's outer corner inherits the parent's radius so the seal reads as a single object, not two stacked rectangles. The negative space in the upper-left does as much work as the fill. Mondrian-clean, Chase-tier construction.</p>
+    </div>
+
+    <div class="mark-grid">
+      <div class="mark-anatomy">
+        <svg width="320" height="320" viewBox="0 0 100 100"><use href="#stamp"/></svg>
+        <svg class="grid" viewBox="0 0 100 100" preserveAspectRatio="none">
+          <rect width="100" height="100" fill="url(#grid8)"/>
+          <line x1="0" y1="64" x2="100" y2="64" stroke="#C8102E" stroke-width=".5" opacity=".5"/>
+          <line x1="64" y1="0" x2="64" y2="100" stroke="#C8102E" stroke-width=".5" opacity=".5"/>
+        </svg>
+      </div>
+      <div class="mark-spec">
+        <h3>Construction</h3>
+        <div class="row"><span class="k">Grid</span><span class="v">100 × 100 unit canvas. The red block occupies the <b>bottom-right 36 × 36u</b> — 36% of the linear edge, the visual golden mean for corner stamps.</span></div>
+        <div class="row"><span class="k">Container</span><span class="v">Rounded square, <code>r = 6u</code>. Slightly more radius than v2's <code>r = 4</code> because the corner block needs the rounded edge to read as a unified seal, not a sticker.</span></div>
+        <div class="row"><span class="k">Red block</span><span class="v">Solid <code>#C8102E</code> rectangle from <code>(64, 64)</code> to <code>(100, 100)</code>. Outer bottom-right corner radius matches the parent at <code>r = 6u</code>. Top and left edges are flat.</span></div>
+        <div class="row"><span class="k">Why bottom-right</span><span class="v">Anchors weight to the lower-right, which is where the eye naturally rests when scanning Western-reading content. Same posture as a signature, a wax seal, a printer's mark on the colophon.</span></div>
+        <div class="row"><span class="k">Clear space</span><span class="v">Minimum <code>0.5×</code> the mark's height of clear space on all sides. Don't put it inside another container without breathing room.</span></div>
+        <div class="row"><span class="k">Min. size</span><span class="v"><code>14px</code> for screen, <code>8mm</code> for print. The red block stays visible because it's <b>36%</b> of the linear dimension — well above the 25% threshold for legibility at micro size.</span></div>
+      </div>
+    </div>
+
+    <!-- sizes -->
+    <div class="sizes">
+      <div class="b"><svg width="14" height="14" viewBox="0 0 100 100"><use href="#stamp"/></svg><span class="lbl">14 · MIN</span></div>
+      <div class="b"><svg width="16" height="16" viewBox="0 0 100 100"><use href="#stamp"/></svg><span class="lbl">16 · favicon</span></div>
+      <div class="b"><svg width="32" height="32" viewBox="0 0 100 100"><use href="#stamp"/></svg><span class="lbl">32 · ui</span></div>
+      <div class="b"><svg width="64" height="64" viewBox="0 0 100 100"><use href="#stamp"/></svg><span class="lbl">64 · header</span></div>
+      <div class="b"><svg width="128" height="128" viewBox="0 0 100 100"><use href="#stamp"/></svg><span class="lbl">128 · app icon</span></div>
+      <div class="b"><svg width="200" height="200" viewBox="0 0 100 100"><use href="#stamp"/></svg><span class="lbl">200 · marketing</span></div>
+    </div>
+
+    <!-- variants -->
+    <div class="variants">
+      <div class="variant on-white">
+        <svg width="80" height="80" viewBox="0 0 100 100"><use href="#stamp"/></svg>
+        <span class="nm">PRIMARY · ON LIGHT</span>
+      </div>
+      <div class="variant on-navy">
+        <svg width="80" height="80" viewBox="0 0 100 100"><use href="#stamp-rev"/></svg>
+        <span class="nm">REVERSED · ON NAVY</span>
+      </div>
+      <div class="variant on-red">
+        <svg width="80" height="80" viewBox="0 0 100 100"><use href="#stamp-red"/></svg>
+        <span class="nm">INVERTED · RED SEAL</span>
+      </div>
+      <div class="variant on-black">
+        <svg width="80" height="80" viewBox="0 0 100 100" style="color:#fff"><use href="#stamp-outline"/></svg>
+        <span class="nm">OUTLINE · 1-COLOR · FOIL</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- §2 WORDMARK -->
+<section id="wordmark">
+  <div class="container">
+    <div class="s-head">
+      <div class="s-num">§ 02 — WORDMARK</div>
+      <h2>The name, set in <em>Geist 700.</em></h2>
+      <p>The wordmark reads <b>LinkedInGrade</b> — three capitals (L, I, G), no separators. Set tight in Geist Bold at −3.5% tracking, in navy on light, white on dark. The capital <b>I</b> in the middle is the optical pivot. The terminal red square dot is the typographic echo of the seal's corner block.</p>
+    </div>
+
+    <div class="wordmark-stage">
+      <div class="word-big">LinkedInGrade<span class="tick"></span></div>
+      <div class="kerning-callouts">
+        <span>FONT · <b>GEIST</b></span>
+        <span>WEIGHT · <b>700</b></span>
+        <span>TRACKING · <b>−0.035em</b></span>
+        <span>CASE · <b>L · I · G CAPS</b></span>
+        <span>TERMINAL · <b>8×8 RED SQUARE</b></span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- §3 LOCKUPS -->
+<section id="lockups">
+  <div class="container">
+    <div class="s-head">
+      <div class="s-num">§ 03 — LOCKUPS</div>
+      <h2>Three lockups. <em>One system.</em></h2>
+      <p>Horizontal is the default — header, business cards, signage, footer. Stacked is for square real-estate. Mark-only for favicons and tiles. Wordmark-only for footers, press, and contexts where the seal would be redundant.</p>
+    </div>
+
+    <div class="lockups-grid">
+      <div class="lockup-card lockup-h dark">
+        <div class="frame">
+          <div class="lockup">
+            <svg width="64" height="64" viewBox="0 0 100 100"><use href="#stamp-rev"/></svg>
+            <span class="word">LinkedInGrade</span>
+          </div>
+        </div>
+        <div class="ft"><span>HORIZONTAL · ON NAVY</span><span><b>DEFAULT</b></span></div>
+      </div>
+      <div class="lockup-card lockup-h">
+        <div class="frame">
+          <div class="lockup">
+            <svg width="64" height="64" viewBox="0 0 100 100"><use href="#stamp"/></svg>
+            <span class="word">LinkedInGrade</span>
+          </div>
+        </div>
+        <div class="ft"><span>HORIZONTAL · ON PAPER</span><span><b>WEB / PRINT</b></span></div>
+      </div>
+      <div class="lockup-card">
+        <div class="frame">
+          <div class="lockup-v">
+            <svg width="80" height="80" viewBox="0 0 100 100"><use href="#stamp"/></svg>
+            <span class="word">LinkedInGrade</span>
+          </div>
+        </div>
+        <div class="ft"><span>STACKED · CENTERED</span><span><b>SOCIAL / AVATAR</b></span></div>
+      </div>
+      <div class="lockup-card dark">
+        <div class="frame">
+          <svg width="120" height="120" viewBox="0 0 100 100"><use href="#stamp-rev"/></svg>
+        </div>
+        <div class="ft"><span>MARK · ALONE</span><span><b>FAVICON / TILE</b></span></div>
+      </div>
+      <div class="lockup-card">
+        <div class="frame">
+          <span style="color:var(--navy);font-family:Geist;font-weight:700;letter-spacing:-0.035em;font-size:42px">LinkedInGrade<span style="color:var(--accent)">.</span></span>
+        </div>
+        <div class="ft"><span>WORDMARK · ALONE</span><span><b>FOOTER / RUN TEXT</b></span></div>
+      </div>
+      <div class="lockup-card dark">
+        <div class="frame">
+          <span style="color:#fff;font-family:Geist;font-weight:700;letter-spacing:-0.035em;font-size:38px">LinkedInGrade<span style="color:var(--accent)">.</span></span>
+        </div>
+        <div class="ft"><span>WORDMARK · REVERSED</span><span><b>DARK CONTEXTS</b></span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- §4 IN USE -->
+<section id="apps">
+  <div class="container">
+    <div class="s-head">
+      <div class="s-num">§ 04 — IN USE</div>
+      <h2>The same Stamp, <em>everywhere.</em></h2>
+      <p>Favicon, app icon, business card, signage, OG card, embroidered hoodie. One mark, six surfaces. No alternate "small-size" version, no "we removed the accent for the favicon" compromise. The 36% red block survives every context.</p>
+    </div>
+
+    <div class="apps-grid">
+      <div class="app-card">
+        <div class="stage">
+          <div style="width:100%;max-width:320px">
+            <div class="tabmock">
+              <div class="tab">
+                <svg width="14" height="14" viewBox="0 0 100 100"><use href="#stamp"/></svg>
+                LinkedInGrade — the honest…
+              </div>
+              <div style="flex:1"></div>
+            </div>
+            <div class="tabmock" style="border-radius:0 0 8px 8px;padding-top:0">
+              <div class="url">https://linkedingrade.com</div>
+            </div>
+          </div>
+        </div>
+        <div class="ft"><span>FAVICON · 16×16</span><span><b>CHROME / SAFARI</b></span></div>
+      </div>
+
+      <div class="app-card">
+        <div class="stage">
+          <div class="phonemock">
+            <div class="icons">
+              <div class="ic"></div><div class="ic"></div><div class="ic"></div>
+              <div class="ic" style="background:transparent;padding:0;overflow:hidden">
+                <svg width="44" height="44" viewBox="0 0 100 100" style="display:block"><use href="#stamp"/></svg>
+              </div>
+              <div class="ic"></div><div class="ic"></div><div class="ic"></div><div class="ic"></div>
+            </div>
+            <div class="nm">LinkedInGrade · 4th</div>
+          </div>
+        </div>
+        <div class="ft"><span>APP ICON · iOS / ANDROID</span><span><b>180 / 512</b></span></div>
+      </div>
+
+      <div class="app-card">
+        <div class="stage">
+          <div class="bizcard">
+            <div class="top">
+              <svg width="32" height="32" viewBox="0 0 100 100"><use href="#stamp-rev"/></svg>
+              <span class="word">LinkedInGrade</span>
+            </div>
+            <div>
+              <div class="name">Mir Quadri<span>Founder · LinkedInGrade Inc.</span></div>
+            </div>
+            <div class="bottom">
+              <span>MIR@LINKEDINGRADE.COM</span>
+              <span>NYC · 2026</span>
+            </div>
+          </div>
+        </div>
+        <div class="ft"><span>BUSINESS CARD · 88×55mm</span><span><b>SOFT-TOUCH NAVY</b></span></div>
+      </div>
+
+      <div class="app-card">
+        <div class="stage">
+          <div class="signage">
+            <div class="l">
+              <svg width="48" height="48" viewBox="0 0 100 100"><use href="#stamp-rev"/></svg>
+              <span class="word">LinkedInGrade</span>
+            </div>
+          </div>
+        </div>
+        <div class="ft"><span>SIGNAGE · ENVELOPED</span><span><b>EVENTS / OFFICE</b></span></div>
+      </div>
+
+      <div class="app-card">
+        <div class="stage">
+          <div class="og-prev">
+            <div class="h-rule-top"></div>
+            <div class="top-meta"><span><b>LINKEDINGRADE</b></span><span>VOL.01 · NO.12</span><span>THE PROFILE, GRADED</span></div>
+            <div class="main">
+              <div class="left">
+                <div class="h">Every LinkedIn profile<br>gets a grade<span style="color:var(--accent)">.</span></div>
+                <div class="sub">CHROME · 6-PAGE PDF · A/B/C/D/F</div>
+              </div>
+              <div class="grade-big">B<sup>−</sup></div>
+            </div>
+            <div class="bottom-meta"><span>LINKEDINGRADE.COM</span><span><b>73/100 · P64</b></span><span>FREE FIRST AUDIT</span></div>
+            <div class="h-rule-bot"></div>
+          </div>
+        </div>
+        <div class="ft"><span>OG CARD · 1200×630</span><span><b>SOCIAL DEFAULT</b></span></div>
+      </div>
+
+      <div class="app-card">
+        <div class="stage">
+          <div class="tshirt">
+            <svg width="56" height="56" viewBox="0 0 100 100"><use href="#stamp-rev"/></svg>
+          </div>
+        </div>
+        <div class="ft"><span>MERCH · EMBROIDERED</span><span><b>BACK · 2"</b></span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- §5 SPEC -->
+<section>
+  <div class="container">
+    <div class="s-head">
+      <div class="s-num">§ 05 — SPEC</div>
+      <h2>Two colors. <em>One font.</em></h2>
+      <p>The whole identity, hand-it-to-the-printer page. Navy, red, Geist. That's the system. Anything more is decoration.</p>
+    </div>
+
+    <div class="spec-grid">
+      <div>
+        <h3 class="label" style="margin:0 0 12px">COLOR</h3>
+        <div class="colorrow">
+          <span class="colorchip"><i style="background:#0F2138"></i><b>NAVY · #0F2138</b></span>
+          <span class="colorchip"><i style="background:#C8102E"></i><b>ACCENT · #C8102E</b></span>
+          <span class="colorchip"><i style="background:#FFFFFF"></i><b>WHITE · #FFFFFF</b></span>
+        </div>
+        <p style="margin:12px 0 0;font-size:13.5px;color:var(--text-2);max-width:64ch">Navy is the body. White is the surface and the type. Red is the corner block — and only the corner block. Never use red as a fill larger than 5% of the composition. Never use red on body text. Never use red on a button background.</p>
+      </div>
+      <div style="border-top:1px solid var(--border);padding-top:32px">
+        <h3 class="label" style="margin:0 0 12px">TYPE</h3>
+        <div class="colorrow">
+          <span class="colorchip"><b>WORDMARK · GEIST 700 · −0.035em</b></span>
+          <span class="colorchip"><b>SUPPORT · GEIST MONO 500 · UC · +0.08em</b></span>
+        </div>
+        <p style="margin:12px 0 0;font-size:13.5px;color:var(--text-2);max-width:64ch">Both faces ship via Google Fonts. The mark resolves to a single SVG under 300 bytes — no font dependency, no rasterization issues, no hinting headaches. Embeddable in email signatures.</p>
+      </div>
+      <div style="border-top:1px solid var(--border);padding-top:32px">
+        <h3 class="label" style="margin:0 0 12px">CLEAR SPACE & PROPORTIONS</h3>
+        <p style="margin:0;font-size:13.5px;color:var(--text-2);max-width:64ch">Mark height equals 1.2× the wordmark's cap height in horizontal lockup. The gap between mark and wordmark equals 0.6× cap height. Minimum clear space around any lockup equals 1× cap height on all four sides. Don't crowd it — the negative space is what makes the corner block read as a corner block and not a misprint.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- §6 DON'TS -->
+<section id="donts">
+  <div class="container">
+    <div class="s-head">
+      <div class="s-num">§ 06 — DON'TS</div>
+      <h2>Six ways to <em>break it.</em></h2>
+      <p>The brand survives if these six rules survive. Every one of them is something a well-meaning vendor, agency, or eager intern will try at some point. Print this section and tape it to the wall.</p>
+    </div>
+
+    <div class="dont-grid">
+      <div class="dont">
+        <span class="cross">×</span>
+        <svg width="80" height="80" viewBox="0 0 100 100"><rect width="100" height="100" rx="6" fill="#0F2138"/><path d="M 64 64 L 100 64 L 100 94 A 6 6 0 0 1 94 100 L 64 100 Z" fill="#C8102E"/><text x="50" y="50" font-family="Geist" font-size="40" font-weight="700" fill="#FFFFFF" text-anchor="middle" dominant-baseline="central">LG</text></svg>
+        <span class="lbl">DON'T ADD LETTERS</span>
+        <span class="desc">The mark is geometric. No initials, no monogram, no "G", no wordmark inside. Letters belong beside the mark, never inside it.</span>
+      </div>
+      <div class="dont">
+        <span class="cross">×</span>
+        <svg width="80" height="80" viewBox="0 0 100 100" style="filter:hue-rotate(180deg)"><use href="#stamp"/></svg>
+        <span class="lbl">DON'T RECOLOR</span>
+        <span class="desc">No teal, no purple, no LinkedIn blue. Navy + accent red + white. Three colors, full stop. Brand audits the world; the world doesn't audit the brand.</span>
+      </div>
+      <div class="dont">
+        <span class="cross">×</span>
+        <svg width="80" height="80" viewBox="0 0 100 100" style="transform:rotate(15deg)"><use href="#stamp"/></svg>
+        <span class="lbl">DON'T ROTATE</span>
+        <span class="desc">The corner block sits in the bottom-right. Always. Rotating the mark moves the block to the wrong corner and breaks the visual signature.</span>
+      </div>
+      <div class="dont">
+        <span class="cross">×</span>
+        <svg width="80" height="80" viewBox="0 0 100 100"><rect width="100" height="100" rx="50" fill="#0F2138"/><path d="M 64 64 L 100 64 L 100 64 L 64 100 Z" fill="#C8102E"/></svg>
+        <span class="lbl">DON'T ROUND IT</span>
+        <span class="desc">Radius stays at 6u — the seal is a square with softened corners, not a pill, not a circle. Circles signal "app," squares signal "stamp."</span>
+      </div>
+      <div class="dont">
+        <span class="cross">×</span>
+        <svg width="80" height="80" viewBox="0 0 100 100" style="filter:drop-shadow(0 4px 8px rgba(0,0,0,.4))"><use href="#stamp"/></svg>
+        <span class="lbl">DON'T ADD SHADOW</span>
+        <span class="desc">No drop shadow, no glow, no bevel, no gradient. The mark is two flat shapes. Depth is the SaaS-template move we built this brand to avoid.</span>
+      </div>
+      <div class="dont">
+        <span class="cross">×</span>
+        <svg width="80" height="80" viewBox="0 0 100 100"><rect width="100" height="100" rx="6" fill="#0F2138"/><rect x="10" y="10" width="20" height="20" fill="#C8102E"/></svg>
+        <span class="lbl">DON'T MOVE THE BLOCK</span>
+        <span class="desc">Bottom-right corner is the signature. Top-left is a different brand. Top-right is a different brand. The block lives at (64, 64) to (100, 100).</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- §7 RATIONALE -->
+<section>
+  <div class="container">
+    <div class="rec">
+      <div class="hd">— WHY THIS WINS</div>
+      <div>
+        <h3>The case for the Stamp.</h3>
+        <p><b>Zero collision risk.</b> No letters means no trademark, copyright, or monogram conflict with anyone. LG, GE, Google, Goldman — all share initial letters with us; none of them share a shape. Two rectangles arranged in a specific way is an extremely defensible mark.</p>
+        <p><b>It reads as the product.</b> The product stamps profiles with a grade. The mark looks like a stamp. The corner block reads as "approved" the way a postage cancellation or a quality seal does. The visual logic and the product logic are the same logic.</p>
+        <p><b>It scales further than a monogram.</b> A 14px favicon of LG loses its kerning, a 14px favicon of G loses its terminus character, a 14px favicon of the Stamp loses nothing — the corner block stays 36% of the linear dimension regardless of size. The mark is its own worst case.</p>
+        <p><b>It is a name, finished.</b> <b>LinkedInGrade</b>, set in Geist 700, anchored by the Stamp. Ready for the printer, the embroiderer, and the engineer.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <div class="foot-meta">
+      <span>© 2026 LINKEDINGRADE INC.</span>
+      <span>IDENTITY · FINAL · APPROVED 13 MAY 2026</span>
+      <span>NAVY #0F2138 · ACCENT #C8102E · GEIST 700</span>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

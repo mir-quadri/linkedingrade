@@ -1,0 +1,757 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>linkedingrade — brand & design system</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#FAFAF7; --surface:#FFFFFF; --surface-sub:#F2F2EC;
+  --text:#0E0E0C; --text-2:#4A4A45; --text-3:#8A8A82;
+  --border:rgba(14,14,12,.09); --border-2:rgba(14,14,12,.18);
+  --accent:#D62828; --warning:#B8730B; --danger:#A8190A; --success:#2D5A3F;
+  --r-sm:4px; --r-md:8px; --r-lg:14px;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#0B0B09; --surface:#141413; --surface-sub:#1B1B19;
+    --text:#F1F0EA; --text-2:#B5B4AB; --text-3:#76756D;
+    --border:rgba(241,240,234,.08); --border-2:rgba(241,240,234,.18);
+    --accent:#FF4D3B; --warning:#E8A547; --danger:#FF6359; --success:#6FBA8A;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:"Geist",system-ui,sans-serif;-webkit-font-smoothing:antialiased;letter-spacing:-0.005em}
+.container{max-width:1240px;margin:0 auto;padding:0 24px}
+.mono{font-family:"Geist Mono",monospace;font-feature-settings:"ss01"}
+.label{font-family:"Geist Mono",monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-3)}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;font-family:"Geist Mono",monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-3)}
+.eyebrow::before{content:"";display:block;width:18px;height:1px;background:var(--accent)}
+hr{border:none;border-top:1px solid var(--border)}
+a{color:inherit}
+
+/* nav */
+.nav{position:sticky;top:0;background:color-mix(in oklab,var(--bg) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--border);z-index:40}
+.nav-row{display:flex;justify-content:space-between;align-items:center;height:60px;font-family:"Geist Mono",monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3)}
+.nav-row a{color:var(--text-3);padding:6px 10px}
+.nav-row a:hover{color:var(--text)}
+.nav-row .home{color:var(--text);font-family:"Geist";font-size:16px;font-weight:600;letter-spacing:-0.02em;text-transform:none}
+.nav-row .home .d{color:var(--accent)}
+
+/* masthead */
+.masthead{padding:80px 0 56px;border-bottom:1px solid var(--text)}
+.masthead .top{display:flex;justify-content:space-between;border-top:1px solid var(--text);padding-top:14px;margin-bottom:32px;font-family:"Geist Mono",monospace;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3)}
+.masthead .top b{color:var(--text);font-weight:500}
+.masthead h1{margin:0;font-size:clamp(56px,9vw,128px);line-height:.92;letter-spacing:-0.04em;font-weight:500;text-wrap:balance}
+.masthead h1 em{font-style:normal;color:var(--accent)}
+.masthead .deck{margin-top:24px;font-size:18px;line-height:1.5;max-width:64ch;color:var(--text-2)}
+
+/* sections */
+section{padding:88px 0;border-bottom:1px solid var(--border)}
+.s-head{display:grid;grid-template-columns:1fr;gap:18px;margin-bottom:48px}
+@media (min-width:900px){.s-head{grid-template-columns:120px 1fr 1fr;gap:32px}}
+.s-num{font-family:"Geist Mono",monospace;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-3);padding-top:8px;border-top:1px solid var(--text);width:96px}
+.s-head h2{margin:0;font-size:clamp(34px,4.6vw,56px);line-height:1;letter-spacing:-0.03em;font-weight:500}
+.s-head h2 em{font-style:normal;color:var(--accent)}
+.s-head p{margin:0;color:var(--text-2);font-size:16px;line-height:1.55;max-width:54ch}
+
+/* card */
+.card{background:var(--surface);border:1px solid var(--border-2);border-radius:var(--r-lg)}
+.card .hd{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:var(--surface-sub);border-radius:var(--r-lg) var(--r-lg) 0 0}
+.card .hd .id{font-family:"Geist Mono",monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3)}
+.card .hd .id b{color:var(--text)}
+.card .hd .badge{font-family:"Geist Mono",monospace;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3);padding:4px 8px;border:1px solid var(--border-2);border-radius:var(--r-sm)}
+.card .bd{padding:32px 24px}
+
+/* logo grid */
+.logos{display:grid;grid-template-columns:1fr;gap:24px}
+@media (min-width:900px){.logos{grid-template-columns:repeat(3,1fr);gap:18px}}
+.logo-card{display:flex;flex-direction:column;gap:0;background:var(--surface);border:1px solid var(--border-2);border-radius:var(--r-lg);overflow:hidden}
+.logo-card .hd{padding:14px 18px;border-bottom:1px solid var(--border);background:var(--surface-sub);display:flex;justify-content:space-between;align-items:baseline;font-family:"Geist Mono",monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3)}
+.logo-card .hd b{color:var(--text)}
+.logo-card .name{font-family:"Geist";font-weight:500;font-size:20px;letter-spacing:-0.02em;text-transform:none;color:var(--text)}
+.logo-stage{padding:48px 24px;display:flex;align-items:center;justify-content:center;min-height:200px;border-bottom:1px solid var(--border)}
+.logo-stage.dark{background:#0B0B09;color:#F1F0EA}
+.logo-stage.dark .accent{color:#FF4D3B}
+.logo-meta{padding:18px 20px;display:flex;flex-direction:column;gap:10px}
+.logo-meta .pitch{font-size:14px;line-height:1.5;color:var(--text-2);text-wrap:pretty}
+.logo-meta .specs{display:grid;grid-template-columns:1fr 1fr;gap:8px;font-family:"Geist Mono",monospace;font-size:11px;color:var(--text-3);letter-spacing:.04em;text-transform:uppercase;border-top:1px solid var(--border);padding-top:10px}
+.logo-meta .specs b{color:var(--text);font-weight:500}
+.logo-row{display:grid;grid-template-columns:1fr 1fr 1fr;border-top:1px solid var(--border)}
+.logo-row .cell{padding:18px;display:flex;align-items:center;justify-content:center;border-left:1px solid var(--border);min-height:88px}
+.logo-row .cell:first-child{border-left:none}
+.logo-row .cell.dark{background:#0B0B09;color:#F1F0EA}
+.logo-row .cell.dark .accent{color:#FF4D3B}
+
+/* recommendation */
+.rec{margin-top:32px;background:var(--surface);border:1px solid var(--text);border-radius:var(--r-lg);padding:28px 28px 32px;display:grid;grid-template-columns:1fr;gap:18px}
+@media (min-width:900px){.rec{grid-template-columns:200px 1fr}}
+.rec .hd{font-family:"Geist Mono",monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);border-bottom:1px solid var(--accent);padding-bottom:8px;align-self:start}
+.rec h3{margin:0 0 12px;font-size:26px;letter-spacing:-0.02em;line-height:1.2;font-weight:500}
+.rec p{margin:0 0 10px;color:var(--text-2);font-size:15.5px;line-height:1.55;max-width:64ch}
+.rec p b{color:var(--text);font-weight:500}
+
+/* color tokens */
+.tokens{display:grid;grid-template-columns:1fr;gap:0;border:1px solid var(--border-2);border-radius:var(--r-lg);overflow:hidden}
+.tok-row{display:grid;grid-template-columns:160px 1fr 1fr;align-items:stretch;border-top:1px solid var(--border)}
+.tok-row:first-child{border-top:none}
+.tok-row.head{font-family:"Geist Mono",monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3);background:var(--surface-sub)}
+.tok-row .c{padding:14px 18px;display:flex;flex-direction:column;justify-content:center;gap:2px}
+.tok-row .swatch{display:flex;align-items:center;gap:14px}
+.tok-row .chip{width:32px;height:32px;border-radius:var(--r-sm);border:1px solid var(--border-2);flex:none}
+.tok-row .name{font-weight:500;font-size:14px}
+.tok-row .role{color:var(--text-3);font-size:12px;font-family:"Geist Mono",monospace;letter-spacing:.04em;text-transform:uppercase}
+.tok-row .hex{font-family:"Geist Mono",monospace;font-size:13px;color:var(--text-2)}
+@media (max-width:700px){.tok-row{grid-template-columns:1fr}}
+
+/* type specimens */
+.specimen{background:var(--surface);border:1px solid var(--border-2);border-radius:var(--r-lg);overflow:hidden;margin-bottom:18px}
+.specimen .hd{padding:14px 20px;display:flex;justify-content:space-between;border-bottom:1px solid var(--border);background:var(--surface-sub);font-family:"Geist Mono",monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3)}
+.specimen .hd b{color:var(--text)}
+.specimen .bd{padding:32px 28px}
+.spec-display{font-size:96px;line-height:.95;letter-spacing:-0.04em;font-weight:500;margin:0;text-wrap:balance}
+.spec-display em{font-style:normal;color:var(--accent)}
+.spec-h1{font-size:56px;letter-spacing:-0.03em;font-weight:500;margin:24px 0 0;line-height:1.02}
+.spec-h2{font-size:36px;letter-spacing:-0.025em;font-weight:500;margin:14px 0 0;line-height:1.05}
+.spec-h3{font-size:24px;letter-spacing:-0.02em;font-weight:500;margin:10px 0 0}
+.spec-body{font-size:16px;line-height:1.55;color:var(--text-2);margin:14px 0 0;max-width:64ch}
+.spec-mono{font-family:"Geist Mono",monospace;font-size:13px;color:var(--text-3);text-transform:uppercase;letter-spacing:.08em;margin-top:14px}
+.scale{margin-top:18px;border-top:1px solid var(--border);padding-top:18px;display:grid;grid-template-columns:1fr;gap:0;font-family:"Geist Mono",monospace;font-size:13px}
+.scale .row{display:grid;grid-template-columns:130px 80px 100px 80px 80px 1fr;align-items:baseline;padding:8px 0;border-bottom:1px solid var(--border);gap:12px;color:var(--text-2)}
+.scale .row.head{color:var(--text-3);font-size:10.5px;letter-spacing:.08em;text-transform:uppercase}
+.scale .row b{color:var(--text);font-weight:500}
+@media (max-width:700px){.scale .row{grid-template-columns:80px 60px 80px 60px 60px;font-size:11px}.scale .row .ex{display:none}}
+
+/* spacing strip */
+.space-strip{display:flex;align-items:flex-end;gap:16px;margin-top:18px;flex-wrap:wrap}
+.space-strip .b{display:flex;flex-direction:column;align-items:center;gap:8px;font-family:"Geist Mono",monospace;font-size:11px;letter-spacing:.04em;color:var(--text-3)}
+.space-strip .b i{display:block;background:var(--text);border-radius:2px;width:32px}
+.space-strip .b span{color:var(--text);font-weight:500}
+
+/* radii / shadows / borders */
+.tri-grid{display:grid;grid-template-columns:1fr;gap:14px}
+@media (min-width:700px){.tri-grid{grid-template-columns:repeat(3,1fr)}}
+.spec-tile{background:var(--surface);border:1px solid var(--border-2);padding:24px;border-radius:var(--r-lg)}
+.spec-tile h4{margin:0 0 14px;font-family:"Geist Mono",monospace;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--text-3);font-weight:500}
+.spec-tile .demo{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.spec-tile .box{width:64px;height:64px;background:var(--surface-sub);border:1px solid var(--border-2)}
+.spec-tile .note{font-size:13px;color:var(--text-2);line-height:1.5}
+.spec-tile code{font-family:"Geist Mono",monospace;font-size:12px;color:var(--text);background:var(--surface-sub);padding:2px 5px;border-radius:3px}
+
+/* imagery */
+.imagery{display:grid;grid-template-columns:1fr;gap:24px}
+@media (min-width:1000px){.imagery{grid-template-columns:1fr 1fr}}
+.asset{background:var(--surface);border:1px solid var(--border-2);border-radius:var(--r-lg);overflow:hidden}
+.asset .hd{padding:14px 20px;border-bottom:1px solid var(--border);background:var(--surface-sub);display:flex;justify-content:space-between;align-items:baseline}
+.asset .hd .nm{font-weight:500;font-size:15px}
+.asset .hd .tag{font-family:"Geist Mono",monospace;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3)}
+.asset .stage{padding:24px;display:flex;align-items:center;justify-content:center;background:var(--surface-sub);min-height:240px}
+.asset .stage.dark{background:#0B0B09}
+.asset .nt{padding:18px 20px;font-size:14px;line-height:1.55;color:var(--text-2);border-top:1px solid var(--border)}
+.asset .nt b{color:var(--text);font-weight:500}
+
+/* favicon row */
+.fav-row{display:flex;gap:24px;align-items:flex-end;flex-wrap:wrap;justify-content:center}
+.fav-row .b{display:flex;flex-direction:column;align-items:center;gap:6px;font-family:"Geist Mono",monospace;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3)}
+.fav-row .b .frame{background:#0B0B09;border:1px solid var(--border-2);border-radius:var(--r-sm);display:flex;align-items:center;justify-content:center}
+
+/* notes */
+.notes{display:grid;grid-template-columns:1fr;gap:24px}
+@media (min-width:900px){.notes{grid-template-columns:1fr 1fr;gap:36px}}
+.notes h3{margin:0 0 16px;font-size:22px;letter-spacing:-0.02em;font-weight:500}
+.notes ol{margin:0;padding:0;list-style:none;counter-reset:n;display:flex;flex-direction:column;gap:14px}
+.notes li{counter-increment:n;display:grid;grid-template-columns:32px 1fr;gap:12px;padding-top:12px;border-top:1px solid var(--border)}
+.notes li::before{content:counter(n,decimal-leading-zero);font-family:"Geist Mono",monospace;font-size:11px;color:var(--accent);letter-spacing:.06em}
+.notes li b{display:block;font-weight:500;margin-bottom:4px}
+.notes li p{margin:0;color:var(--text-2);font-size:14.5px;line-height:1.55}
+
+/* footer */
+footer{padding:48px 0 56px}
+.foot-meta{display:flex;justify-content:space-between;font-family:"Geist Mono",monospace;font-size:11px;letter-spacing:.06em;color:var(--text-3);text-transform:uppercase;border-top:1px solid var(--text);padding-top:14px;flex-wrap:wrap;gap:12px}
+
+/* logo concept SVG inline rendering helpers */
+.lock{display:flex;align-items:baseline;gap:0;font-weight:500;letter-spacing:-0.025em}
+.lock.lg{font-size:42px}
+.lock.md{font-size:32px}
+.lock.sm{font-size:20px}
+.lock .dot{color:var(--accent)}
+.lock .slash{color:var(--accent);margin:0 4px;font-weight:300}
+.serif{font-family:"Instrument Serif",serif;font-style:italic}
+</style>
+</head>
+<body>
+
+<!-- nav -->
+<nav class="nav">
+  <div class="container nav-row">
+    <a href="Brand System.html" class="home">linkedingrade<span class="d">.</span></a>
+    <div>
+      <a href="#logos">Logos</a>
+      <a href="#system">System</a>
+      <a href="#imagery">Imagery</a>
+      <a href="#notes">Notes</a>
+      <a href="Landing Page.html" style="border:1px solid var(--border-2);border-radius:4px;color:var(--text)">View landing →</a>
+    </div>
+  </div>
+</nav>
+
+<!-- masthead -->
+<header class="masthead">
+  <div class="container">
+    <div class="top">
+      <span><b>BRAND BOOK</b>&nbsp;&nbsp;VOL. 01 · NO. 01</span>
+      <span>13 MAY 2026</span>
+      <span>FOR LINKEDINGRADE.COM</span>
+    </div>
+    <h1>The honest grade,<br>built by hand<em>.</em></h1>
+    <p class="deck">A brand system for linkedingrade.com — three logo proposals, a complete token set, and the imagery the product earns. Editorial in posture, data-dense in detail, restrained on color. No mascots, no gradients, no soft pastels. One red dot is doing most of the work.</p>
+  </div>
+</header>
+
+<!-- ───────────────── §1 LOGOS ───────────────── -->
+<section id="logos">
+  <div class="container">
+    <div class="s-head">
+      <div class="s-num">§ 01 — LOGO</div>
+      <h2>Three concepts. <em>Three different bets.</em></h2>
+      <p>Not three variations of one idea — three strategic positions. The Grade owns the product mechanic. The Wordmark trusts the typography. The Index points at the analytical engine. Each ships with a full lockup, a compact mark, and a single-color version that survives embossing.</p>
+    </div>
+
+    <div class="logos">
+
+      <!-- ─── OPTION A — THE GRADE ─── -->
+      <article class="logo-card">
+        <div class="hd"><span><b>OPTION A</b> · THE GRADE</span><span>FONT · GEIST</span></div>
+        <div class="logo-stage">
+          <!-- Lockup: A+ mark + wordmark -->
+          <div style="display:flex;align-items:center;gap:14px">
+            <svg width="52" height="52" viewBox="0 0 52 52" aria-hidden="true">
+              <rect x="1" y="1" width="50" height="50" rx="6" fill="none" stroke="currentColor" stroke-width="1.5"/>
+              <text x="14" y="38" font-family="Geist, sans-serif" font-size="30" font-weight="600" letter-spacing="-1.5" fill="currentColor">A</text>
+              <text x="33" y="22" font-family="Geist Mono, monospace" font-size="14" font-weight="500" fill="#D62828">+</text>
+            </svg>
+            <span class="lock lg">linkedingrade<span class="dot">.</span></span>
+          </div>
+        </div>
+        <div class="logo-stage dark">
+          <div style="display:flex;align-items:center;gap:14px">
+            <svg width="52" height="52" viewBox="0 0 52 52" aria-hidden="true">
+              <rect x="1" y="1" width="50" height="50" rx="6" fill="none" stroke="currentColor" stroke-width="1.5"/>
+              <text x="14" y="38" font-family="Geist, sans-serif" font-size="30" font-weight="600" letter-spacing="-1.5" fill="currentColor">A</text>
+              <text x="33" y="22" font-family="Geist Mono, monospace" font-size="14" font-weight="500" fill="#FF4D3B">+</text>
+            </svg>
+            <span class="lock lg">linkedingrade<span class="dot" style="color:#FF4D3B">.</span></span>
+          </div>
+        </div>
+        <div class="logo-row">
+          <!-- compact mark light -->
+          <div class="cell">
+            <svg width="40" height="40" viewBox="0 0 52 52">
+              <rect x="1" y="1" width="50" height="50" rx="6" fill="none" stroke="currentColor" stroke-width="1.5"/>
+              <text x="14" y="38" font-family="Geist, sans-serif" font-size="30" font-weight="600" letter-spacing="-1.5" fill="currentColor">A</text>
+              <text x="33" y="22" font-family="Geist Mono, monospace" font-size="14" font-weight="500" fill="#D62828">+</text>
+            </svg>
+          </div>
+          <!-- compact dark -->
+          <div class="cell dark">
+            <svg width="40" height="40" viewBox="0 0 52 52">
+              <rect x="1" y="1" width="50" height="50" rx="6" fill="none" stroke="currentColor" stroke-width="1.5"/>
+              <text x="14" y="38" font-family="Geist, sans-serif" font-size="30" font-weight="600" letter-spacing="-1.5" fill="currentColor">A</text>
+              <text x="33" y="22" font-family="Geist Mono, monospace" font-size="14" font-weight="500" fill="#FF4D3B">+</text>
+            </svg>
+          </div>
+          <!-- single color -->
+          <div class="cell">
+            <svg width="40" height="40" viewBox="0 0 52 52">
+              <rect x="1" y="1" width="50" height="50" rx="6" fill="none" stroke="currentColor" stroke-width="1.5"/>
+              <text x="14" y="38" font-family="Geist, sans-serif" font-size="30" font-weight="600" letter-spacing="-1.5" fill="currentColor">A</text>
+              <text x="33" y="22" font-family="Geist Mono, monospace" font-size="14" font-weight="500" fill="currentColor">+</text>
+            </svg>
+          </div>
+        </div>
+        <div class="logo-meta">
+          <p class="pitch"><b>The bet:</b> the grade is the product. Naming it as the mark — a notched square containing an A+ — gives the brand a single ownable shape that scales to a 16px favicon and reads as both letter and badge. The accent + is the only color in the system.</p>
+          <div class="specs">
+            <div>MARK · <b>BADGE</b></div>
+            <div>BEST FOR · <b>FAVICON</b></div>
+            <div>RISK · <b>"GRADUATION"</b></div>
+            <div>READ · <b>LOUDEST</b></div>
+          </div>
+        </div>
+      </article>
+
+      <!-- ─── OPTION B — THE WORDMARK ─── -->
+      <article class="logo-card">
+        <div class="hd"><span><b>OPTION B</b> · THE WORDMARK</span><span>FONT · GEIST</span></div>
+        <div class="logo-stage">
+          <div class="lock lg">linkedin<span class="slash">/</span>grade<span class="dot">.</span></div>
+        </div>
+        <div class="logo-stage dark">
+          <div class="lock lg">linkedin<span class="slash" style="color:#FF4D3B">/</span>grade<span class="dot" style="color:#FF4D3B">.</span></div>
+        </div>
+        <div class="logo-row">
+          <div class="cell"><span class="lock md">l<span class="slash">/</span>g<span class="dot">.</span></span></div>
+          <div class="cell dark"><span class="lock md">l<span class="slash" style="color:#FF4D3B">/</span>g<span class="dot" style="color:#FF4D3B">.</span></span></div>
+          <div class="cell"><span class="lock md">l<span style="color:inherit;margin:0 4px;font-weight:300">/</span>g.</span></div>
+        </div>
+        <div class="logo-meta">
+          <p class="pitch"><b>The bet:</b> the typeface is the brand. Lowercase "linkedin/grade" with a red slash that does triple duty — it separates the two nouns, hints at division/ratio (the grading mechanic), and supplies the single accent the system needs. Stripe / Linear / Vercel school.</p>
+          <div class="specs">
+            <div>MARK · <b>SLASH</b></div>
+            <div>BEST FOR · <b>HEADER</b></div>
+            <div>RISK · <b>QUIET AT 16PX</b></div>
+            <div>READ · <b>MOST CONFIDENT</b></div>
+          </div>
+        </div>
+      </article>
+
+      <!-- ─── OPTION C — THE INDEX ─── -->
+      <article class="logo-card">
+        <div class="hd"><span><b>OPTION C</b> · THE INDEX</span><span>FONT · GEIST</span></div>
+        <div class="logo-stage">
+          <div style="display:flex;align-items:center;gap:14px">
+            <svg width="48" height="48" viewBox="0 0 48 48" aria-hidden="true">
+              <rect x="6"  y="28" width="4" height="14" fill="currentColor"/>
+              <rect x="14" y="22" width="4" height="20" fill="currentColor"/>
+              <rect x="22" y="14" width="4" height="28" fill="currentColor"/>
+              <rect x="30" y="8"  width="4" height="34" fill="currentColor"/>
+              <rect x="38" y="4"  width="4" height="38" fill="#D62828"/>
+            </svg>
+            <span class="lock lg">linkedingrade<span class="dot">.</span></span>
+          </div>
+        </div>
+        <div class="logo-stage dark">
+          <div style="display:flex;align-items:center;gap:14px">
+            <svg width="48" height="48" viewBox="0 0 48 48" aria-hidden="true">
+              <rect x="6"  y="28" width="4" height="14" fill="currentColor"/>
+              <rect x="14" y="22" width="4" height="20" fill="currentColor"/>
+              <rect x="22" y="14" width="4" height="28" fill="currentColor"/>
+              <rect x="30" y="8"  width="4" height="34" fill="currentColor"/>
+              <rect x="38" y="4"  width="4" height="38" fill="#FF4D3B"/>
+            </svg>
+            <span class="lock lg">linkedingrade<span class="dot" style="color:#FF4D3B">.</span></span>
+          </div>
+        </div>
+        <div class="logo-row">
+          <div class="cell">
+            <svg width="36" height="36" viewBox="0 0 48 48"><rect x="6" y="28" width="4" height="14" fill="currentColor"/><rect x="14" y="22" width="4" height="20" fill="currentColor"/><rect x="22" y="14" width="4" height="28" fill="currentColor"/><rect x="30" y="8" width="4" height="34" fill="currentColor"/><rect x="38" y="4" width="4" height="38" fill="#D62828"/></svg>
+          </div>
+          <div class="cell dark">
+            <svg width="36" height="36" viewBox="0 0 48 48"><rect x="6" y="28" width="4" height="14" fill="currentColor"/><rect x="14" y="22" width="4" height="20" fill="currentColor"/><rect x="22" y="14" width="4" height="28" fill="currentColor"/><rect x="30" y="8" width="4" height="34" fill="currentColor"/><rect x="38" y="4" width="4" height="38" fill="#FF4D3B"/></svg>
+          </div>
+          <div class="cell">
+            <svg width="36" height="36" viewBox="0 0 48 48"><rect x="6" y="28" width="4" height="14" fill="currentColor"/><rect x="14" y="22" width="4" height="20" fill="currentColor"/><rect x="22" y="14" width="4" height="28" fill="currentColor"/><rect x="30" y="8" width="4" height="34" fill="currentColor"/><rect x="38" y="4" width="4" height="38" fill="currentColor"/></svg>
+          </div>
+        </div>
+        <div class="logo-meta">
+          <p class="pitch"><b>The bet:</b> the analytical engine is the brand. Five rising bars — a measurement, a signal strength, a grade-from-F-to-A — with the tallest bar in accent red. It says "we are the instrument", not "we are the diagnosis". Closer to a Bloomberg or Moody's mark than a SaaS logo.</p>
+          <div class="specs">
+            <div>MARK · <b>BARS</b></div>
+            <div>BEST FOR · <b>HEADER+OG</b></div>
+            <div>RISK · <b>STOCK-CHART CLICHE</b></div>
+            <div>READ · <b>MOST ANALYTICAL</b></div>
+          </div>
+        </div>
+      </article>
+
+    </div>
+
+    <!-- Recommendation -->
+    <div class="rec">
+      <div class="hd">— RECOMMENDATION</div>
+      <div>
+        <h3>Ship <b>Option B — The Wordmark.</b></h3>
+        <p>It is the most confident of the three and the one that ages best. A grade-as-mark logo (Option A) trades short-term recognition for a permanent association with school imagery the brand brief explicitly avoids. A bar chart (Option C) is sharp but joins a crowded analytics-tool aesthetic where every fintech and dashboard product already lives. The <b>"linkedin/grade."</b> wordmark — with one red slash and one red period — is unmistakably us, scales from 16px favicon (the "l/g." compact form) to a billboard without modification, and lets the typography carry the brand the way Stripe and Linear let theirs do the work. The mark we save for the favicon: a 32×32 rounded square containing just "l/g." in red.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────────── §2 DESIGN SYSTEM ───────────────── -->
+<section id="system">
+  <div class="container">
+    <div class="s-head">
+      <div class="s-num">§ 02 — SYSTEM</div>
+      <h2>Tokens. <em>Restrained on purpose.</em></h2>
+      <p>Nine colors. Two fonts. Three radii. One shadow that almost never appears. The discipline is the point — editorial designs earn their power from what they refuse to do.</p>
+    </div>
+
+    <h3 class="label" style="margin:0 0 18px">COLOR · 9 TOKENS · PAIRED LIGHT / DARK</h3>
+    <div class="tokens">
+      <div class="tok-row head">
+        <div class="c">Token</div>
+        <div class="c">Light</div>
+        <div class="c">Dark</div>
+      </div>
+      <!-- bg -->
+      <div class="tok-row">
+        <div class="c"><div class="swatch"><div class="name">bg</div></div><div class="role">Page background</div></div>
+        <div class="c"><div class="swatch"><span class="chip" style="background:#FAFAF7"></span><span class="hex">#FAFAF7</span></div></div>
+        <div class="c"><div class="swatch"><span class="chip" style="background:#0B0B09"></span><span class="hex">#0B0B09</span></div></div>
+      </div>
+      <div class="tok-row">
+        <div class="c"><div class="name">surface</div><div class="role">Card / report background</div></div>
+        <div class="c"><div class="swatch"><span class="chip" style="background:#FFFFFF"></span><span class="hex">#FFFFFF</span></div></div>
+        <div class="c"><div class="swatch"><span class="chip" style="background:#141413"></span><span class="hex">#141413</span></div></div>
+      </div>
+      <div class="tok-row">
+        <div class="c"><div class="name">surface-sub</div><div class="role">Inset / header strip</div></div>
+        <div class="c"><div class="swatch"><span class="chip" style="background:#F2F2EC"></span><span class="hex">#F2F2EC</span></div></div>
+        <div class="c"><div class="swatch"><span class="chip" style="background:#1B1B19"></span><span class="hex">#1B1B19</span></div></div>
+      </div>
+      <div class="tok-row">
+        <div class="c"><div class="name">text</div><div class="role">Primary text</div></div>
+        <div class="c"><div class="swatch"><span class="chip" style="background:#0E0E0C"></span><span class="hex">#0E0E0C</span></div></div>
+        <div class="c"><div class="swatch"><span class="chip" style="background:#F1F0EA"></span><span class="hex">#F1F0EA</span></div></div>
+      </div>
+      <div class="tok-row">
+        <div class="c"><div class="name">text-2</div><div class="role">Secondary / body</div></div>
+        <div class="c"><div class="swatch"><span class="chip" style="background:#4A4A45"></span><span class="hex">#4A4A45</span></div></div>
+        <div class="c"><div class="swatch"><span class="chip" style="background:#B5B4AB"></span><span class="hex">#B5B4AB</span></div></div>
+      </div>
+      <div class="tok-row">
+        <div class="c"><div class="name">text-3</div><div class="role">Muted / labels</div></div>
+        <div class="c"><div class="swatch"><span class="chip" style="background:#8A8A82"></span><span class="hex">#8A8A82</span></div></div>
+        <div class="c"><div class="swatch"><span class="chip" style="background:#76756D"></span><span class="hex">#76756D</span></div></div>
+      </div>
+      <div class="tok-row">
+        <div class="c"><div class="name">accent</div><div class="role">The punctuation color · &lt;5% of page</div></div>
+        <div class="c"><div class="swatch"><span class="chip" style="background:#D62828"></span><span class="hex">#D62828</span></div></div>
+        <div class="c"><div class="swatch"><span class="chip" style="background:#FF4D3B"></span><span class="hex">#FF4D3B</span></div></div>
+      </div>
+      <div class="tok-row">
+        <div class="c"><div class="name">warning</div><div class="role">Amber · grade C territory</div></div>
+        <div class="c"><div class="swatch"><span class="chip" style="background:#B8730B"></span><span class="hex">#B8730B</span></div></div>
+        <div class="c"><div class="swatch"><span class="chip" style="background:#E8A547"></span><span class="hex">#E8A547</span></div></div>
+      </div>
+      <div class="tok-row">
+        <div class="c"><div class="name">danger</div><div class="role">Deep red · grade D/F</div></div>
+        <div class="c"><div class="swatch"><span class="chip" style="background:#A8190A"></span><span class="hex">#A8190A</span></div></div>
+        <div class="c"><div class="swatch"><span class="chip" style="background:#FF6359"></span><span class="hex">#FF6359</span></div></div>
+      </div>
+      <div class="tok-row">
+        <div class="c"><div class="name">success</div><div class="role">Deep forest · grade A · sparingly</div></div>
+        <div class="c"><div class="swatch"><span class="chip" style="background:#2D5A3F"></span><span class="hex">#2D5A3F</span></div></div>
+        <div class="c"><div class="swatch"><span class="chip" style="background:#6FBA8A"></span><span class="hex">#6FBA8A</span></div></div>
+      </div>
+    </div>
+
+    <p style="margin:18px 0 0;color:var(--text-3);font-size:13px;font-family:'Geist Mono',monospace;letter-spacing:.04em;text-transform:uppercase">BORDERS · DERIVED FROM TEXT TOKEN · RGBA(text, 0.09) HAIRLINE · RGBA(text, 0.18) STRONG · NO STANDALONE BORDER TOKEN</p>
+
+    <!-- Typography -->
+    <h3 class="label" style="margin:64px 0 18px">TYPOGRAPHY · TWO FONTS · ONE OPTIONAL EDITORIAL SERIF</h3>
+
+    <div class="specimen">
+      <div class="hd"><span><b>DISPLAY + UI</b> · GEIST</span><span>WEIGHTS · 300 / 400 / 500 / 600 / 700</span></div>
+      <div class="bd">
+        <p class="spec-display">your profile, <em>graded.</em></p>
+        <p class="spec-h1">Every profile gets a grade.</p>
+        <p class="spec-h2">One real audit, redacted.</p>
+        <p class="spec-h3">Three different bets.</p>
+        <p class="spec-body">Geist carries the whole brand. It's sharp enough to feel modern, restrained enough to feel editorial, and the lowercase forms have just enough character that the wordmark holds its own without a symbol. Pair with Geist Mono for any number, label, or score.</p>
+        <p class="spec-mono">SS01 ALTERNATE FORMS ENABLED · LETTER-SPACING −0.02EM ON DISPLAY</p>
+      </div>
+    </div>
+
+    <div class="specimen">
+      <div class="hd"><span><b>MONO</b> · GEIST MONO</span><span>WEIGHTS · 400 / 500</span></div>
+      <div class="bd">
+        <p style="font-family:'Geist Mono',monospace;font-size:32px;letter-spacing:-0.02em;margin:0">RUN 014,289 · 13 MAY 2026 · 14:02 ET</p>
+        <p style="font-family:'Geist Mono',monospace;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3);margin:10px 0 0">§ 02 — METHOD · HEADLINE 14% · ABOUT 22% · EXPERIENCE 28%</p>
+        <p class="spec-body">Mono is the brand's voice for evidence — scores, labels, runtime metrics, section numbers, fineprint. Never set body copy in mono; it belongs to data and to the editorial chrome that frames data.</p>
+      </div>
+    </div>
+
+    <div class="specimen">
+      <div class="hd"><span><b>EDITORIAL · OPTIONAL</b> · INSTRUMENT SERIF</span><span>USE · PULLED QUOTES, MARKETING ONLY</span></div>
+      <div class="bd">
+        <p class="serif" style="font-size:60px;line-height:1;letter-spacing:-0.01em;margin:0">"the recruiter heat map<br>is what made me pay."</p>
+        <p class="spec-body">Reserved for editorial moments only — pulled quotes, a marketing landing, a press page. Never inside the product. The product is sans + mono, full stop.</p>
+      </div>
+    </div>
+
+    <!-- Type scale -->
+    <div class="specimen">
+      <div class="hd"><span><b>SCALE</b> · GEIST</span><span>BASE · 16PX · LH · 1.5</span></div>
+      <div class="bd">
+        <div class="scale">
+          <div class="row head"><span>STYLE</span><span>SIZE</span><span>LH</span><span>WEIGHT</span><span>TRACK</span><span class="ex">EXAMPLE</span></div>
+          <div class="row"><b>h1 / display</b><span>72–88px</span><span>0.96</span><span>500</span><span>−0.035em</span><span class="ex" style="font-size:22px;letter-spacing:-0.025em;color:var(--text);font-family:Geist">Every profile gets a grade.</span></div>
+          <div class="row"><b>h2 / section</b><span>40–52px</span><span>1.02</span><span>500</span><span>−0.03em</span><span class="ex" style="font-size:20px;letter-spacing:-0.025em;color:var(--text);font-family:Geist">Three different bets.</span></div>
+          <div class="row"><b>h3 / card</b><span>22–28px</span><span>1.15</span><span>500</span><span>−0.02em</span><span class="ex" style="font-size:16px;letter-spacing:-0.02em;color:var(--text);font-family:Geist">One fixed rubric.</span></div>
+          <div class="row"><b>body</b><span>15–16px</span><span>1.5–1.55</span><span>400</span><span>−0.005em</span><span class="ex" style="font-size:14px;color:var(--text-2);font-family:Geist">Six sections. Each scored on its own rubric.</span></div>
+          <div class="row"><b>small / caption</b><span>13–13.5px</span><span>1.5</span><span>400</span><span>−0.005em</span><span class="ex" style="font-size:13px;color:var(--text-3);font-family:Geist">No card required. Two-click uninstall.</span></div>
+          <div class="row"><b>label · mono UC</b><span>10.5–11px</span><span>1</span><span>500</span><span>+0.08–.10em</span><span class="ex" style="font-family:'Geist Mono',monospace;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--text-3)">§ 02 — METHOD</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Spacing + radius + shadow + borders + icons -->
+    <h3 class="label" style="margin:64px 0 18px">SPACING · 4PX BASE · GEOMETRIC SCALE</h3>
+    <div class="spec-tile">
+      <div class="space-strip">
+        <div class="b"><i style="height:4px"></i><span>04</span></div>
+        <div class="b"><i style="height:8px"></i><span>08</span></div>
+        <div class="b"><i style="height:12px"></i><span>12</span></div>
+        <div class="b"><i style="height:16px"></i><span>16</span></div>
+        <div class="b"><i style="height:24px"></i><span>24</span></div>
+        <div class="b"><i style="height:32px"></i><span>32</span></div>
+        <div class="b"><i style="height:48px"></i><span>48</span></div>
+        <div class="b"><i style="height:64px"></i><span>64</span></div>
+        <div class="b"><i style="height:96px"></i><span>96</span></div>
+      </div>
+      <div class="note" style="margin-top:18px"><b>Section padding</b> 96 top/bottom on desktop, 64 on mobile. <b>Card inner padding</b> 24. <b>Sibling gap</b> 12 within a card, 24 between cards, 48 between sub-sections. <b>Container gutter</b> 24. The 32 and 48 steps mediate.</div>
+    </div>
+
+    <h3 class="label" style="margin:48px 0 18px">RADIUS · BORDERS · SHADOWS</h3>
+    <div class="tri-grid">
+      <div class="spec-tile">
+        <h4>Radius</h4>
+        <div class="demo">
+          <div class="box" style="border-radius:4px"></div>
+          <div class="box" style="border-radius:8px"></div>
+          <div class="box" style="border-radius:14px"></div>
+        </div>
+        <div class="note"><code>sm 4</code> buttons, inputs, tags · <code>md 8</code> nested boxes · <code>lg 14</code> cards, the audit report, modals. Three values, no more.</div>
+      </div>
+      <div class="spec-tile">
+        <h4>Borders</h4>
+        <div class="demo">
+          <div class="box" style="border:1px solid var(--border)"></div>
+          <div class="box" style="border:1px solid var(--border-2)"></div>
+          <div class="box" style="border:1px solid var(--text)"></div>
+        </div>
+        <div class="note">Hairline <code>rgba(text, .09)</code> for structure · strong <code>rgba(text, .18)</code> for cards · full <code>text</code> for masthead rules and section dividers only.</div>
+      </div>
+      <div class="spec-tile">
+        <h4>Shadows</h4>
+        <div class="demo">
+          <div class="box" style="box-shadow:none"></div>
+          <div class="box" style="box-shadow:0 1px 0 rgba(14,14,12,.04)"></div>
+        </div>
+        <div class="note">Effectively none. One acceptable hairline shadow at <code>0 1px 0 rgba(text,.04)</code> for the sticky nav lift. Otherwise structure is carried by rules and borders, not depth.</div>
+      </div>
+    </div>
+
+    <h3 class="label" style="margin:48px 0 18px">ICONS · LUCIDE · 1.5PX STROKE · ROUND CAPS · OUTLINE ONLY</h3>
+    <div class="spec-tile">
+      <div style="display:flex;flex-wrap:wrap;gap:24px;align-items:center;color:var(--text)">
+        <!-- a few inline lucide-style icons -->
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/></svg>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9h6v6H9z"/></svg>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l4-4 4 4 5-7"/></svg>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.5" y2="16.5"/></svg>
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="M4 9h16"/><path d="M9 4v16"/></svg>
+      </div>
+      <div class="note" style="margin-top:16px">Lucide, never Phosphor (Phosphor's softer curves fight the typography). 1.5px stroke. Round caps. Outline by default, filled only when active. Never colored unless the action is destructive (then <code>accent</code>) or affirmative (then <code>success</code>, sparingly).</div>
+    </div>
+  </div>
+</section>
+
+<!-- ───────────────── §3 IMAGERY ───────────────── -->
+<section id="imagery">
+  <div class="container">
+    <div class="s-head">
+      <div class="s-num">§ 03 — IMAGERY</div>
+      <h2>The four assets <em>that earn their place.</em></h2>
+      <p>Hero anchor, sample audit teaser, favicon family, OG card. No stock photography. No illustration of people. No abstract "connection" lines. The only images allowed are the ones produced by the product, or that depict the product producing them.</p>
+    </div>
+
+    <div class="imagery">
+
+      <!-- (a) HERO ANCHOR — the same audit card the landing uses -->
+      <article class="asset">
+        <div class="hd"><span class="nm">(a) Hero anchor — live audit card</span><span class="tag">SVG · INLINE</span></div>
+        <div class="stage" style="background:var(--bg)">
+          <div style="width:100%;max-width:420px;background:var(--surface);border:1px solid var(--border-2);border-radius:14px;overflow:hidden;font-size:12px;font-family:Geist,system-ui,sans-serif">
+            <div style="padding:12px 16px;display:flex;justify-content:space-between;background:var(--surface-sub);border-bottom:1px solid var(--border);font-family:'Geist Mono',monospace;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3)">
+              <span>AUDIT · LIVE</span><span style="color:var(--accent)">SCANNING</span>
+            </div>
+            <div style="padding:18px;display:grid;grid-template-columns:120px 1fr;gap:18px;align-items:center">
+              <div style="position:relative;width:120px;height:120px">
+                <svg width="120" height="120" viewBox="0 0 120 120" style="transform:rotate(-90deg)">
+                  <circle cx="60" cy="60" r="50" fill="none" stroke="var(--border)" stroke-width="8"/>
+                  <circle cx="60" cy="60" r="50" fill="none" stroke="var(--text)" stroke-width="8" stroke-dasharray="314.159" stroke-dashoffset="84.82"/>
+                </svg>
+                <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center">
+                  <div style="font-size:48px;font-weight:500;letter-spacing:-0.05em;line-height:1">B<sup style="font-size:20px;color:var(--accent)">−</sup></div>
+                  <div style="font-family:'Geist Mono',monospace;font-size:10px;color:var(--text-3);letter-spacing:.06em;margin-top:4px;text-transform:uppercase">73 / 100</div>
+                </div>
+              </div>
+              <div>
+                <div style="font-weight:500;font-size:13px">Subject · anonymized</div>
+                <div style="color:var(--text-2);font-size:12px;margin-top:2px">VP, Eng · top-3 US bank</div>
+                <div style="margin-top:10px;display:flex;flex-wrap:wrap;gap:5px;font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.04em;text-transform:uppercase">
+                  <span style="border:1px solid var(--border-2);padding:2px 6px;border-radius:4px;color:var(--text-2)">10y exp</span>
+                  <span style="border:1px solid var(--border-2);padding:2px 6px;border-radius:4px;color:var(--text-2)">NYC</span>
+                  <span style="border:1px solid color-mix(in oklab,var(--accent) 50%,transparent);padding:2px 6px;border-radius:4px;color:var(--accent)">photo dated</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="nt"><b>Strategic role:</b> The product's first frame. We pick this over a dashboard mockup or an abstract grade circle because it's the literal artefact the user pays for — a graded subject card. It earns the headline; you don't need a second sales pitch under it.</div>
+      </article>
+
+      <!-- (b) SAMPLE AUDIT TEASER — the bigger report card on the landing -->
+      <article class="asset">
+        <div class="hd"><span class="nm">(b) Sample audit teaser — the report</span><span class="tag">SVG · INLINE</span></div>
+        <div class="stage" style="background:var(--bg)">
+          <div style="width:100%;max-width:520px;background:var(--surface);border:1px solid var(--border-2);border-radius:14px;overflow:hidden;font-size:12px;font-family:Geist,system-ui,sans-serif">
+            <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;font-family:'Geist Mono',monospace;font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3)">
+              <span><b style="color:var(--text)">RUN 014,289</b> · 13 MAY 2026</span>
+              <span style="border:1px solid var(--border-2);padding:3px 6px;border-radius:4px">REDACTED · SAMPLE</span>
+            </div>
+            <div style="display:grid;grid-template-columns:160px 1fr">
+              <div style="padding:18px;background:var(--surface-sub);border-right:1px solid var(--border);text-align:center">
+                <div style="font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.08em;color:var(--text-3);text-transform:uppercase;margin-bottom:6px">Composite</div>
+                <div style="font-size:88px;font-weight:500;letter-spacing:-0.06em;line-height:1">B<sup style="font-size:30px;color:var(--accent)">−</sup></div>
+                <div style="font-family:'Geist Mono',monospace;font-size:11px;color:var(--text-2);margin-top:6px;letter-spacing:.04em;text-transform:uppercase">73/100 · P64</div>
+              </div>
+              <div>
+                <div style="display:grid;grid-template-columns:1fr 70px;padding:10px 16px;border-bottom:1px solid var(--border);align-items:center"><span style="font-weight:500;font-size:12px">Headline</span><span style="font-family:'Geist Mono',monospace;font-size:16px;text-align:right;color:var(--success);font-weight:500">B+</span></div>
+                <div style="display:grid;grid-template-columns:1fr 70px;padding:10px 16px;border-bottom:1px solid var(--border);align-items:center"><span style="font-weight:500;font-size:12px">About</span><span style="font-family:'Geist Mono',monospace;font-size:16px;text-align:right;color:var(--warning);font-weight:500">C</span></div>
+                <div style="display:grid;grid-template-columns:1fr 70px;padding:10px 16px;border-bottom:1px solid var(--border);align-items:center"><span style="font-weight:500;font-size:12px">Experience</span><span style="font-family:'Geist Mono',monospace;font-size:16px;text-align:right;font-weight:500">B</span></div>
+                <div style="display:grid;grid-template-columns:1fr 70px;padding:10px 16px;border-bottom:1px solid var(--border);align-items:center"><span style="font-weight:500;font-size:12px">Skills</span><span style="font-family:'Geist Mono',monospace;font-size:16px;text-align:right;color:var(--success);font-weight:500">A−</span></div>
+                <div style="display:grid;grid-template-columns:1fr 70px;padding:10px 16px;border-bottom:1px solid var(--border);align-items:center"><span style="font-weight:500;font-size:12px">Activity</span><span style="font-family:'Geist Mono',monospace;font-size:16px;text-align:right;color:var(--accent);font-weight:500">D</span></div>
+                <div style="display:grid;grid-template-columns:1fr 70px;padding:10px 16px;align-items:center"><span style="font-weight:500;font-size:12px">Photo</span><span style="font-family:'Geist Mono',monospace;font-size:16px;text-align:right;font-weight:500">B+</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="nt"><b>Strategic role:</b> The "you'd actually pay for this" exhibit. Looks like a real audit, not a generic product card. The composite grade is big enough to read at thumbnail size; the per-section grades read as monospace numbers that look measured, not vibed.</div>
+      </article>
+
+      <!-- (c) FAVICON family -->
+      <article class="asset">
+        <div class="hd"><span class="nm">(c) Favicon &amp; app icon — l/g.</span><span class="tag">SVG · 16 · 32 · 180 · 512</span></div>
+        <div class="stage dark">
+          <div class="fav-row">
+            <div class="b">
+              <div class="frame" style="width:16px;height:16px">
+                <span style="font-family:Geist,sans-serif;font-size:8px;font-weight:600;color:#F1F0EA;letter-spacing:-0.06em">l<span style="color:#FF4D3B">/</span>g<span style="color:#FF4D3B">.</span></span>
+              </div>
+              <span>16</span>
+            </div>
+            <div class="b">
+              <div class="frame" style="width:32px;height:32px;border-radius:6px">
+                <span style="font-family:Geist,sans-serif;font-size:15px;font-weight:600;color:#F1F0EA;letter-spacing:-0.06em">l<span style="color:#FF4D3B">/</span>g<span style="color:#FF4D3B">.</span></span>
+              </div>
+              <span>32</span>
+            </div>
+            <div class="b">
+              <div class="frame" style="width:64px;height:64px;border-radius:12px">
+                <span style="font-family:Geist,sans-serif;font-size:30px;font-weight:600;color:#F1F0EA;letter-spacing:-0.06em">l<span style="color:#FF4D3B">/</span>g<span style="color:#FF4D3B">.</span></span>
+              </div>
+              <span>64</span>
+            </div>
+            <div class="b">
+              <div class="frame" style="width:96px;height:96px;border-radius:18px">
+                <span style="font-family:Geist,sans-serif;font-size:46px;font-weight:600;color:#F1F0EA;letter-spacing:-0.06em">l<span style="color:#FF4D3B">/</span>g<span style="color:#FF4D3B">.</span></span>
+              </div>
+              <span>180 (apple)</span>
+            </div>
+            <div class="b">
+              <div class="frame" style="width:128px;height:128px;border-radius:24px">
+                <span style="font-family:Geist,sans-serif;font-size:62px;font-weight:600;color:#F1F0EA;letter-spacing:-0.06em">l<span style="color:#FF4D3B">/</span>g<span style="color:#FF4D3B">.</span></span>
+              </div>
+              <span>512 (pwa)</span>
+            </div>
+          </div>
+        </div>
+        <div class="nt"><b>Derived from:</b> Option B's "l/g." compact form, set in Geist 600 on a rounded-square. Black square with off-white letterforms and red slash + period. Works at 16px because the red punctuation reads as shape, not stroke detail.</div>
+      </article>
+
+      <!-- (d) OG image -->
+      <article class="asset">
+        <div class="hd"><span class="nm">(d) OG image — 1200×630</span><span class="tag">SVG · INLINE · DARK DEFAULT</span></div>
+        <div class="stage dark" style="padding:24px">
+          <!-- OG -->
+          <div style="aspect-ratio:1200/630;width:100%;max-width:600px;background:#0B0B09;color:#F1F0EA;border:1px solid rgba(241,240,234,.08);border-radius:8px;padding:34px 40px;display:grid;grid-template-columns:1.05fr .95fr;gap:30px;align-items:end;font-family:Geist,system-ui,sans-serif;position:relative;overflow:hidden">
+            <!-- top rule -->
+            <div style="position:absolute;top:18px;left:40px;right:40px;height:1px;background:#FF4D3B"></div>
+            <div style="position:absolute;top:22px;left:40px;right:40px;display:flex;justify-content:space-between;font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#76756D">
+              <span><b style="color:#F1F0EA;font-weight:500">LINKEDINGRADE<span style="color:#FF4D3B">.</span></b></span>
+              <span>VOL. 01 · NO. 12</span>
+              <span>THE PROFILE, GRADED</span>
+            </div>
+            <!-- main grade + headline -->
+            <div>
+              <div style="font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#76756D;margin-bottom:6px">A 30-SECOND AUDIT</div>
+              <div style="font-size:34px;letter-spacing:-0.03em;line-height:1.02;font-weight:500;text-wrap:balance">Every LinkedIn profile<br>gets a grade<span style="color:#FF4D3B">.</span></div>
+              <div style="margin-top:14px;font-family:'Geist Mono',monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:#B5B4AB">CHROME · 6-PAGE PDF · A/B/C/D/F</div>
+            </div>
+            <!-- giant grade -->
+            <div style="display:flex;justify-content:flex-end;align-items:flex-end">
+              <div style="position:relative;display:inline-flex;align-items:flex-start;line-height:.85">
+                <span style="font-size:200px;letter-spacing:-0.07em;font-weight:500;color:#F1F0EA">B</span>
+                <span style="font-size:84px;color:#FF4D3B;font-weight:500;letter-spacing:-0.04em;margin-top:8px">−</span>
+              </div>
+            </div>
+            <!-- footer -->
+            <div style="position:absolute;bottom:18px;left:40px;right:40px;height:1px;background:rgba(241,240,234,.18)"></div>
+            <div style="position:absolute;bottom:22px;left:40px;right:40px;display:flex;justify-content:space-between;font-family:'Geist Mono',monospace;font-size:9px;letter-spacing:.1em;text-transform:uppercase;color:#76756D">
+              <span>LINKEDINGRADE.COM</span>
+              <span style="color:#FF4D3B">73 / 100 · P64</span>
+              <span>FREE FIRST AUDIT</span>
+            </div>
+          </div>
+        </div>
+        <div class="nt"><b>Strategic role:</b> The most-clicked asset of the launch. Dark on purpose — looks premium in a social feed and contrasts with the blue-and-white SaaS card crowd. The giant <code>B−</code> on the right tells the whole story before anyone reads a word; the masthead chrome at top and bottom signals "this is a serious analyst's tool, not another AI sparkle."<br><br><b>Midjourney prompt</b> (if you want a richer variant): <i>"editorial dark-mode hero card, 1200×630, swiss editorial layout, large letterform 'B−' on right in off-white with single red minus, monospace masthead chrome top and bottom, geist typography, magazine credit lines, paper-grain texture barely visible, no people no gradients no emoji, style ref: bloomberg terminal × the economist × stripe press, --ar 1200:630 --style raw"</i> · <b>Negatives:</b> blue, gradient, glassmorphism, hands, laptops, abstract connections, sparkles.</div>
+      </article>
+
+    </div>
+  </div>
+</section>
+
+<!-- ───────────────── §4 NOTES ───────────────── -->
+<section id="notes">
+  <div class="container">
+    <div class="s-head">
+      <div class="s-num">§ 04 — NOTES</div>
+      <h2>Designer's notes. <em>Push-back &amp; sharpening.</em></h2>
+      <p>Five decisions I'd defend if you asked me to change them, and five places this brief should sharpen before v2. Read as a junior designer talking to a manager who can take it.</p>
+    </div>
+
+    <div class="notes">
+      <div>
+        <h3>Things I'd push back on</h3>
+        <ol>
+          <li><div><b>Red, not orange or blue.</b><p>Brief said "Economist red equivalent". I picked the deeper #D62828 / #FF4D3B pair instead of a brighter "AI orange" or a safer corporate red. If you tell me to soften it, I'd ship something fewer people remember.</p></div></li>
+          <li><div><b>Recommend B (Wordmark) — even though A has the better story.</b><p>Option A is the more "marketable" pitch in a pitch deck (the grade IS the product). It also chains the brand to school imagery for the next decade. B is harder to fall in love with at first and easier to live with for years.</p></div></li>
+          <li><div><b>No serif in the product.</b><p>I added Instrument Serif as an editorial flourish on the brand book and in pulled quotes. Inside the product (audit reports, dashboard, extension), it never appears. Mixing serifs into a data-dense product makes it read as a blog.</p></div></li>
+          <li><div><b>Lowercase everything, including the wordmark.</b><p>Lowercase is the most opinionated typographic call in the brief. It signals confidence without performance. If you ask me to capital-case "LinkedinGrade" it will read corporate within two weeks.</p></div></li>
+          <li><div><b>No hero illustration.</b><p>The hero anchor is the audit card itself, not a stylised mockup. The product is the picture. Putting a "stylised abstract grade circle" next to the headline would be the SaaS-template move the brief explicitly rejects.</p></div></li>
+        </ol>
+      </div>
+      <div>
+        <h3>Things to sharpen in v2</h3>
+        <ol>
+          <li><div><b>"Bloomberg meets recruiter gut" is two metaphors.</b><p>One is institutional and quantitative; the other is intuitive and subjective. Pick one for marketing copy and the other for product micro-copy, or write a unifying line. Right now they fight on the home page.</p></div></li>
+          <li><div><b>The pricing tiers carry a positioning conflict.</b><p>$19 Pro looks like a consumer SKU; $149 Team looks B2B. There's no Coach-to-Team ladder. Either the Coach plan needs API access (so coaches can grow into Team), or the Pro plan should be priced at $29 and lose CSV export to harden the upsell.</p></div></li>
+          <li><div><b>"6-page PDF" is concrete but unchallenged.</b><p>Six is arbitrary. Default to "6-page" in marketing, but ship a version-2 report length tied to seniority — a graduate analyst doesn't need 6 pages, a CEO needs more. The mechanic is grade-density, not page-count.</p></div></li>
+          <li><div><b>The free tier has no virality lever.</b><p>A free single audit with a watermarked PDF and no sharing prompt is a missed loop. Add: a public, link-shareable "lite" version with the composite grade only and a "see your full audit" CTA. Watermark the PDF with a per-user share code.</p></div></li>
+          <li><div><b>"Reverse-engineer the profiles you compete with" is the strongest line in the brief and isn't the hero.</b><p>The hero says "every profile gets a grade", which is correct but undifferentiated. Test a hero variant that leads with the competitive-intelligence angle. The first audience in the brief (Active job seekers) implies it; the copy doesn't deliver it.</p></div></li>
+        </ol>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <div class="foot-meta">
+      <span>© 2026 LINKEDINGRADE INC.</span>
+      <span>BRAND BOOK · VOL. 01 · NO. 01</span>
+      <span>SET IN GEIST, GEIST MONO, INSTRUMENT SERIF</span>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>
