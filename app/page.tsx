@@ -324,13 +324,25 @@ function WhyExtension() {
                 maxWidth: "38ch",
               }}
             >
-              Six sections, 38 weighted signals, calibrated to the frameworks
+              Twelve sections, 38 weighted signals, calibrated to the frameworks
               senior recruiters and hiring managers use. Re-run the same profile
               a year from now and you&apos;ll get a grade that&apos;s directly
               comparable. Ask GPT twice and you&apos;ll get two different
               answers.
             </p>
             <div style={{ marginTop: 28 }}>
+              <div
+                className="font-mono"
+                style={{
+                  fontSize: 10.5,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                  color: "var(--text-3)",
+                  marginBottom: 10,
+                }}
+              >
+                Top 6 of 12 sections
+              </div>
               <div
                 className="font-mono"
                 style={{
@@ -546,7 +558,7 @@ function BuiltFor() {
       stats: [
         ["Time per client report", "2 min"],
         ["White-label PDF", "included"],
-        ["Bulk pricing", "50/mo"],
+        ["Audits / mo", "50"],
       ],
     },
     {
@@ -679,7 +691,7 @@ function Pricing() {
     { label: "No history, no exports", excluded: true },
   ];
   const pro: Feature[] = [
-    { label: (<><b>Unlimited</b> audits</>) },
+    { label: (<><b>25</b> audits / month</>) },
     { label: "Full 6-page PDF, no watermark" },
     { label: (<><b>Before/after</b> rewrites</>) },
     { label: "Audit history · 12 months" },
@@ -732,7 +744,7 @@ function Pricing() {
             name="Pro"
             price="$19"
             per="/ month"
-            blurb="Unlimited audits for one person. The job-search and self-improvement plan."
+            blurb="25 audits per month for one person. The job-search and self-improvement plan."
             features={pro}
             ctaLabel="Start Pro"
           />
