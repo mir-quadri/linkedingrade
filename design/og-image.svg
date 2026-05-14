@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <!-- background: solid navy -->
+  <rect width="1200" height="630" fill="#0F2138"/>
+
+  <!-- Stamp mark (white seal + red corner), top-left, 140x140 at (80, 80) -->
+  <g transform="translate(80 80) scale(1.4)">
+    <rect width="100" height="100" rx="6" fill="#FFFFFF"/>
+    <path d="M 64 64 L 100 64 L 100 94 A 6 6 0 0 1 94 100 L 64 100 Z" fill="#C8102E"/>
+  </g>
+
+  <!-- Wordmark, baseline aligned to bottom of stamp -->
+  <text x="252" y="220"
+        font-family="Geist, 'Geist Sans', sans-serif"
+        font-weight="700"
+        font-size="56"
+        letter-spacing="-1.96"
+        fill="#FAFAF7">LinkedInGrade<tspan fill="#C8102E">.</tspan></text>
+
+  <!-- Headline — Geist 500, 88px, white with red period -->
+  <text x="80" y="400"
+        font-family="Geist, 'Geist Sans', sans-serif"
+        font-weight="500"
+        font-size="88"
+        letter-spacing="-3.08"
+        fill="#FAFAF7">The honest LinkedIn audit<tspan fill="#C8102E">.</tspan></text>
+
+  <!-- Bottom-left issue meta -->
+  <text x="80" y="560"
+        font-family="'Geist Mono', monospace"
+        font-weight="400"
+        font-size="18"
+        letter-spacing="1.8"
+        fill="#B5B4AB">VOL. 01 · NO. 01 · LAUNCH ISSUE · 2026</text>
+
+  <!-- Bottom-right domain -->
+  <text x="1120" y="560"
+        text-anchor="end"
+        font-family="'Geist Mono', monospace"
+        font-weight="400"
+        font-size="18"
+        letter-spacing="1.8"
+        fill="#B5B4AB">LINKEDINGRADE.COM</text>
+</svg>
