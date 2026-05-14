@@ -127,3 +127,6 @@ vite.config.ts.timestamp-*
 .vercel
 # typescript
 next-env.d.ts
+
+# Generated OG renderer font cache
+scripts/.font-cache/

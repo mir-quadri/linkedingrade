@@ -20,7 +20,6 @@ const title = "LinkedInGrade — the honest LinkedIn audit";
 const description =
   "A 30-second Chrome extension audits any LinkedIn profile and returns a 6-page report. Letter grade, recruiter heat map, before/after rewrites, priority action plan.";
 
-// TODO: generate 1200×630 OG PNG per /design/LinkedInGrade Identity.html § 04 and wire to openGraph.images.
 export const metadata: Metadata = {
   title,
   description,
@@ -30,11 +29,20 @@ export const metadata: Metadata = {
     description,
     type: "website",
     url: "https://linkedingrade.com",
+    images: [
+      {
+        url: "/og.png",
+        width: 1200,
+        height: 630,
+        alt: "LinkedInGrade — the honest LinkedIn audit",
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title,
     description,
+    images: ["/og.png"],
   },
   // TODO: export /public/apple-touch-icon.png (180×180) from /public/favicon.svg and add to icons.apple.
   icons: {
