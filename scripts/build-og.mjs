@@ -1,4 +1,4 @@
-// One-off renderer: /design/og-image.svg → /public/og.png (1200×630 @ 2x).
+// One-off renderer: /design/og-image.svg → /public/og.png (1200×630).
 // Downloads Geist + Geist Mono TTFs from Google Fonts so resvg can shape text.
 
 import { readFile, writeFile, mkdir, stat } from "node:fs/promises";
@@ -45,7 +45,7 @@ async function main() {
   const svg = await readFile(SVG_PATH, "utf8");
 
   const resvg = new Resvg(svg, {
-    fitTo: { mode: "width", value: 2400 }, // 2x density
+    fitTo: { mode: "width", value: 1200 },
     background: "#0F2138",
     font: {
       fontFiles,
