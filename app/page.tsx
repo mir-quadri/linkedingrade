@@ -153,8 +153,8 @@ function SampleAudit() {
                 maxWidth: "46ch",
               }}
             >
-              Six sections. Each scored on its own rubric, calibrated to the
-              frameworks senior recruiters and hiring managers use. Each
+              Six headline grades. Each composed from a sub-rubric, calibrated
+              to the frameworks senior recruiters and hiring managers use. Each
               cross-checked against the population of profiles at the same
               seniority, function, and industry — so a B+ for a senior VP means
               something different than a B+ for a graduate analyst.
