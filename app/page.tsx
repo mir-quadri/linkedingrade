@@ -2,49 +2,23 @@ import Link from "next/link";
 
 import AuditPreviewCard from "./components/AuditPreviewCard";
 import AuditReportCard from "./components/AuditReportCard";
-import BrandLockup from "./components/BrandLockup";
-import Logo from "./components/Logo";
 import PricingTier, { type Feature } from "./components/PricingTier";
-import ThemeToggle from "./components/ThemeToggle";
+import SiteFooter from "./components/SiteFooter";
+import SiteNav from "./components/SiteNav";
 import WaitlistForm from "./components/WaitlistForm";
-import Wordmark from "./components/Wordmark";
 
 export default function Page() {
   return (
     <>
-      <Nav />
+      <SiteNav />
       <Hero />
       <SampleAudit />
       <WhyExtension />
       <BuiltFor />
       <Pricing />
       <FinalCTA />
-      <Footer />
+      <SiteFooter />
     </>
-  );
-}
-
-function Nav() {
-  return (
-    <nav className="nav" aria-label="Primary">
-      <div className="container-x nav-row">
-        <Link href="/" aria-label="LinkedInGrade home">
-          <BrandLockup size={24} fontSize={17} />
-        </Link>
-        <div className="nav-links" role="navigation">
-          <Link href="#sample">Sample</Link>
-          <Link href="#how">How it works</Link>
-          <Link href="#audiences">Built for</Link>
-          <Link href="#pricing">Pricing</Link>
-        </div>
-        <div className="nav-cta">
-          <ThemeToggle />
-          <Link href="#cta" className="btn btn-primary">
-            Install free
-          </Link>
-        </div>
-      </div>
-    </nav>
   );
 }
 
@@ -798,129 +772,3 @@ function FinalCTA() {
   );
 }
 
-function Footer() {
-  return (
-    <footer style={{ padding: "64px 0 56px" }}>
-      <div className="container-x">
-        <div className="foot-grid">
-          <div>
-            <Link
-              href="/"
-              aria-label="LinkedInGrade home"
-              style={{ display: "inline-flex" }}
-            >
-              <span
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 9,
-                  fontSize: 17,
-                  fontWeight: 600,
-                  letterSpacing: "-0.025em",
-                }}
-              >
-                <Logo size={22} />
-                <Wordmark />
-              </span>
-            </Link>
-            <p
-              style={{
-                color: "var(--text-2)",
-                fontSize: 13.5,
-                maxWidth: "34ch",
-                margin: "8px 0 0",
-                lineHeight: 1.5,
-              }}
-            >
-              The honest LinkedIn audit. 30-second Chrome extension, 6-page
-              report, real letter grade. Independent and not affiliated with
-              LinkedIn Corp.
-            </p>
-          </div>
-          <FooterCol
-            title="Product"
-            links={[
-              ["Sample audit", "#sample"],
-              ["How it works", "#how"],
-              ["Pricing", "#pricing"],
-              ["Changelog", "#"],
-            ]}
-          />
-          <FooterCol
-            title="Use cases"
-            links={[
-              ["For job seekers", "#audiences"],
-              ["For coaches", "#audiences"],
-              ["For recruiters", "#audiences"],
-              ["For sales", "#audiences"],
-            ]}
-          />
-          <FooterCol
-            title="Company"
-            links={[
-              ["Method", "#"],
-              ["Privacy", "#"],
-              ["Terms", "#"],
-              ["Contact", "mailto:hi@linkedingrade.com"],
-            ]}
-          />
-        </div>
-        <div className="foot-meta">
-          <span>© 2026 LINKEDINGRADE</span>
-          <span>SET IN GEIST &amp; GEIST MONO</span>
-          <span>VOL. 01 · NO. 01 · LAUNCH</span>
-        </div>
-      </div>
-    </footer>
-  );
-}
-
-function FooterCol({
-  title,
-  links,
-}: {
-  title: string;
-  links: [string, string][];
-}) {
-  return (
-    <div>
-      <h5
-        className="font-mono"
-        style={{
-          margin: "0 0 14px",
-          fontSize: 10.5,
-          letterSpacing: "0.1em",
-          textTransform: "uppercase",
-          color: "var(--text-3)",
-          fontWeight: 500,
-        }}
-      >
-        {title}
-      </h5>
-      <ul
-        style={{
-          margin: 0,
-          padding: 0,
-          listStyle: "none",
-          display: "flex",
-          flexDirection: "column",
-          gap: 8,
-        }}
-      >
-        {links.map(([label, href]) => (
-          <li key={label}>
-            <Link
-              href={href}
-              style={{
-                color: "var(--text-2)",
-                fontSize: 14,
-              }}
-            >
-              {label}
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
