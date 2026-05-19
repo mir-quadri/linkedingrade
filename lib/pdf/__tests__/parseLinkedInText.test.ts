@@ -785,6 +785,99 @@ M.S. Computer Science (2015 - 2017)
   });
 });
 
+describe('parseLinkedInText - education with standalone date-range line', () => {
+  it('handles three-line education entries (School / Degree / Dates)', () => {
+    const profile = parseLinkedInText(`Contact
+www.linkedin.com/in/edu3
+
+Top Skills
+A
+
+Languages
+English
+
+Certifications
+C
+
+Edu Three
+Engineer
+City
+
+Summary
+S.
+
+Experience
+Acme
+Engineer
+March 2022 - Present (3 years 2 months)
+Remote
+
+Education
+Stanford University
+Master of Science in Computer Science
+2015 - 2017
+Massachusetts Institute of Technology
+Bachelor of Science in Computer Science
+Sep 2011 - Jun 2015
+`);
+    expect(profile.education.data).toEqual([
+      {
+        school: 'Stanford University',
+        degree: 'Master of Science in Computer Science',
+        dates: '2015 - 2017',
+      },
+      {
+        school: 'Massachusetts Institute of Technology',
+        degree: 'Bachelor of Science in Computer Science',
+        dates: 'Sep 2011 - Jun 2015',
+      },
+    ]);
+  });
+
+  it('handles a mixed export with both parenthesised and standalone date shapes', () => {
+    const profile = parseLinkedInText(`Contact
+www.linkedin.com/in/mix
+
+Top Skills
+A
+
+Languages
+English
+
+Certifications
+C
+
+Mix Person
+Engineer
+City
+
+Summary
+S.
+
+Experience
+Acme
+Engineer
+March 2022 - Present (3 years 2 months)
+Remote
+
+Education
+Stanford University
+Master of Science in Computer Science (2015 - 2017)
+MIT
+B.S. EECS
+2011 - 2015
+`);
+    expect(profile.education.data).toEqual([
+      {
+        school: 'Stanford University',
+        degree: 'Master of Science in Computer Science',
+        dates: '2015 - 2017',
+      },
+      { school: 'MIT', degree: 'B.S. EECS', dates: '2011 - 2015' },
+    ]);
+  });
+});
+
 describe('parseLinkedInText - profile without Summary section', () => {
   it('still recovers name/headline/location using Experience as the anchor', () => {
     const profile = parseLinkedInText(`Contact

@@ -460,28 +460,52 @@ function toExperienceEntry(raw: RawExperience): ExperienceEntry {
 }
 
 /**
- * Education entries are pairs: institution name on one line, then a
- * degree/field line that may carry a parenthesised date range, e.g.
- * "Bachelor of Science in Computer Science (2014 - 2018)".
+ * Standalone education-date range, e.g. "2014 - 2018" or "Sep 2014 - May 2018"
+ * appearing on its own line. Used to detect three-line education entries
+ * where the dates aren't parenthesised into the degree line.
+ */
+const STANDALONE_EDU_DATES =
+  /^(?:(?:[A-Za-z]{3,9}\s+)?(?:19|20)\d{2})\s*[-–—]\s*(?:(?:[A-Za-z]{3,9}\s+)?(?:19|20)\d{2}|Present|Current)$/i;
+
+/**
+ * Education entries come in two shapes:
+ *   - Two lines: `School` then `Degree (Dates)` — dates parenthesised into
+ *     the degree line.
+ *   - Three lines: `School` then `Degree` then a standalone date-range
+ *     line.
+ *
+ * The fixed `i += 2` walk treated the standalone date line as the next
+ * school, corrupting every subsequent entry (the Codex P2 we're closing).
+ * The loop now looks ahead — when the line after the degree matches a
+ * date-range pattern, consume it as this entry's dates and skip it before
+ * moving on.
  */
 function parseEducation(lines: string[]): EducationItem[] {
   const items: EducationItem[] = [];
-  for (let i = 0; i < lines.length; i += 2) {
+  let i = 0;
+  while (i < lines.length) {
     const school = lines[i]?.trim();
-    const detail = lines[i + 1]?.trim();
+    i += 1;
     if (!school) continue;
-    if (!detail) {
+    if (i >= lines.length) {
       items.push({ school, degree: null, dates: null });
+      break;
+    }
+    const detail = lines[i]!.trim();
+    i += 1;
+    const parenMatch = detail.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
+    if (parenMatch) {
+      const degree = parenMatch[1]!.trim() || null;
+      const dates = parenMatch[2]!.trim();
+      items.push({ school, degree, dates });
       continue;
     }
-    const dateMatch = detail.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
-    if (dateMatch) {
-      const degree = dateMatch[1]!.trim() || null;
-      const dates = dateMatch[2]!.trim();
-      items.push({ school, degree, dates });
-    } else {
-      items.push({ school, degree: detail, dates: null });
+    if (i < lines.length && STANDALONE_EDU_DATES.test(lines[i]!.trim())) {
+      items.push({ school, degree: detail || null, dates: lines[i]!.trim() });
+      i += 1;
+      continue;
     }
+    items.push({ school, degree: detail || null, dates: null });
   }
   return items;
 }
