@@ -737,6 +737,58 @@ Degree (2014 - 2018)
 });
 
 describe('parseLinkedInText - content lines must not shadow real section headers', () => {
+  it('a Top Skill literally named "Languages" does not shadow the real Languages header', () => {
+    // Languages is the NEXT canonical sidebar header after Top Skills, so
+    // the order-aware scan used to accept the skill line as the real
+    // Languages header (since it matched the very next canonical name).
+    // The blank-above paragraph-boundary check rules it out.
+    const profile = parseLinkedInText(`Contact
+www.linkedin.com/in/x
+
+Top Skills
+TypeScript
+Languages
+React
+
+Languages
+English (Native or Bilingual)
+French (Limited Working)
+
+Certifications
+Cert
+
+Lang Person
+Senior Engineer
+Brooklyn, NY
+
+Summary
+S.
+
+Experience
+Acme
+Senior Engineer
+March 2022 - Present (3 years 2 months)
+Brooklyn, NY
+
+Education
+School
+Degree (2014 - 2018)
+`);
+    // The skill stays a skill — all three "Top Skills" items survive.
+    expect(profile.skills.data?.topThree).toEqual([
+      'TypeScript',
+      'Languages',
+      'React',
+    ]);
+    // The real Certifications section parses to the real cert, not to
+    // language items that would have been mis-attributed.
+    expect(profile.certifications.data).toEqual([
+      { name: 'Cert', issuer: null, date: null },
+    ]);
+    // Identity still recovers correctly downstream.
+    expect(profile.fullName).toBe('Lang Person');
+  });
+
   it('a Top Skill literally named "Education" does not capture the Education section', () => {
     const profile = parseLinkedInText(`Contact
 www.linkedin.com/in/x

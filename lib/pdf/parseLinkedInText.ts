@@ -66,16 +66,38 @@ function present<T>(data: T): SectionExtraction<T> {
   return { data, confidence: 'high' };
 }
 
-/**
- * Split the raw text into a clean array of trimmed lines with page-footers
- * removed. Blank lines are dropped — LinkedIn's PDF export does not put any
- * structural meaning on blank lines that section headers don't already carry.
- */
-function normalizeLines(text: string): string[] {
-  return text
+interface NormalizedLines {
+  /** Non-blank, non-page-footer lines in document order. */
+  lines: string[];
+  /**
+   * For each entry in `lines`, true when the immediately preceding raw line
+   * was blank (or a page footer, which acts as a paragraph break).
+   * LinkedIn's PDF export puts a blank line above every real section header,
+   * so this is the structural signal we use to distinguish a header from a
+   * sidebar list item that happens to share the header's text (e.g. a Top
+   * Skill literally named "Languages").
+   */
+  isBlankAbove: boolean[];
+}
+
+function normalizeLines(text: string): NormalizedLines {
+  const raw = text
     .split(/\r?\n/)
-    .map((l) => l.replace(/ /g, ' ').trimEnd())
-    .filter((l) => l.trim().length > 0 && !PAGE_FOOTER.test(l));
+    .map((l) => l.replace(/ /g, ' ').trimEnd());
+  const lines: string[] = [];
+  const isBlankAbove: boolean[] = [];
+  let pendingBlank = true; // start-of-doc counts as a paragraph break
+  for (const r of raw) {
+    const t = r.trim();
+    if (!t || PAGE_FOOTER.test(r)) {
+      pendingBlank = true;
+      continue;
+    }
+    lines.push(r);
+    isBlankAbove.push(pendingBlank);
+    pendingBlank = false;
+  }
+  return { lines, isBlankAbove };
 }
 
 /**
@@ -91,12 +113,21 @@ function normalizeLines(text: string): string[] {
  * Save-to-PDF export in, so iterating it gives us the order constraint for
  * free.
  */
-function findHeaders(lines: string[]): HeaderIndex[] {
+function findHeaders(
+  lines: string[],
+  isBlankAbove: boolean[],
+): HeaderIndex[] {
   const found: HeaderIndex[] = [];
   let cursor = 0;
   for (const header of SECTION_HEADERS) {
     for (let i = cursor; i < lines.length; i++) {
-      if (lines[i]!.trim() === header) {
+      // Two-part check: the text must match AND the line must sit at a
+      // paragraph boundary (blank line / page footer / start-of-doc above
+      // it). The boundary check is what stops a sidebar item literally
+      // named "Languages" / "Certifications" / etc. from being recorded
+      // as the real header — adjacent list items don't carry the
+      // blank-above marker that real section headers do.
+      if (lines[i]!.trim() === header && isBlankAbove[i]) {
         found.push({ header, line: i });
         cursor = i + 1;
         break;
@@ -537,8 +568,8 @@ export function parseLinkedInText(
   rawText: string,
   options: ParseLinkedInOptions = {},
 ): ProfileData {
-  const lines = normalizeLines(rawText);
-  const headers = findHeaders(lines);
+  const { lines, isBlankAbove } = normalizeLines(rawText);
+  const headers = findHeaders(lines, isBlankAbove);
 
   const contactLines = sliceSection(lines, headers, 'Contact');
   const summaryLines = sliceSection(lines, headers, 'Summary');
