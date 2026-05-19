@@ -38,7 +38,16 @@ export function buildJudgeRequest(profile: ProfileData): JudgeRequest {
   // extractExperience stores the current role as history[0]; skip it here so
   // the current-role description doesn't appear in fullText twice and over-
   // weight a single section in the AI's buzzword/keyword judgment.
-  const pastRoles = (profile.experienceHistory.data ?? []).slice(1);
+  //
+  // SYNC-DIVERGENCE: the unconditional `slice(1)` is wrong when there is
+  // no current role (PDF-sourced between-jobs profiles). In that case
+  // history[0] is the most recent past role and dropping it strips the
+  // user's freshest description from `fullText`, starving the AI's
+  // buzzword/keyword judgments. See `lib/engine/README.md`. Back-port and
+  // restore the unconditional form once the extension lands the same fix.
+  const pastRoles = cur
+    ? (profile.experienceHistory.data ?? []).slice(1)
+    : (profile.experienceHistory.data ?? []);
   const fullText = [
     profile.headline.data ?? '',
     profile.about.data ?? '',
@@ -132,7 +141,12 @@ function expectedJudgeKeys(profile: ProfileData): (keyof JudgeResponse)[] {
   // Must mirror buildJudgeRequest.fullText, which also pulls past-role
   // descriptions — otherwise profiles with text only in history would
   // wrongly report 'ok' when buzzwords/keywords judgments are missing.
-  const pastRoles = (profile.experienceHistory.data ?? []).slice(1);
+  // SYNC-DIVERGENCE: mirrors the conditional slice in buildJudgeRequest
+  // so expectedJudgeKeys stays consistent with what fullText actually
+  // contained. See `lib/engine/README.md`.
+  const pastRoles = profile.currentExperience.data
+    ? (profile.experienceHistory.data ?? []).slice(1)
+    : (profile.experienceHistory.data ?? []);
   const hasText =
     !!profile.headline.data?.trim() ||
     !!profile.about.data?.trim() ||

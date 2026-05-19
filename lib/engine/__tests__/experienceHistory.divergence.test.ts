@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { scoreExperienceHistory } from '@/lib/engine/scoring/sections/experienceHistory';
+import { buildJudgeRequest } from '@/lib/engine/scoring/index';
 import type { ProfileData, ExperienceEntry } from '@/lib/engine/types';
 
 function makeEntry(over: Partial<ExperienceEntry> = {}): ExperienceEntry {
@@ -76,5 +77,49 @@ describe('scoreExperienceHistory (SYNC-DIVERGENCE from extension)', () => {
     });
     const result = scoreExperienceHistory(profile);
     expect(result.reasons.join(' ')).toMatch(/bare title-and-date stubs/);
+  });
+});
+
+describe('buildJudgeRequest fullText (SYNC-DIVERGENCE)', () => {
+  it('keeps history[0] in fullText when there is no current role', () => {
+    const recent = makeEntry({
+      title: 'Senior Engineer',
+      description: 'UNIQUE_RECENT_DESCRIPTION shipped multi-region failover.',
+    });
+    const older = makeEntry({
+      title: 'Engineer',
+      description: 'Older role description.',
+    });
+    const profile = makeProfile({
+      history: [recent, older],
+      currentRole: null,
+    });
+    const req = buildJudgeRequest(profile);
+    // Without the conditional, history[0]'s description gets stripped from
+    // fullText and the AI judge has no signal from the user's freshest role.
+    expect(req.fullText?.text ?? '').toContain('UNIQUE_RECENT_DESCRIPTION');
+  });
+
+  it('still drops history[0] when there is a current role', () => {
+    const current = makeEntry({
+      title: 'Staff Engineer',
+      description:
+        'CURRENT_ROLE_DESCRIPTION owns the deploy pipeline end to end.',
+    });
+    const older = makeEntry({
+      title: 'Engineer',
+      description: 'PAST_ROLE_DESCRIPTION.',
+    });
+    const profile = makeProfile({
+      history: [current, older],
+      currentRole: current,
+    });
+    const req = buildJudgeRequest(profile);
+    const text = req.fullText?.text ?? '';
+    // The current role's description comes from `cur?.description` already
+    // and must appear exactly once — it must not be repeated via history[0].
+    const occurrences = text.split('CURRENT_ROLE_DESCRIPTION').length - 1;
+    expect(occurrences).toBe(1);
+    expect(text).toContain('PAST_ROLE_DESCRIPTION');
   });
 });

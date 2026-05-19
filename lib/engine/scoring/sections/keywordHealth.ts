@@ -124,7 +124,13 @@ function collectText(p: ProfileData): string {
   if (cur) parts.push(cur);
   // extractExperience stores the current role as history[0]; skip it so the
   // current-role description doesn't get counted twice in the buzzword scan.
-  for (const e of (p.experienceHistory.data ?? []).slice(1)) {
+  // SYNC-DIVERGENCE: when there's no current role the conditional keeps
+  // history[0] (the most recent past role) in the scan, otherwise the
+  // buzzword/keyword health is judged from stale or empty text on
+  // between-jobs PDFs. See `lib/engine/README.md`.
+  const history = p.experienceHistory.data ?? [];
+  const past = p.currentExperience.data ? history.slice(1) : history;
+  for (const e of past) {
     if (e.description) parts.push(e.description);
   }
   return parts.join('\n\n');

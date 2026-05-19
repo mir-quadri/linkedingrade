@@ -31,11 +31,14 @@ These are intentional, isolated fixes applied here ahead of the next
 extension→website sync. Each must be back-ported to
 `linkedingrade-extension` and removed from this list.
 
-- `scoring/sections/experienceHistory.ts` — `past = entries.slice(1)`
-  is now guarded on `currentExperience.data` being non-null. Without
-  the guard, the website's PDF parser correctly reports a between-jobs
-  profile as having no current role, but the unconditional `slice(1)`
-  drops the most-recent past role from the history score, silently
-  excluding the user's strongest evidence. The conditional restores
-  the intended behaviour. Look for the `SYNC-DIVERGENCE` comment in
-  the file.
+- Conditional `slice(1)` on `experienceHistory.data` — three callsites
+  inside the engine assume `history[0]` is the current role, which is
+  wrong when the PDF parser correctly surfaces a between-jobs profile
+  with `currentExperience.data = null`. Each callsite now keeps
+  `history[0]` when there's no current role and otherwise drops it as
+  before. Look for the `SYNC-DIVERGENCE` comments in:
+  - `scoring/sections/experienceHistory.ts` (full-history score)
+  - `scoring/index.ts` — `buildJudgeRequest` and `expectedJudgeKeys`
+    (AI judge `fullText` + judge-coverage accounting)
+  - `scoring/sections/keywordHealth.ts` — `collectText` (buzzword /
+    keyword scan)
