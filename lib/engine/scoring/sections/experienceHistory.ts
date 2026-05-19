@@ -47,8 +47,18 @@ export function scoreExperienceHistory(profile: ProfileData): ExperienceHistoryS
     };
   }
 
-  // Look at non-current roles only (skip index 0, the current role).
-  const past = entries.slice(1);
+  // Look at non-current roles only. The website's PDF parser correctly
+  // reports `currentExperience.data = null` for between-jobs profiles, in
+  // which case `entries[0]` is the most recent *past* role and must stay
+  // in the history score — otherwise the strongest evidence the user has
+  // is silently excluded. When there IS a current role, it sits at
+  // entries[0] and we drop it as before.
+  //
+  // SYNC-DIVERGENCE: this conditional diverges from
+  // linkedingrade-extension's `src/scoring/sections/experienceHistory.ts`,
+  // which still does an unconditional `slice(1)`. Back-port and remove
+  // this note once the extension lands the same change.
+  const past = profile.currentExperience.data ? entries.slice(1) : entries;
   const withDescription = past.filter((e) => (e.description?.trim().length ?? 0) >= 40);
   const withQuantifiers = past.filter((e) => countQuantifiers(e.description) >= 1);
 

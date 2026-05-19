@@ -24,3 +24,18 @@ Do NOT modify scoring logic, rubric weights, or seniority logic in this
 copy. If a bug needs fixing, fix it in the extension repo first, then
 copy the change here. The only local edits permitted are import-path
 adjustments so the code compiles under this repo's `@/*` alias.
+
+## Known divergences from the extension
+
+These are intentional, isolated fixes applied here ahead of the next
+extension→website sync. Each must be back-ported to
+`linkedingrade-extension` and removed from this list.
+
+- `scoring/sections/experienceHistory.ts` — `past = entries.slice(1)`
+  is now guarded on `currentExperience.data` being non-null. Without
+  the guard, the website's PDF parser correctly reports a between-jobs
+  profile as having no current role, but the unconditional `slice(1)`
+  drops the most-recent past role from the history score, silently
+  excluding the user's strongest evidence. The conditional restores
+  the intended behaviour. Look for the `SYNC-DIVERGENCE` comment in
+  the file.
