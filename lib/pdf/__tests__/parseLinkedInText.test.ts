@@ -478,6 +478,107 @@ Degree (2014 - 2018)
   });
 });
 
+describe('parseLinkedInText - between-jobs profile (no Present role)', () => {
+  it('reports currentExperience as missing rather than promoting the latest past role', () => {
+    const profile = parseLinkedInText(`Contact
+www.linkedin.com/in/between
+
+Top Skills
+A
+
+Languages
+English
+
+Certifications
+C
+
+Pat Between
+Between roles
+Brooklyn, NY
+
+Summary
+Taking time off.
+
+Experience
+Acme
+Senior Engineer
+February 2020 - November 2024 (4 years 10 months)
+Brooklyn, NY
+• Owned the platform team.
+
+Beta
+Engineer
+March 2017 - January 2020 (2 years 11 months)
+Remote
+
+Education
+School
+Degree (2013 - 2017)
+`);
+    expect(profile.currentExperience.data).toBeNull();
+    expect(profile.currentExperience.confidence).toBe('missing');
+    expect(profile.currentExperience.notes).toMatch(/no current role/i);
+    // History is still populated.
+    expect(profile.experienceHistory.data).toHaveLength(2);
+    expect(profile.experienceHistory.data?.[0]?.company).toBe('Acme');
+  });
+});
+
+describe('parseLinkedInText - plain-text descriptions inside grouped roles', () => {
+  it('keeps continuation roles when the gap looks like description prose, not a new company', () => {
+    const profile = parseLinkedInText(`Contact
+www.linkedin.com/in/prose
+
+Top Skills
+A
+
+Languages
+English
+
+Certifications
+C
+
+Plain Prose
+Senior Engineer
+City
+
+Summary
+Tenured across three roles.
+
+Experience
+Acme
+6 years
+Director of Engineering
+March 2023 - Present (2 years 2 months)
+San Francisco, CA
+Led the platform group across five teams
+Senior Engineering Manager
+January 2021 - February 2023 (2 years 1 month)
+San Francisco, CA
+Drove the developer experience charter end to end
+Senior Engineer
+March 2019 - December 2020 (1 year 9 months)
+San Francisco, CA
+
+Education
+School
+Degree (2010 - 2014)
+`);
+    const history = profile.experienceHistory.data!;
+    // All three roles must remain attributed to Acme; the plain-text
+    // descriptions ("Led the platform group…", "Drove the developer…")
+    // sit in the same structural slot a fresh-entry company line would
+    // occupy, so the parser has to distinguish prose from company names.
+    expect(history).toHaveLength(3);
+    expect(history.every((e) => e.company === 'Acme')).toBe(true);
+    expect(history.map((e) => e.title)).toEqual([
+      'Director of Engineering',
+      'Senior Engineering Manager',
+      'Senior Engineer',
+    ]);
+  });
+});
+
 describe('parseLinkedInText - graceful degradation', () => {
   it('does not throw on a profile missing optional sections', () => {
     const minimal = `Contact

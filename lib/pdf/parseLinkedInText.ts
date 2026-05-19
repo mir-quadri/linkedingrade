@@ -219,6 +219,38 @@ interface RawExperience {
  */
 type DateLineKind = 'fresh' | 'group-start' | 'continuation';
 
+/**
+ * Heuristic: does this line read like a LinkedIn company name rather than a
+ * sentence of description prose? Companies render in Title Case ("Acme Corp",
+ * "Goldman Sachs", "Bank of America"), are usually short, and don't terminate
+ * with sentence-ending punctuation. Prose descriptions ("Led major initiatives
+ * across teams.") mix in lowercase non-connector words and often end with a
+ * period.
+ *
+ * This is intentionally conservative — when it returns false we fall through
+ * to "continuation", which preserves same-company attribution rather than
+ * splitting a grouped tenure into the wrong shape.
+ */
+const CONNECTOR_WORDS = new Set([
+  'a', 'an', 'and', 'at', 'by', 'de', 'for', 'in', 'la', 'le', 'of',
+  'on', 'or', 'the', 'to', 'von', '&', '+',
+]);
+function looksLikeCompanyLine(line: string): boolean {
+  const t = line.trim();
+  if (!t || t.startsWith('•')) return false;
+  if (t.length > 80) return false;
+  if (/[.?!]$/.test(t)) return false;
+  const words = t.split(/\s+/);
+  if (words.length === 0) return false;
+  for (const w of words) {
+    if (CONNECTOR_WORDS.has(w.toLowerCase())) continue;
+    // Title-case test: a word that starts with a letter must start with a
+    // capital. Words starting with a digit, ampersand or other symbol pass.
+    if (/^[a-z]/.test(w)) return false;
+  }
+  return true;
+}
+
 function classifyDateLines(
   lines: string[],
   dateIdx: number[],
@@ -239,16 +271,15 @@ function classifyDateLines(
       continue;
     }
     if (inGroup && d > 0) {
-      // Continuation roles share the parent company and only add a title
-      // line of preamble — so between consecutive dates we either see
-      // `[<location>] [• bullets…] <next title>` (description present) or
-      // just `<next title>` (no description), giving at most two non-bullet
-      // lines (location + title). A *fresh* entry after the group inserts a
-      // dedicated company line, lifting the non-bullet count to ≥3
-      // (prev-location + new-company + new-title). Counting bullets isn't
-      // useful — a grouped role with bullet descriptions still exits to a
-      // fresh entry when the new company line is present, so we key the
-      // exit signal off non-bullet count only.
+      // A *fresh* entry after the group inserts a dedicated company line, so
+      // the gap between consecutive dates contains ≥3 non-bullet lines
+      // (prev-location + new-company + new-title) AND the line two above the
+      // date itself looks like a company name (Title Case, no terminal
+      // punctuation, short). Without the content check, a continuation role
+      // whose description is a plain non-bullet sentence ("Led major
+      // initiatives across teams") would also produce three non-bullet
+      // lines and get mis-classified as a new company — which is exactly
+      // the Codex P2 we're closing here.
       const prevJ = dateIdx[d - 1]!;
       let nonBullets = 0;
       for (let k = prevJ + 1; k < j; k++) {
@@ -256,7 +287,8 @@ function classifyDateLines(
         if (!t || t.startsWith('•')) continue;
         nonBullets += 1;
       }
-      if (nonBullets >= 3) {
+      const companyCandidate = j >= 2 ? lines[j - 2]!.trim() : '';
+      if (nonBullets >= 3 && looksLikeCompanyLine(companyCandidate)) {
         inGroup = false;
         kinds.push('fresh');
         continue;
@@ -464,11 +496,18 @@ export function parseLinkedInText(
   const rawExperiences = parseExperience(experienceLines);
   const experienceEntries = rawExperiences.map(toExperienceEntry);
   const currentRaw = rawExperiences.find((e) => e.isCurrent);
+  // A profile with no role ending in "Present" / "Current" has no current
+  // role — typical for someone between jobs. Returning the most recent past
+  // role as `currentExperience` would feed the current-role scorer and judge
+  // as if the user still held that job, so we explicitly report missing
+  // instead of falling back to history[0].
   const currentExperience: SectionExtraction<ExperienceEntry> = currentRaw
     ? present(toExperienceEntry(currentRaw))
-    : experienceEntries[0]
-      ? present(experienceEntries[0])
-      : missing('No experience entries parsed from PDF');
+    : missing(
+        experienceEntries.length > 0
+          ? 'No current role — no Experience entry ends in "Present" in this PDF'
+          : 'No experience entries parsed from PDF',
+      );
   const experienceHistory: SectionExtraction<ExperienceEntry[]> =
     experienceEntries.length > 0
       ? present(experienceEntries)
