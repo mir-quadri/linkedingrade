@@ -367,6 +367,117 @@ B.S. EECS (2013 - 2017)
   });
 });
 
+describe('parseLinkedInText - exits a group when a bullet description precedes a fresh company', () => {
+  it('treats the post-bullets new company as a fresh entry, not a continuation', () => {
+    const profile = parseLinkedInText(`Contact
+www.linkedin.com/in/x
+
+Top Skills
+A
+B
+C
+
+Languages
+English
+
+Certifications
+Cert One
+
+Sample Person
+Headline
+Location
+
+Summary
+S.
+
+Experience
+Acme
+4 years 2 months
+Senior Engineer
+March 2023 - Present (2 years 2 months)
+Remote
+• Owned the platform team's roadmap.
+• Shipped multi-region failover.
+Engineer
+January 2021 - February 2023 (2 years)
+Remote
+• Built the deploy pipeline that cut p95 deploys by 4x.
+Beta Co
+Engineer
+June 2018 - December 2020 (2 years 7 months)
+Boston, MA
+• First engineer on data platform.
+
+Education
+School
+Degree (2014 - 2018)
+`);
+    const history = profile.experienceHistory.data!;
+    const acme = history.filter((e) => e.company === 'Acme');
+    const beta = history.filter((e) => e.company === 'Beta Co');
+    expect(acme).toHaveLength(2);
+    expect(beta).toHaveLength(1);
+    expect(beta[0]?.title).toBe('Engineer');
+    // The bullet-tail of the prior Acme role must NOT have been re-attributed
+    // as a company.
+    expect(
+      history.every((e) => !e.company?.startsWith('•')),
+    ).toBe(true);
+  });
+});
+
+describe('parseLinkedInText - date-line anchor only matches real LinkedIn date ranges', () => {
+  it('ignores description bullets that incidentally contain " - " and parentheses', () => {
+    const profile = parseLinkedInText(`Contact
+www.linkedin.com/in/x
+
+Top Skills
+A
+
+Languages
+English
+
+Certifications
+C
+
+Real Person
+Headline
+City
+
+Summary
+S.
+
+Experience
+Acme
+Senior Engineer
+February 2022 - Present (3 years 3 months)
+San Francisco, CA
+• Reduced latency - improved p95 (35%)
+• Migration to k8s - moved 12 services (Q3)
+
+Beta
+Engineer
+March 2018 - January 2022 (3 years 11 months)
+Remote
+
+Education
+School
+Degree (2014 - 2018)
+`);
+    const history = profile.experienceHistory.data!;
+    // Without the regex tightening, each "• X - Y (Z)" bullet would have
+    // anchored as its own date line, creating phantom entries and stealing
+    // surrounding lines as company/title.
+    expect(history).toHaveLength(2);
+    expect(history.map((e) => e.company)).toEqual(['Acme', 'Beta']);
+    // The bullets must remain in the description, not get hoisted into the
+    // dates/duration fields.
+    expect(history[0]?.description).toContain('Reduced latency');
+    expect(history[0]?.description).toContain('Migration to k8s');
+    expect(history[0]?.dates).toBe('February 2022 - Present');
+  });
+});
+
 describe('parseLinkedInText - graceful degradation', () => {
   it('does not throw on a profile missing optional sections', () => {
     const minimal = `Contact

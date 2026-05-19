@@ -35,10 +35,18 @@ interface HeaderIndex {
 const PAGE_FOOTER = /^\s*Page\s+\d+\s+of\s+\d+\s*$/i;
 
 // Date line: "<start> - <end> (<duration>)".
-// Separator allows ASCII hyphen, en dash or em dash with surrounding spaces.
-// Anchored so a description line that happens to contain a dashed parenthetical
-// can't be mistaken for the role's date line.
-const DATE_LINE = /^(.+?)\s+[-–—]\s+(.+?)\s+\((.+?)\)\s*$/;
+// Endpoints must be a 4-digit calendar year (optionally preceded by a month
+// name) or "Present" / "Current". This stops accomplishment bullets such as
+// "• Reduced latency - improved p95 (35%)" from being mistaken for a role's
+// date line, which would otherwise inject phantom entries and truncate the
+// real role's description.
+const MONTH_NAME =
+  '(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)';
+const DATE_ENDPOINT = `(?:${MONTH_NAME}\\s+)?(?:19|20)\\d{2}|Present|Current`;
+const DATE_LINE = new RegExp(
+  `^(${DATE_ENDPOINT})\\s+[-–—]\\s+(${DATE_ENDPOINT})\\s+\\((.+?)\\)\\s*$`,
+  'i',
+);
 
 // Aggregate-duration line: when a company groups several positions, LinkedIn's
 // PDF places the total tenure ("5 years 3 months") on its own line between the
@@ -234,21 +242,21 @@ function classifyDateLines(
       // Continuation roles share the parent company and only add a title
       // line of preamble — so between consecutive dates we either see
       // `[<location>] [• bullets…] <next title>` (description present) or
-      // just `<next title>` (no description). A *fresh* entry after the
-      // group inserts a dedicated company line, so the gap holds at least
-      // three plain (non-bullet) lines with no bullets in between
-      // (location-of-prev, new company, new title). That asymmetry is the
-      // cleanest exit signal we have without re-parsing role titles.
+      // just `<next title>` (no description), giving at most two non-bullet
+      // lines (location + title). A *fresh* entry after the group inserts a
+      // dedicated company line, lifting the non-bullet count to ≥3
+      // (prev-location + new-company + new-title). Counting bullets isn't
+      // useful — a grouped role with bullet descriptions still exits to a
+      // fresh entry when the new company line is present, so we key the
+      // exit signal off non-bullet count only.
       const prevJ = dateIdx[d - 1]!;
-      let bullets = 0;
       let nonBullets = 0;
       for (let k = prevJ + 1; k < j; k++) {
         const t = lines[k]!.trim();
-        if (!t) continue;
-        if (t.startsWith('•')) bullets += 1;
-        else nonBullets += 1;
+        if (!t || t.startsWith('•')) continue;
+        nonBullets += 1;
       }
-      if (nonBullets >= 3 && bullets === 0) {
+      if (nonBullets >= 3) {
         inGroup = false;
         kinds.push('fresh');
         continue;
