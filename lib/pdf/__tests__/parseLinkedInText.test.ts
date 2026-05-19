@@ -687,6 +687,96 @@ Degree (2014 - 2018)
   });
 });
 
+describe('parseLinkedInText - non-US locations inside grouped roles', () => {
+  it('keeps grouped continuation when prev role location is "City, Country"', () => {
+    const profile = parseLinkedInText(`Contact
+www.linkedin.com/in/intl
+
+Top Skills
+A
+
+Languages
+English
+
+Certifications
+C
+
+Intl Person
+Senior Engineer
+London, England
+
+Summary
+S.
+
+Experience
+Acme
+5 years
+Senior Engineer
+March 2023 - Present (2 years 2 months)
+London, England
+• Owned the platform.
+Engineer
+February 2020 - February 2023 (3 years)
+London, England
+• Built things.
+
+Education
+School
+Degree (2014 - 2018)
+`);
+    const history = profile.experienceHistory.data!;
+    // Both grouped roles must stay attributed to Acme; the "London,
+    // England" location must NOT be parsed as the continuation role's
+    // company.
+    expect(history).toHaveLength(2);
+    expect(history.every((e) => e.company === 'Acme')).toBe(true);
+    expect(history.map((e) => e.title)).toEqual([
+      'Senior Engineer',
+      'Engineer',
+    ]);
+  });
+
+  it('handles three-part international locations like "Mumbai, Maharashtra, India"', () => {
+    const profile = parseLinkedInText(`Contact
+www.linkedin.com/in/in
+
+Top Skills
+A
+
+Languages
+English
+
+Certifications
+C
+
+India Person
+Senior Engineer
+Mumbai, Maharashtra, India
+
+Summary
+S.
+
+Experience
+Acme
+4 years
+Senior Engineer
+March 2023 - Present (2 years 2 months)
+Mumbai, Maharashtra, India
+• Owned the platform.
+Engineer
+March 2021 - February 2023 (2 years)
+Mumbai, Maharashtra, India
+
+Education
+School
+Degree (2014 - 2018)
+`);
+    const history = profile.experienceHistory.data!;
+    expect(history).toHaveLength(2);
+    expect(history.every((e) => e.company === 'Acme')).toBe(true);
+  });
+});
+
 describe('parseLinkedInText - group exit without a prior location', () => {
   it('still classifies the next company as a fresh entry when the last grouped role has no location/description', () => {
     const profile = parseLinkedInText(`Contact

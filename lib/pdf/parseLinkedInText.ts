@@ -317,8 +317,40 @@ const US_STATE_ABBR = new Set([
   'NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT',
   'VA','WA','WV','WI','WY','DC',
 ]);
+/**
+ * Country and major-subdivision names that show up as the trailing token of
+ * a LinkedIn location string ("London, England", "Toronto, Ontario",
+ * "Berlin, Germany", "Mumbai, India"). Stored lowercase for case-insensitive
+ * matching. Not exhaustive — covers the high-frequency LinkedIn user
+ * geographies; uncommon places fall through to the canonical group-exit
+ * heuristic without triggering a fresh-entry exit.
+ */
+const COUNTRY_OR_REGION_NAMES = new Set([
+  'usa','united states','u.s.','u.s.a.',
+  'canada','mexico',
+  'united kingdom','u.k.','england','scotland','wales','northern ireland','ireland',
+  'germany','france','spain','italy','portugal','netherlands','belgium','switzerland',
+  'sweden','norway','denmark','finland','austria','poland','czech republic','czechia',
+  'greece','hungary','romania','luxembourg',
+  'australia','new zealand',
+  'india','china','japan','south korea','korea','singapore','hong kong','taiwan',
+  'thailand','vietnam','philippines','indonesia','malaysia','pakistan','bangladesh',
+  'brazil','argentina','chile','colombia','peru','venezuela',
+  'israel','uae','united arab emirates','saudi arabia','turkey','qatar','jordan','lebanon',
+  'south africa','egypt','nigeria','kenya','morocco','ghana',
+  'russia','ukraine','belarus',
+  // Common UK/Canada/Australia/India subdivisions that often appear as the
+  // last token (e.g. "Toronto, Ontario", "Sydney, New South Wales",
+  // "Mumbai, Maharashtra").
+  'ontario','quebec','british columbia','alberta','manitoba','saskatchewan',
+  'nova scotia','new brunswick',
+  'new south wales','victoria','queensland','western australia','tasmania',
+  'south australia','australian capital territory','northern territory',
+  'maharashtra','karnataka','tamil nadu','delhi','telangana','gujarat',
+  'kerala','west bengal','uttar pradesh','rajasthan','haryana','punjab',
+]);
 const LOCATION_KEYWORD =
-  /\b(remote|hybrid|on[- ]?site|bay area|metro(?:politan)?|greater|region|area|county)\b/i;
+  /\b(remote|hybrid|on[- ]?site|bay area|metro(?:politan)?|greater|region|area|county|district)\b/i;
 function looksLikeLocationLine(line: string): boolean {
   const t = line.trim();
   if (!t || t.startsWith('•')) return false;
@@ -327,9 +359,18 @@ function looksLikeLocationLine(line: string): boolean {
   const parts = t.split(',').map((s) => s.trim()).filter(Boolean);
   if (parts.length >= 2) {
     const last = parts[parts.length - 1]!;
-    const second = parts[parts.length - 2]!;
+    const lastLower = last.toLowerCase();
     if (US_STATE_ABBR.has(last.toUpperCase())) return true;
-    if (US_STATE_ABBR.has(second.toUpperCase())) return true;
+    if (COUNTRY_OR_REGION_NAMES.has(lastLower)) return true;
+    // "City, Region, Country" form: check the middle token too, since the
+    // last one might be a country we don't list (e.g. "Mumbai, Maharashtra,
+    // <Unlisted Country>").
+    if (parts.length >= 3) {
+      const second = parts[parts.length - 2]!;
+      const secondLower = second.toLowerCase();
+      if (US_STATE_ABBR.has(second.toUpperCase())) return true;
+      if (COUNTRY_OR_REGION_NAMES.has(secondLower)) return true;
+    }
   }
   return false;
 }
