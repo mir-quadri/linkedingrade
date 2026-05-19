@@ -78,22 +78,32 @@ function normalizeLines(text: string): string[] {
     .filter((l) => l.trim().length > 0 && !PAGE_FOOTER.test(l));
 }
 
+/**
+ * Match section headers in canonical LinkedIn-PDF order. For each header in
+ * `SECTION_HEADERS`, take the first occurrence that appears *after* the
+ * previously matched header — never before. Out-of-order content lines that
+ * happen to match a later header's label (e.g. a Top Skill literally named
+ * "Education", or a certification called "Experience") therefore cannot
+ * shadow the real section. Headers that don't appear in the document are
+ * simply skipped.
+ *
+ * SECTION_HEADERS is declared in the canonical order LinkedIn writes the
+ * Save-to-PDF export in, so iterating it gives us the order constraint for
+ * free.
+ */
 function findHeaders(lines: string[]): HeaderIndex[] {
   const found: HeaderIndex[] = [];
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]!.trim();
-    if ((SECTION_HEADERS as readonly string[]).includes(line)) {
-      found.push({ header: line as SectionHeader, line: i });
+  let cursor = 0;
+  for (const header of SECTION_HEADERS) {
+    for (let i = cursor; i < lines.length; i++) {
+      if (lines[i]!.trim() === header) {
+        found.push({ header, line: i });
+        cursor = i + 1;
+        break;
+      }
     }
   }
-  // Dedupe: a section may appear twice in extracted text in rare edge cases;
-  // keep the first occurrence so downstream slicing stays in document order.
-  const seen = new Set<SectionHeader>();
-  return found.filter((h) => {
-    if (seen.has(h.header)) return false;
-    seen.add(h.header);
-    return true;
-  });
+  return found;
 }
 
 function sliceSection(

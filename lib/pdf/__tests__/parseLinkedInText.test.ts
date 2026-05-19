@@ -736,6 +736,55 @@ Degree (2014 - 2018)
   });
 });
 
+describe('parseLinkedInText - content lines must not shadow real section headers', () => {
+  it('a Top Skill literally named "Education" does not capture the Education section', () => {
+    const profile = parseLinkedInText(`Contact
+www.linkedin.com/in/x
+
+Top Skills
+Education
+TypeScript
+React
+
+Languages
+English
+
+Certifications
+Cert
+
+Edu Trainer
+Senior Engineer
+Brooklyn, NY
+
+Summary
+S.
+
+Experience
+Acme
+Senior Engineer
+March 2022 - Present (3 years 2 months)
+Brooklyn, NY
+
+Education
+Stanford University
+M.S. Computer Science (2015 - 2017)
+`);
+    expect(profile.skills.data?.topThree).toEqual([
+      'Education',
+      'TypeScript',
+      'React',
+    ]);
+    // The real Education section must still parse, with the genuine school.
+    expect(profile.education.data).toEqual([
+      {
+        school: 'Stanford University',
+        degree: 'M.S. Computer Science',
+        dates: '2015 - 2017',
+      },
+    ]);
+  });
+});
+
 describe('parseLinkedInText - graceful degradation', () => {
   it('does not throw on a profile missing optional sections', () => {
     const minimal = `Contact
