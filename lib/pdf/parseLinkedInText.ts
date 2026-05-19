@@ -286,6 +286,30 @@ const CONNECTOR_WORDS = new Set([
   'a', 'an', 'and', 'at', 'by', 'de', 'for', 'in', 'la', 'le', 'of',
   'on', 'or', 'the', 'to', 'von', '&', '+',
 ]);
+/**
+ * A single word is "company-like" when one of these holds:
+ *   - It's a connector word ("of", "the", "&", …).
+ *   - It starts with an uppercase letter (canonical Title Case).
+ *   - It starts with a digit or symbol (e.g. "23andMe", "3M", "&pizza").
+ *   - It's internally capitalised (camelCase like "eBay", "iRobot",
+ *     "iPhone", "GoPro").
+ *   - It contains a domain-style suffix like ".com", ".io", ".ai"
+ *     ("monday.com", "x.ai", "openai.com").
+ *
+ * The internal-cap and dotted-brand patterns are what let lowercase-led
+ * modern company names exit a grouped tenure instead of being mistaken for
+ * description text.
+ */
+function isCompanyWord(w: string): boolean {
+  if (!w) return false;
+  if (CONNECTOR_WORDS.has(w.toLowerCase())) return true;
+  if (/^[A-Z]/.test(w)) return true;
+  if (/^[^a-zA-Z]/.test(w)) return true; // digit / symbol start
+  if (/[A-Z]/.test(w)) return true; // internal capital (eBay, iRobot)
+  if (/\.[a-zA-Z]{2,}\b/.test(w)) return true; // monday.com, x.ai
+  return false;
+}
+
 function looksLikeCompanyLine(line: string): boolean {
   const t = line.trim();
   if (!t || t.startsWith('•')) return false;
@@ -294,10 +318,7 @@ function looksLikeCompanyLine(line: string): boolean {
   const words = t.split(/\s+/);
   if (words.length === 0) return false;
   for (const w of words) {
-    if (CONNECTOR_WORDS.has(w.toLowerCase())) continue;
-    // Title-case test: a word that starts with a letter must start with a
-    // capital. Words starting with a digit, ampersand or other symbol pass.
-    if (/^[a-z]/.test(w)) return false;
+    if (!isCompanyWord(w)) return false;
   }
   return true;
 }
@@ -367,13 +388,32 @@ const COUNTRY_OR_REGION_NAMES = new Set([
   'maharashtra','karnataka','tamil nadu','delhi','telangana','gujarat',
   'kerala','west bengal','uttar pradesh','rajasthan','haryana','punjab',
 ]);
-const LOCATION_KEYWORD =
-  /\b(remote|hybrid|on[- ]?site|bay area|metro(?:politan)?|greater|region|area|county|district)\b/i;
+/**
+ * Location-style phrases that LinkedIn surfaces *instead* of a comma-
+ * separated City/State/Country line. Each pattern matches a whole phrase
+ * (e.g. "Bay Area", "Greater Boston Area", "Metropolitan Region") rather
+ * than a bare keyword — bare `region` / `area` / `county` would otherwise
+ * fire on description text like "multi-region failover" or
+ * "owns the area roadmap" and steal it as a location.
+ */
+const LOCATION_PHRASES: RegExp[] = [
+  /\b(?:remote|hybrid|on[- ]?site)\b/i,
+  /\bbay area\b/i,
+  /\bgreater\s+[A-Z][a-z]/, // "Greater Boston", "Greater Atlanta"
+  /\b(?:metro|metropolitan)\s+(?:area|region)\b/i,
+  /\bmetropolitan\s+[A-Z][a-z]/, // "Metropolitan Tokyo"
+];
+function matchesLocationPhrase(t: string): boolean {
+  for (const re of LOCATION_PHRASES) {
+    if (re.test(t)) return true;
+  }
+  return false;
+}
 function looksLikeLocationLine(line: string): boolean {
   const t = line.trim();
   if (!t || t.startsWith('•')) return false;
   if (t.length > 100) return false;
-  if (LOCATION_KEYWORD.test(t)) return true;
+  if (matchesLocationPhrase(t)) return true;
   const parts = t.split(',').map((s) => s.trim()).filter(Boolean);
   if (parts.length >= 2) {
     const last = parts[parts.length - 1]!;
@@ -518,7 +558,13 @@ function parseExperience(lines: string[]): RawExperience[] {
     let location: string | null = null;
     if (cursor < blockEnd) {
       const candidate = lines[cursor]!.trim();
-      if (!candidate.startsWith('•')) {
+      // Only treat the first post-date line as location when it actually
+      // *looks* like a LinkedIn location string (City + state/country, a
+      // location keyword like "Remote" / "Bay Area", or "Greater X Area").
+      // Otherwise leave it for description — a role that omits location and
+      // begins with a plain-text description sentence used to lose that
+      // sentence to the location field.
+      if (!candidate.startsWith('•') && looksLikeLocationLine(candidate)) {
         location = candidate;
         cursor += 1;
       }

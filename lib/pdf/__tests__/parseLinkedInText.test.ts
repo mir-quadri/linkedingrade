@@ -687,6 +687,112 @@ Degree (2014 - 2018)
   });
 });
 
+describe('parseLinkedInText - location omitted, description-first', () => {
+  it('does not steal the first description line as location when location is missing', () => {
+    const profile = parseLinkedInText(`Contact
+www.linkedin.com/in/desc
+
+Top Skills
+A
+
+Languages
+English
+
+Certifications
+C
+
+Desc Person
+Senior Engineer
+City
+
+Summary
+S.
+
+Experience
+Acme
+Senior Engineer
+March 2022 - Present (3 years 2 months)
+Led the platform group to multi-region failover and 4-minute deploys.
+Shipped the deploy pipeline that cut p95 deploys by 4x.
+
+Education
+School
+Degree (2014 - 2018)
+`);
+    const entry = profile.experienceHistory.data![0]!;
+    expect(entry.company).toBe('Acme');
+    expect(entry.title).toBe('Senior Engineer');
+    // No location section in the role, so the description must contain
+    // both prose lines — neither stolen by the location-after-date branch.
+    expect(entry.description).toContain('Led the platform group');
+    expect(entry.description).toContain('Shipped the deploy pipeline');
+  });
+});
+
+describe('parseLinkedInText - lowercase-branded companies', () => {
+  it('treats "eBay" / "iRobot" / "monday.com" as valid fresh-entry companies', () => {
+    const profile = parseLinkedInText(`Contact
+www.linkedin.com/in/lc
+
+Top Skills
+A
+
+Languages
+English
+
+Certifications
+C
+
+Brand Person
+Senior Engineer
+Remote
+
+Summary
+S.
+
+Experience
+Acme
+5 years
+Senior Engineer
+March 2024 - Present (1 year 2 months)
+Remote
+• Owned the platform.
+Engineer
+March 2022 - February 2024 (2 years)
+Remote
+• Built things.
+
+eBay
+Senior Engineer
+March 2020 - February 2022 (2 years)
+Remote
+• Did things at eBay.
+
+iRobot
+Engineer
+March 2018 - February 2020 (2 years)
+Bedford, MA
+
+monday.com
+Engineer
+March 2016 - February 2018 (2 years)
+Tel Aviv, Israel
+
+Education
+School
+Degree (2010 - 2014)
+`);
+    const history = profile.experienceHistory.data!;
+    const companies = history.map((e) => e.company);
+    expect(companies).toContain('eBay');
+    expect(companies).toContain('iRobot');
+    expect(companies).toContain('monday.com');
+    // Acme keeps both grouped roles and doesn't grow to absorb the
+    // post-group lowercase-branded entries.
+    expect(companies.filter((c) => c === 'Acme')).toHaveLength(2);
+  });
+});
+
 describe('parseLinkedInText - spelled-out US state inside grouped roles', () => {
   it('keeps grouped continuation when prev role location uses the full state name', () => {
     const profile = parseLinkedInText(`Contact
