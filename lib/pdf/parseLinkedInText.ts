@@ -318,6 +318,24 @@ const US_STATE_ABBR = new Set([
   'VA','WA','WV','WI','WY','DC',
 ]);
 /**
+ * Spelled-out US state names. LinkedIn PDFs surface either the two-letter
+ * abbreviation ("San Francisco, CA") or the full name ("San Francisco,
+ * California"), and the full-name form needs to match the same location
+ * gate that the abbreviation does. Stored lowercase for case-insensitive
+ * lookup.
+ */
+const US_STATE_NAME = new Set([
+  'alabama','alaska','arizona','arkansas','california','colorado','connecticut',
+  'delaware','florida','georgia','hawaii','idaho','illinois','indiana','iowa',
+  'kansas','kentucky','louisiana','maine','maryland','massachusetts','michigan',
+  'minnesota','mississippi','missouri','montana','nebraska','nevada',
+  'new hampshire','new jersey','new mexico','new york','north carolina',
+  'north dakota','ohio','oklahoma','oregon','pennsylvania','rhode island',
+  'south carolina','south dakota','tennessee','texas','utah','vermont',
+  'virginia','washington','west virginia','wisconsin','wyoming',
+  'district of columbia','puerto rico',
+]);
+/**
  * Country and major-subdivision names that show up as the trailing token of
  * a LinkedIn location string ("London, England", "Toronto, Ontario",
  * "Berlin, Germany", "Mumbai, India"). Stored lowercase for case-insensitive
@@ -361,14 +379,16 @@ function looksLikeLocationLine(line: string): boolean {
     const last = parts[parts.length - 1]!;
     const lastLower = last.toLowerCase();
     if (US_STATE_ABBR.has(last.toUpperCase())) return true;
+    if (US_STATE_NAME.has(lastLower)) return true;
     if (COUNTRY_OR_REGION_NAMES.has(lastLower)) return true;
     // "City, Region, Country" form: check the middle token too, since the
     // last one might be a country we don't list (e.g. "Mumbai, Maharashtra,
-    // <Unlisted Country>").
+    // <Unlisted Country>") and the middle one carries the locality signal.
     if (parts.length >= 3) {
       const second = parts[parts.length - 2]!;
       const secondLower = second.toLowerCase();
       if (US_STATE_ABBR.has(second.toUpperCase())) return true;
+      if (US_STATE_NAME.has(secondLower)) return true;
       if (COUNTRY_OR_REGION_NAMES.has(secondLower)) return true;
     }
   }

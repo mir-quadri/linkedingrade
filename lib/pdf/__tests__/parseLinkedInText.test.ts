@@ -687,6 +687,53 @@ Degree (2014 - 2018)
   });
 });
 
+describe('parseLinkedInText - spelled-out US state inside grouped roles', () => {
+  it('keeps grouped continuation when prev role location uses the full state name', () => {
+    const profile = parseLinkedInText(`Contact
+www.linkedin.com/in/spelled
+
+Top Skills
+A
+
+Languages
+English
+
+Certifications
+C
+
+Spelled Person
+Senior Engineer
+San Francisco, California
+
+Summary
+S.
+
+Experience
+Acme
+5 years
+Senior Engineer
+March 2023 - Present (2 years 2 months)
+San Francisco, California
+• Owned the platform.
+Engineer
+February 2020 - February 2023 (3 years)
+Los Angeles, California
+• Built things.
+
+Education
+School
+Degree (2014 - 2018)
+`);
+    const history = profile.experienceHistory.data!;
+    expect(history).toHaveLength(2);
+    expect(history.every((e) => e.company === 'Acme')).toBe(true);
+    expect(history.map((e) => e.title)).toEqual([
+      'Senior Engineer',
+      'Engineer',
+    ]);
+  });
+});
+
 describe('parseLinkedInText - non-US locations inside grouped roles', () => {
   it('keeps grouped continuation when prev role location is "City, Country"', () => {
     const profile = parseLinkedInText(`Contact
