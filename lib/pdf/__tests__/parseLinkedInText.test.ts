@@ -579,6 +579,81 @@ Degree (2010 - 2014)
   });
 });
 
+describe('parseLinkedInText - "Current" end-date recognised as current role', () => {
+  it('flags a role ending in Current (not Present) as currentExperience', () => {
+    const profile = parseLinkedInText(`Contact
+www.linkedin.com/in/c
+
+Top Skills
+A
+
+Languages
+English
+
+Certifications
+C
+
+Curr Person
+Headline
+City
+
+Summary
+S.
+
+Experience
+Acme
+Engineer
+March 2022 - Current (3 years 2 months)
+Remote
+• Did things.
+
+Education
+School
+Degree (2014 - 2018)
+`);
+    expect(profile.currentExperience.data?.company).toBe('Acme');
+    expect(profile.currentExperience.confidence).toBe('high');
+  });
+});
+
+describe('parseLinkedInText - Top Skills as trailing sidebar', () => {
+  it('does not leak identity lines into the skills list', () => {
+    const profile = parseLinkedInText(`Contact
+www.linkedin.com/in/short
+
+Top Skills
+TypeScript
+
+Lone Skill
+Senior Engineer
+San Francisco Bay Area
+
+Summary
+Skills are sparse but that's OK.
+
+Experience
+Acme
+Senior Engineer
+March 2022 - Present (3 years 2 months)
+San Francisco, CA
+
+Education
+School
+Degree (2014 - 2018)
+`);
+    expect(profile.fullName).toBe('Lone Skill');
+    expect(profile.headline.data).toBe('Senior Engineer');
+    expect(profile.skills.data?.topThree).toEqual(['TypeScript']);
+    // Critically, neither the name nor the headline nor the location bleeds
+    // into the skills list.
+    expect(profile.skills.data?.topThree).not.toContain('Lone Skill');
+    expect(profile.skills.data?.topThree).not.toContain('Senior Engineer');
+    expect(profile.skills.data?.topThree).not.toContain(
+      'San Francisco Bay Area',
+    );
+  });
+});
+
 describe('parseLinkedInText - graceful degradation', () => {
   it('does not throw on a profile missing optional sections', () => {
     const minimal = `Contact

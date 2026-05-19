@@ -382,7 +382,7 @@ function parseExperience(lines: string[]): RawExperience[] {
       durationText,
       location,
       description,
-      isCurrent: /^present$/i.test(endDate),
+      isCurrent: /^(present|current)$/i.test(endDate),
     });
   }
   return entries;
@@ -456,30 +456,33 @@ export function parseLinkedInText(
   const headers = findHeaders(lines);
 
   const contactLines = sliceSection(lines, headers, 'Contact');
-  const topSkillsLines = sliceSection(lines, headers, 'Top Skills');
   const summaryLines = sliceSection(lines, headers, 'Summary');
   const experienceLines = sliceSection(lines, headers, 'Experience');
   const educationLines = sliceSection(lines, headers, 'Education');
 
   const identity = extractIdentity(lines, headers);
 
-  // Certifications come from the Certifications section's slice. When that
-  // section is the trailing sidebar (the canonical LinkedIn shape), its
-  // slice contains cert items *plus* the identity block; `extractIdentity`
-  // already returns the cert items separately in that case. When Certifications
-  // is followed by another sidebar (Top Skills / Languages) before Summary,
-  // the raw slice has no identity lines in it.
-  const certsHeader = headers.find((h) => h.header === 'Certifications');
-  let certNames: string[] = [];
-  if (certsHeader) {
-    if (identity.trailingHeader === 'Certifications') {
-      certNames = identity.trailingSidebarItems;
-    } else {
-      certNames = sliceSection(lines, headers, 'Certifications')
-        .map((l) => l.trim())
-        .filter(Boolean);
+  // For any sidebar section, the section's items live in the raw slice
+  // between its header and the next header — *unless* that section is the
+  // last sidebar before `Summary`, in which case the slice also contains
+  // the identity lines (name / headline / location). `extractIdentity`
+  // already split those out into `identity.trailingSidebarItems`, so use
+  // that whenever the queried section is the trailing one. Without this,
+  // a short Top-Skills callout (under three skills) followed directly by
+  // Summary would surface the user's name, headline or location as a
+  // "skill" — the Codex P2 we're closing.
+  const sidebarItems = (header: SectionHeader): string[] => {
+    if (!headers.some((h) => h.header === header)) return [];
+    if (identity.trailingHeader === header) {
+      return identity.trailingSidebarItems;
     }
-  }
+    return sliceSection(lines, headers, header)
+      .map((l) => l.trim())
+      .filter(Boolean);
+  };
+
+  const topSkillsLines = sidebarItems('Top Skills');
+  const certNames = sidebarItems('Certifications');
 
   const url = findLinkedInUrl(contactLines);
 
