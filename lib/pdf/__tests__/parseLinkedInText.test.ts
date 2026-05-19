@@ -204,6 +204,169 @@ B.S. Computer Science (2014 - 2018)
   });
 });
 
+describe('parseLinkedInText - profile without Certifications', () => {
+  it('still recovers name/headline/location when Certifications is absent', () => {
+    const profile = parseLinkedInText(`Contact
+www.linkedin.com/in/noah
+
+Top Skills
+TypeScript
+React
+Go
+
+Languages
+English (Native or Bilingual)
+French (Limited Working)
+
+Noah Mercer
+Staff Engineer @ Acme — building developer tools
+Brooklyn, NY
+
+Summary
+Builder. Mentor. Mostly the former.
+
+Experience
+Acme
+Staff Engineer
+March 2020 - Present (6 years 2 months)
+Brooklyn, NY
+• Owns the dev tools surface.
+
+Education
+NYU
+B.S. Computer Science (2012 - 2016)
+`);
+    expect(profile.fullName).toBe('Noah Mercer');
+    expect(profile.headline.data).toBe(
+      'Staff Engineer @ Acme — building developer tools',
+    );
+    expect(profile.certifications.data).toBeNull();
+    expect(profile.certifications.confidence).toBe('missing');
+  });
+
+  it('does not pull identity lines into the Languages section', () => {
+    const profile = parseLinkedInText(`Contact
+www.linkedin.com/in/noah
+
+Top Skills
+TypeScript
+
+Languages
+English
+
+Noah Mercer
+Staff Engineer
+Brooklyn, NY
+
+Summary
+About.
+
+Experience
+
+Education
+`);
+    expect(profile.fullName).toBe('Noah Mercer');
+    expect(profile.headline.data).toBe('Staff Engineer');
+  });
+});
+
+describe('parseLinkedInText - grouped same-company roles', () => {
+  const PROFILE = `Contact
+www.linkedin.com/in/grouped
+
+Top Skills
+Leadership
+Systems
+
+Languages
+English
+
+Certifications
+Cert
+
+Pat Group
+Senior Engineering Manager
+San Francisco Bay Area
+
+Summary
+Tenured at Acme across multiple roles.
+
+Experience
+Acme
+5 years 3 months
+Senior Engineering Manager
+March 2024 - Present (1 year 3 months)
+San Francisco, CA
+• Leading the platform group across five teams.
+• Shipped the cross-team SLO program.
+Engineering Manager
+February 2022 - February 2024 (2 years 1 month)
+San Francisco, CA
+• Built the developer experience team from 0 to 8.
+Senior Engineer
+March 2020 - January 2022 (1 year 11 months)
+Remote
+
+Beta Co
+Software Engineer
+June 2017 - February 2020 (2 years 9 months)
+Boston, MA
+• First engineer on the data platform.
+
+Education
+MIT
+B.S. EECS (2013 - 2017)
+`;
+
+  const profile = parseLinkedInText(PROFILE);
+
+  it('attributes every grouped role to the parent company', () => {
+    const history = profile.experienceHistory.data!;
+    expect(history.length).toBeGreaterThanOrEqual(4);
+    const acmeRoles = history.filter((e) => e.company === 'Acme');
+    expect(acmeRoles).toHaveLength(3);
+    expect(acmeRoles.map((r) => r.title)).toEqual([
+      'Senior Engineering Manager',
+      'Engineering Manager',
+      'Senior Engineer',
+    ]);
+  });
+
+  it('does not leak the aggregate-duration line into the company field', () => {
+    expect(
+      profile.experienceHistory.data!.every(
+        (e) => !/^\d+\s+years?/i.test(e.company ?? ''),
+      ),
+    ).toBe(true);
+  });
+
+  it('does not leak description-tail lines into subsequent role companies', () => {
+    expect(
+      profile.experienceHistory.data!.every(
+        (e) => !e.company?.startsWith('•') && !/Shipped|Built|first engineer/i.test(e.company ?? ''),
+      ),
+    ).toBe(true);
+  });
+
+  it('picks the grouped "Present" role as current and keeps its description', () => {
+    expect(profile.currentExperience.data?.company).toBe('Acme');
+    expect(profile.currentExperience.data?.title).toBe(
+      'Senior Engineering Manager',
+    );
+    expect(profile.currentExperience.data?.description).toContain(
+      'Leading the platform group',
+    );
+  });
+
+  it('still parses the non-grouped follow-up company correctly', () => {
+    const beta = profile.experienceHistory.data!.find(
+      (e) => e.company === 'Beta Co',
+    );
+    expect(beta).toBeDefined();
+    expect(beta?.title).toBe('Software Engineer');
+  });
+});
+
 describe('parseLinkedInText - graceful degradation', () => {
   it('does not throw on a profile missing optional sections', () => {
     const minimal = `Contact
