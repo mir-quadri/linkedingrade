@@ -129,32 +129,42 @@ interface NameHeadlineLocation {
   trailingHeader: SectionHeader | null;
 }
 
+// Main sections — the identity block sits before the first one that appears.
+// Summary is the canonical anchor, but a PDF without an About/Summary section
+// still has the identity above Experience or Education.
+const MAIN_HEADERS: ReadonlySet<SectionHeader> = new Set([
+  'Summary',
+  'Experience',
+  'Education',
+]);
+
 /**
- * Find the last sidebar header that appears strictly before `Summary` in the
- * document — the slice between that header and `Summary` contains whichever
- * sidebar items exist plus the identity block (name / headline / location).
- * If `Summary` is missing entirely (rare; malformed export) we return null
- * and fall back to a best-effort identity guess elsewhere.
+ * Find the last sidebar header that appears strictly before the first main
+ * section header in the document. The slice between that sidebar header and
+ * the main header contains whichever sidebar items exist plus the identity
+ * block (name / headline / location). If no main section header is present
+ * at all (rare; severely malformed export) we return null.
  */
-function lastSidebarBeforeSummary(
+function lastSidebarBeforeMain(
   headers: HeaderIndex[],
-): { trailing: HeaderIndex | null; summary: HeaderIndex } | null {
-  const summary = headers.find((h) => h.header === 'Summary');
-  if (!summary) return null;
+): { trailing: HeaderIndex | null; mainStart: HeaderIndex } | null {
+  const main = headers.find((h) => MAIN_HEADERS.has(h.header));
+  if (!main) return null;
   let trailing: HeaderIndex | null = null;
   for (const h of headers) {
-    if (h.line >= summary.line) break;
+    if (h.line >= main.line) break;
     if (SIDEBAR_HEADERS.has(h.header)) trailing = h;
   }
-  return { trailing, summary };
+  return { trailing, mainStart: main };
 }
 
 /**
  * Identity (NAME / HEADLINE / LOCATION) is always the last three lines of
- * whatever sidebar slice precedes `Summary`. The Codex review caught the
- * earlier assumption that Certifications is always present — sidebars can
- * end at Languages or Top Skills when a profile has no certs, so the
- * trailing-sidebar lookup is computed dynamically.
+ * whatever sidebar slice precedes the first main section. The bound used to
+ * be `Summary`, but an export without an About/Summary section still has the
+ * identity above Experience or Education, and falling through to the empty
+ * default would let the trailing sidebar slice (Certifications / Languages /
+ * Top Skills) absorb the name/headline/location as if they were items.
  */
 function extractIdentity(
   lines: string[],
@@ -167,11 +177,11 @@ function extractIdentity(
     trailingSidebarItems: [],
     trailingHeader: null,
   };
-  const located = lastSidebarBeforeSummary(headers);
+  const located = lastSidebarBeforeMain(headers);
   if (!located) return empty;
-  const { trailing, summary } = located;
+  const { trailing, mainStart } = located;
   const start = trailing ? trailing.line + 1 : 0;
-  const slice = lines.slice(start, summary.line).map((l) => l.trim()).filter(Boolean);
+  const slice = lines.slice(start, mainStart.line).map((l) => l.trim()).filter(Boolean);
   if (slice.length === 0) {
     return { ...empty, trailingHeader: trailing?.header ?? null };
   }

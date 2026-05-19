@@ -785,6 +785,48 @@ M.S. Computer Science (2015 - 2017)
   });
 });
 
+describe('parseLinkedInText - profile without Summary section', () => {
+  it('still recovers name/headline/location using Experience as the anchor', () => {
+    const profile = parseLinkedInText(`Contact
+www.linkedin.com/in/no-summary
+
+Top Skills
+TypeScript
+React
+Go
+
+Languages
+English
+
+Certifications
+Cert
+
+No Summary Person
+Senior Engineer at Acme
+Brooklyn, NY
+
+Experience
+Acme
+Senior Engineer
+March 2022 - Present (3 years 2 months)
+Brooklyn, NY
+• Owns the dev tools surface.
+
+Education
+NYU
+B.S. Computer Science (2014 - 2018)
+`);
+    expect(profile.fullName).toBe('No Summary Person');
+    expect(profile.headline.data).toBe('Senior Engineer at Acme');
+    // The trailing sidebar (Certifications) must still surface its real
+    // items, not the identity lines.
+    expect(profile.certifications.data).toEqual([
+      { name: 'Cert', issuer: null, date: null },
+    ]);
+    expect(profile.about.data).toBeNull();
+  });
+});
+
 describe('parseLinkedInText - graceful degradation', () => {
   it('does not throw on a profile missing optional sections', () => {
     const minimal = `Contact
