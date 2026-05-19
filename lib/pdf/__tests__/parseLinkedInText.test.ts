@@ -516,11 +516,44 @@ School
 Degree (2013 - 2017)
 `);
     expect(profile.currentExperience.data).toBeNull();
-    expect(profile.currentExperience.confidence).toBe('missing');
+    // Critically, confidence must be NON-degraded so the engine's
+    // scoreCurrentExperience treats this as "No current role detected"
+    // rather than "Current role could not be extracted — flagged for review".
+    expect(profile.currentExperience.confidence).toBe('high');
     expect(profile.currentExperience.notes).toMatch(/no current role/i);
     // History is still populated.
     expect(profile.experienceHistory.data).toHaveLength(2);
     expect(profile.experienceHistory.data?.[0]?.company).toBe('Acme');
+  });
+
+  it('keeps confidence "missing" when no experience entries parse at all', () => {
+    const profile = parseLinkedInText(`Contact
+www.linkedin.com/in/none
+
+Top Skills
+A
+
+Languages
+English
+
+Certifications
+C
+
+Empty Person
+Headline
+City
+
+Summary
+S.
+
+Experience
+
+Education
+School
+Degree (2014 - 2018)
+`);
+    expect(profile.currentExperience.data).toBeNull();
+    expect(profile.currentExperience.confidence).toBe('missing');
   });
 });
 
@@ -651,6 +684,55 @@ Degree (2014 - 2018)
     expect(profile.skills.data?.topThree).not.toContain(
       'San Francisco Bay Area',
     );
+  });
+});
+
+describe('parseLinkedInText - group exit without a prior location', () => {
+  it('still classifies the next company as a fresh entry when the last grouped role has no location/description', () => {
+    const profile = parseLinkedInText(`Contact
+www.linkedin.com/in/x
+
+Top Skills
+A
+
+Languages
+English
+
+Certifications
+C
+
+Sample Person
+Headline
+Location
+
+Summary
+S.
+
+Experience
+Acme
+4 years 2 months
+Senior Engineer
+March 2023 - Present (2 years 2 months)
+Remote
+• Owned the platform team's roadmap.
+Engineer
+January 2021 - February 2023 (2 years 1 month)
+Beta Co
+Engineer
+June 2018 - December 2020 (2 years 7 months)
+Boston, MA
+• First engineer on data platform.
+
+Education
+School
+Degree (2014 - 2018)
+`);
+    const history = profile.experienceHistory.data!;
+    const acme = history.filter((e) => e.company === 'Acme');
+    const beta = history.filter((e) => e.company === 'Beta Co');
+    expect(acme).toHaveLength(2);
+    expect(beta).toHaveLength(1);
+    expect(beta[0]?.title).toBe('Engineer');
   });
 });
 

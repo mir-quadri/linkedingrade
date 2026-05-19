@@ -251,6 +251,38 @@ function looksLikeCompanyLine(line: string): boolean {
   return true;
 }
 
+/**
+ * Heuristic: does this line read like a LinkedIn location string? Locations
+ * are short, often comma-separated ("San Francisco, CA"), and frequently
+ * carry stock geo-words ("Remote", "Hybrid", "Bay Area", "Greater Boston
+ * Area", "Metropolitan Region"). We use this as a disambiguator when the
+ * gap between two consecutive dates is exactly two non-bullet lines: in a
+ * fresh entry that would be company + title, while in a continuation with a
+ * located prev role it would be location + title.
+ */
+const US_STATE_ABBR = new Set([
+  'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA',
+  'KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ',
+  'NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT',
+  'VA','WA','WV','WI','WY','DC',
+]);
+const LOCATION_KEYWORD =
+  /\b(remote|hybrid|on[- ]?site|bay area|metro(?:politan)?|greater|region|area|county)\b/i;
+function looksLikeLocationLine(line: string): boolean {
+  const t = line.trim();
+  if (!t || t.startsWith('•')) return false;
+  if (t.length > 100) return false;
+  if (LOCATION_KEYWORD.test(t)) return true;
+  const parts = t.split(',').map((s) => s.trim()).filter(Boolean);
+  if (parts.length >= 2) {
+    const last = parts[parts.length - 1]!;
+    const second = parts[parts.length - 2]!;
+    if (US_STATE_ABBR.has(last.toUpperCase())) return true;
+    if (US_STATE_ABBR.has(second.toUpperCase())) return true;
+  }
+  return false;
+}
+
 function classifyDateLines(
   lines: string[],
   dateIdx: number[],
@@ -271,15 +303,20 @@ function classifyDateLines(
       continue;
     }
     if (inGroup && d > 0) {
-      // A *fresh* entry after the group inserts a dedicated company line, so
-      // the gap between consecutive dates contains ≥3 non-bullet lines
-      // (prev-location + new-company + new-title) AND the line two above the
-      // date itself looks like a company name (Title Case, no terminal
-      // punctuation, short). Without the content check, a continuation role
-      // whose description is a plain non-bullet sentence ("Led major
-      // initiatives across teams") would also produce three non-bullet
-      // lines and get mis-classified as a new company — which is exactly
-      // the Codex P2 we're closing here.
+      // Continuation / fresh disambiguation. A continuation role's gap to
+      // the previous date is `[<location>?] [• bullets…] <title>`; a fresh
+      // entry's gap is `[<prev location>?] <new company> <title>`. The
+      // structural signal is the candidate company line at j-2:
+      //
+      //   - If it looks like a company (Title Case, ≤80 chars, no terminal
+      //     punctuation) AND does NOT look like a location string, exit to
+      //     fresh. This catches both the "3 non-bullet lines" canonical
+      //     shape (prev-location + new-company + new-title) and the
+      //     "2 non-bullet lines" no-prev-location shape (new-company +
+      //     new-title), which previously stayed mis-attributed.
+      //   - Otherwise stay in continuation. Plain-text descriptions like
+      //     "Led major initiatives" fail the company-line check (lowercase
+      //     non-connector words) and don't trigger a spurious exit.
       const prevJ = dateIdx[d - 1]!;
       let nonBullets = 0;
       for (let k = prevJ + 1; k < j; k++) {
@@ -288,7 +325,11 @@ function classifyDateLines(
         nonBullets += 1;
       }
       const companyCandidate = j >= 2 ? lines[j - 2]!.trim() : '';
-      if (nonBullets >= 3 && looksLikeCompanyLine(companyCandidate)) {
+      if (
+        nonBullets >= 2 &&
+        looksLikeCompanyLine(companyCandidate) &&
+        !looksLikeLocationLine(companyCandidate)
+      ) {
         inGroup = false;
         kinds.push('fresh');
         continue;
@@ -499,18 +540,24 @@ export function parseLinkedInText(
   const rawExperiences = parseExperience(experienceLines);
   const experienceEntries = rawExperiences.map(toExperienceEntry);
   const currentRaw = rawExperiences.find((e) => e.isCurrent);
-  // A profile with no role ending in "Present" / "Current" has no current
-  // role — typical for someone between jobs. Returning the most recent past
-  // role as `currentExperience` would feed the current-role scorer and judge
-  // as if the user still held that job, so we explicitly report missing
-  // instead of falling back to history[0].
+  // A profile with experience entries but none ending in "Present" /
+  // "Current" is a real finding (e.g. someone between jobs), not an
+  // extraction failure. The engine's scoreCurrentExperience routes
+  // `confidence: 'missing' | 'low'` into the extraction-failure branch
+  // (60 + needsReview) and a non-degraded confidence with null data into
+  // the intended "No current role detected" 30-point branch — so we set
+  // confidence='high' for the parsed-no-current case and reserve 'missing'
+  // for the section-absent / no-entries-parsed case.
   const currentExperience: SectionExtraction<ExperienceEntry> = currentRaw
     ? present(toExperienceEntry(currentRaw))
-    : missing(
-        experienceEntries.length > 0
-          ? 'No current role — no Experience entry ends in "Present" in this PDF'
-          : 'No experience entries parsed from PDF',
-      );
+    : experienceEntries.length > 0
+      ? {
+          data: null,
+          confidence: 'high',
+          notes:
+            'No current role — no Experience entry ends in "Present" or "Current" in this PDF',
+        }
+      : missing('No experience entries parsed from PDF');
   const experienceHistory: SectionExtraction<ExperienceEntry[]> =
     experienceEntries.length > 0
       ? present(experienceEntries)
