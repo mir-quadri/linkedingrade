@@ -33,6 +33,11 @@ interface HeaderIndex {
 }
 
 const PAGE_FOOTER = /^\s*Page\s+\d+\s+of\s+\d+\s*$/i;
+// "-- N of M --" separator that pdf-parse injects between rendered pages of
+// the export. Like the page footer, it can appear mid-section (between an
+// entry's title and its date line) and must be stripped before structural
+// parsing so adjacent content reads as continuous.
+const PAGE_SEPARATOR = /^\s*-{2,}\s*\d+\s+of\s+\d+\s*-{2,}\s*$/i;
 
 // Date line: "<start> - <end> (<duration>)".
 // Endpoints must be a 4-digit calendar year (optionally preceded by a month
@@ -89,7 +94,7 @@ function normalizeLines(text: string): NormalizedLines {
   let pendingBlank = true; // start-of-doc counts as a paragraph break
   for (const r of raw) {
     const t = r.trim();
-    if (!t || PAGE_FOOTER.test(r)) {
+    if (!t || PAGE_FOOTER.test(r) || PAGE_SEPARATOR.test(r)) {
       pendingBlank = true;
       continue;
     }
@@ -113,21 +118,21 @@ function normalizeLines(text: string): NormalizedLines {
  * Save-to-PDF export in, so iterating it gives us the order constraint for
  * free.
  */
-function findHeaders(
+function findHeadersWithBoundary(
   lines: string[],
-  isBlankAbove: boolean[],
+  isBlankAbove: boolean[] | null,
 ): HeaderIndex[] {
   const found: HeaderIndex[] = [];
   let cursor = 0;
   for (const header of SECTION_HEADERS) {
     for (let i = cursor; i < lines.length; i++) {
-      // Two-part check: the text must match AND the line must sit at a
-      // paragraph boundary (blank line / page footer / start-of-doc above
-      // it). The boundary check is what stops a sidebar item literally
-      // named "Languages" / "Certifications" / etc. from being recorded
-      // as the real header — adjacent list items don't carry the
-      // blank-above marker that real section headers do.
-      if (lines[i]!.trim() === header && isBlankAbove[i]) {
+      // Two-part check: the text must match AND, when a boundary array is
+      // supplied, the line must sit at a paragraph boundary (blank line /
+      // page footer / start-of-doc above it). The boundary check is what
+      // stops a sidebar item literally named "Languages" / "Certifications"
+      // / etc. from being recorded as the real header — adjacent list items
+      // don't carry the blank-above marker that real section headers do.
+      if (lines[i]!.trim() === header && (!isBlankAbove || isBlankAbove[i])) {
         found.push({ header, line: i });
         cursor = i + 1;
         break;
@@ -135,6 +140,26 @@ function findHeaders(
     }
   }
   return found;
+}
+
+/**
+ * Find section headers, preferring strict blank-above matching but falling
+ * back to lenient (order-aware first match without the boundary requirement)
+ * when strict finds strictly fewer headers. Real LinkedIn "Save to PDF"
+ * exports run sidebar items directly into the next section header with no
+ * blank line between them — strict mode finds nothing past "Contact" on
+ * those, while lenient mode recovers the full structure. Synthetic test
+ * fixtures put blank lines around every header, so strict and lenient
+ * usually tie and strict wins (preserving the "Languages skill must not
+ * shadow the Languages header" guarantee).
+ */
+function findHeaders(
+  lines: string[],
+  isBlankAbove: boolean[],
+): HeaderIndex[] {
+  const strict = findHeadersWithBoundary(lines, isBlankAbove);
+  const lenient = findHeadersWithBoundary(lines, null);
+  return lenient.length > strict.length ? lenient : strict;
 }
 
 function sliceSection(
@@ -190,12 +215,77 @@ function lastSidebarBeforeMain(
 }
 
 /**
- * Identity (NAME / HEADLINE / LOCATION) is always the last three lines of
- * whatever sidebar slice precedes the first main section. The bound used to
- * be `Summary`, but an export without an About/Summary section still has the
- * identity above Experience or Education, and falling through to the empty
- * default would let the trailing sidebar slice (Certifications / Languages /
- * Top Skills) absorb the name/headline/location as if they were items.
+ * Words that disqualify a candidate line from being treated as a person's
+ * full name. These are the high-signal nouns/verbs that appear in
+ * certification titles ("Certified Ethical Hacker", "Kubernetes Certified
+ * Administrator", "Foundations of Project Management"). Stored lowercase
+ * for case-insensitive lookup.
+ */
+const CERT_DISQUALIFIERS = new Set([
+  'certified', 'certificate', 'certification',
+  'professional', 'practitioner', 'administrator', 'specialist',
+  'associate', 'foundation', 'foundations',
+  'master', 'masters', 'expert', 'analyst', 'consultant', 'scrum',
+  'fundamentals', 'principles',
+  // Common LinkedIn job-title words. Without these, a 2-word headline like
+  // "Senior Engineer" would pass as a person's name and shadow the real
+  // identity line above it.
+  'engineer', 'engineering', 'developer', 'designer', 'manager',
+  'director', 'lead', 'leader', 'principal', 'staff', 'senior', 'junior',
+  'head', 'chief', 'vice', 'president', 'founder', 'cofounder',
+  'partner', 'owner', 'recruiter', 'coach', 'mentor', 'advisor',
+  'architect', 'scientist', 'researcher', 'product', 'program',
+  'project', 'operations', 'finance', 'marketing', 'sales',
+]);
+
+/**
+ * Does this line read like a person's full name? LinkedIn names render in
+ * Title Case across 2-4 words ("Mir Quadri", "Jane Doe", "Mary O'Brien",
+ * "Jean-Luc Picard"), without connector words ("of", "the", "and") and
+ * without cert-y nouns ("Certified", "Practitioner", …). The heuristic is
+ * conservative — when it returns false we fall back to the legacy "last
+ * three lines" identity slot, which preserves the pre-existing behaviour
+ * for malformed inputs.
+ */
+function looksLikeName(line: string): boolean {
+  const t = line.trim();
+  if (!t) return false;
+  if (/[.?!:]$/.test(t)) return false; // sentences / bullets
+  const words = t.split(/\s+/);
+  // 2-3 word Title-Case names cover the LinkedIn norm ("Mir Quadri",
+  // "No Summary Person"). 4+ word candidates are far more likely to be
+  // a cert title ("Amazon Web Services Cloud", "Project Management and
+  // Risk") than a person — restricting the window keeps cert lines from
+  // being promoted into the identity slot.
+  if (words.length < 2 || words.length > 3) return false;
+  for (const w of words) {
+    if (!/^[A-Z][\p{L}'\-]*$/u.test(w)) return false;
+    const lower = w.toLowerCase();
+    if (CONNECTOR_WORDS.has(lower)) return false;
+    if (CERT_DISQUALIFIERS.has(lower)) return false;
+  }
+  return true;
+}
+
+/**
+ * Identity (NAME / HEADLINE / LOCATION) sits between the last sidebar
+ * section and the first main section. Three shapes have to be handled:
+ *
+ *   1. Real LinkedIn export, no blank lines: the trailing Certifications
+ *      block may contain wrapped 2-line cert names that immediately bleed
+ *      into the identity. We locate the fullName line via the
+ *      `looksLikeName` heuristic, everything before is sidebar items, and
+ *      everything after up to the last line is the (possibly multi-line)
+ *      headline. The last line is the location.
+ *
+ *   2. Synthetic-style export with blanks: the slice often contains just
+ *      `<name> <headline> <location>` on three lines. The name heuristic
+ *      picks the name; the same after-name logic produces a single-line
+ *      headline and the location.
+ *
+ *   3. Malformed slice where no line looks like a name: fall back to the
+ *      legacy "last three lines = name/headline/location" rule so existing
+ *      degraded-input behaviour is preserved.
  */
 function extractIdentity(
   lines: string[],
@@ -213,25 +303,54 @@ function extractIdentity(
   const { trailing, mainStart } = located;
   const start = trailing ? trailing.line + 1 : 0;
   const slice = lines.slice(start, mainStart.line).map((l) => l.trim()).filter(Boolean);
+  const trailingHeader = trailing?.header ?? null;
   if (slice.length === 0) {
-    return { ...empty, trailingHeader: trailing?.header ?? null };
+    return { ...empty, trailingHeader };
   }
+
+  // Walk backwards from the second-to-last line looking for the first
+  // line that reads like a person's name. The last line is always the
+  // location anchor; everything between the name and the location is the
+  // (possibly multi-line) headline; everything before the name is trailing
+  // sidebar content (wrapped certs / language items).
+  //
+  // Walking *backwards* matters: a sidebar slice that runs
+  // ["Cert One", "Alex Example", "Engineer", "Remote"] would otherwise pick
+  // the cert name first. From the bottom, "Remote" is location, "Engineer"
+  // fails the length check, and "Alex Example" wins as the name.
+  let nameIdx = -1;
+  for (let k = slice.length - 2; k >= 0; k--) {
+    if (looksLikeName(slice[k]!)) {
+      nameIdx = k;
+      break;
+    }
+  }
+  if (nameIdx !== -1) {
+    const name = slice[nameIdx]!;
+    const sidebarItems = slice.slice(0, nameIdx);
+    const after = slice.slice(nameIdx + 1);
+    let headline: string | null = null;
+    let location: string | null = null;
+    if (after.length === 1) {
+      location = after[0]!;
+    } else if (after.length >= 2) {
+      location = after[after.length - 1]!;
+      headline = after.slice(0, after.length - 1).join(' ').replace(/\s+/g, ' ').trim();
+    }
+    return { name, headline, location, trailingSidebarItems: sidebarItems, trailingHeader };
+  }
+
+  // Legacy fallback for slices where no line passes the name heuristic.
   if (slice.length === 1) {
     return {
-      name: slice[0]!,
-      headline: null,
-      location: null,
-      trailingSidebarItems: [],
-      trailingHeader: trailing?.header ?? null,
+      name: slice[0]!, headline: null, location: null,
+      trailingSidebarItems: [], trailingHeader,
     };
   }
   if (slice.length === 2) {
     return {
-      name: slice[0]!,
-      headline: null,
-      location: slice[1]!,
-      trailingSidebarItems: [],
-      trailingHeader: trailing?.header ?? null,
+      name: slice[0]!, headline: null, location: slice[1]!,
+      trailingSidebarItems: [], trailingHeader,
     };
   }
   return {
@@ -239,7 +358,7 @@ function extractIdentity(
     headline: slice[slice.length - 2]!,
     location: slice[slice.length - 1]!,
     trailingSidebarItems: slice.slice(0, slice.length - 3),
-    trailingHeader: trailing?.header ?? null,
+    trailingHeader,
   };
 }
 
@@ -649,6 +768,35 @@ function parseEducation(lines: string[]): EducationItem[] {
 }
 
 /**
+ * LinkedIn's PDF export wraps long certification names onto two lines —
+ * "Project Management and Risk\nAnalysis" → "Project Management and Risk
+ * Analysis" — without any structural delimiter. Walk the sidebar slice and
+ * fold any short (1-2 word) follow-up line into the preceding certification,
+ * unless that follow-up line itself reads like the start of a new cert
+ * (3+ words). Standalone short-name certs ("Practitioner" alone on a line
+ * with another short line next) are rare enough to treat as continuations
+ * — and the alternative would split every long cert in two.
+ */
+function reassembleCertifications(rawLines: string[]): string[] {
+  const certs: string[] = [];
+  let i = 0;
+  while (i < rawLines.length) {
+    const current = rawLines[i]!.trim();
+    if (!current) { i += 1; continue; }
+    const next = i + 1 < rawLines.length ? rawLines[i + 1]!.trim() : '';
+    const nextWords = next ? next.split(/\s+/) : [];
+    if (next && nextWords.length > 0 && nextWords.length <= 2) {
+      certs.push(`${current} ${next}`.replace(/\s+/g, ' ').trim());
+      i += 2;
+      continue;
+    }
+    certs.push(current);
+    i += 1;
+  }
+  return certs;
+}
+
+/**
  * Find a LinkedIn profile URL inside the Contact block. The Contact section
  * is the only place an export reliably surfaces the profile URL.
  */
@@ -714,7 +862,13 @@ export function parseLinkedInText(
     ? present(identity.headline)
     : missing('Headline not found in PDF');
 
-  const aboutText = summaryLines.join('\n').trim();
+  // Collapse the wrapped summary lines into a single paragraph. The PDF
+  // export hard-wraps the About block at the column boundary; joining with
+  // spaces (rather than newlines) reconstructs the prose as the user wrote
+  // it and keeps the missing-space artefacts ("production.Four", "stick.What")
+  // exactly where they appear in the source — those quirks live inside a
+  // single line in the PDF, so neither join introduces or removes a space.
+  const aboutText = summaryLines.map((l) => l.trim()).filter(Boolean).join(' ').trim();
   const about: SectionExtraction<string> = aboutText
     ? present(aboutText)
     : missing('Summary section empty or absent in PDF');
@@ -763,7 +917,8 @@ export function parseLinkedInText(
       ? present(educationItems)
       : missing('No education entries parsed from PDF');
 
-  const certificationItems: CertificationItem[] = certNames.map((name) => ({
+  const reassembledCertNames = reassembleCertifications(certNames);
+  const certificationItems: CertificationItem[] = reassembledCertNames.map((name) => ({
     name,
     issuer: null,
     date: null,
