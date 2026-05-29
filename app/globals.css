@@ -716,3 +716,80 @@ section.s {
   font-size: 14.5px;
   color: var(--text-2);
 }
+
+/* === /audit page ============================================== */
+.audit-page {
+  padding: 64px 0 96px;
+}
+.audit-page-head {
+  max-width: 720px;
+  margin-bottom: 40px;
+}
+.audit-page-head .meta-line {
+  margin-bottom: 18px;
+}
+.audit-page-head h1 {
+  margin: 0 0 12px;
+  font-size: clamp(32px, 5vw, 48px);
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+  font-weight: 500;
+}
+.audit-page-head h1 em { font-style: normal; color: var(--accent); }
+.audit-page-head .deck {
+  margin: 0;
+  color: var(--text-2);
+  font-size: 17px;
+  line-height: 1.55;
+  max-width: 60ch;
+}
+
+.audit-foot-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+}
+@media (min-width: 760px) {
+  .audit-foot-grid { grid-template-columns: 1fr 1fr; }
+}
+.audit-foot-col {
+  background: var(--surface);
+  border: 1px solid var(--border-2);
+  border-radius: var(--r-lg);
+  padding: 22px 24px;
+}
+.audit-foot-col h4 {
+  margin: 0 0 14px;
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-3);
+  font-weight: 500;
+}
+.audit-foot-col ul,
+.audit-foot-col ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.audit-foot-col li {
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--text);
+  padding-left: 20px;
+  position: relative;
+}
+.audit-foot-col li::before {
+  content: "→";
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  color: var(--text-3);
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+.audit-foot-col ul.wins li::before { color: var(--success); }
+.audit-foot-col ol.fixes li::before { color: var(--accent); }

@@ -25,8 +25,10 @@ export default function PrivacyPage() {
     >
       <h2>What this site collects today</h2>
       <p>
-        Right now, this site is a marketing page with one form: the waitlist.
-        When you sign up, we collect your <b>email address</b>. That&apos;s it.
+        This site has two surfaces that touch your data: the marketing page
+        with its <b>waitlist form</b> (your email), and the{' '}
+        <a href="/audit">/audit page</a> (your uploaded LinkedIn PDF and,
+        optionally, your email). The details for each are below.
       </p>
       <p>
         We also use <b>Vercel Analytics</b> to measure basic, aggregated traffic
@@ -55,6 +57,59 @@ export default function PrivacyPage() {
         That&apos;s the full list. We do not sell email addresses. We do not
         share them with advertisers, data brokers, or any other party.
       </p>
+
+      <h2>The /audit page on this site</h2>
+      <p>
+        This site also hosts <a href="/audit">linkedingrade.com/audit</a> — a
+        web-based audit you can run by uploading the PDF your LinkedIn profile
+        produces from <b>More → Save to PDF</b>. The flow is different from a
+        page view, so here&apos;s the full picture:
+      </p>
+      <ul>
+        <li>
+          When you upload a PDF, we parse it on the server, run our scoring
+          engine, and store <b>the parsed text contents of the PDF</b> (the
+          structured profile fields), the resulting <b>audit report</b>, and a
+          server-side <b>audit ID</b> for up to 90 days. The PDF file itself is
+          not retained — we read it once and discard the bytes.
+        </li>
+        <li>
+          If you submit your email to see the full report, we store that{' '}
+          <b>email</b> on the audit record so we can send you the report and a
+          link back to it. We also store the <b>browser user-agent</b> string,
+          and a one-way <b>SHA-256 hash of your IP</b> (peppered with a server
+          secret). We never store your raw IP.
+        </li>
+        <li>
+          If you fill in the optional self-assessed checklist (photo, banner,
+          activity, recommendations, featured), those answers are saved on the
+          same audit record. They are recorded for the report only; they are{' '}
+          <b>not folded into your composite score</b> and are not used for
+          analytics or marketing.
+        </li>
+        <li>
+          Email delivery uses <b>Resend</b> (resend.com) as a transactional
+          email processor. Resend is the only third party that receives your
+          email address from the audit flow.
+        </li>
+        <li>
+          Audit records are stored in <b>Vercel KV</b> (Upstash Redis) with a
+          90-day expiry. After 90 days the record — and your email&apos;s
+          association with it — are deleted automatically.
+        </li>
+        <li>
+          You can ask us to delete your audit and email association at any
+          time by emailing{' '}
+          <a href="mailto:hello@linkedingrade.com">
+            hello@linkedingrade.com
+          </a>{' '}
+          with your audit ID (visible in the result-page URL) or the email you
+          used.
+        </li>
+      </ul>
+      {/* LEGAL-REVIEW: confirm the 90-day retention is the right window for the
+          /audit feature once usage data exists; align with extension retention
+          once that side of the product ships. */}
 
       <h2>The Chrome extension (when it launches)</h2>
       <p>
