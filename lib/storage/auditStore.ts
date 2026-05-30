@@ -53,6 +53,28 @@ function isExpired(record: AuditRecord, now: number): boolean {
 }
 
 /**
+ * How many seconds remain in this record's 90-day window, counted from
+ * `createdAt` — NOT `now`. The KV implementation passes this to
+ * `kv.set(..., { ex })` on attach paths so a late attach doesn't extend
+ * retention past the original window. Returns 0 for records we can't
+ * parse (the conservative read of the "malformed createdAt is preserved"
+ * rule applies on the read side; on the write side, refusing to extend
+ * is the equivalent conservative choice).
+ *
+ * Mirrors the rule the privacy policy advertises: "After 90 days the
+ * record — and your email's association with it — are deleted
+ * automatically." `attachEmail` and `attachSelfReport` are mutations, not
+ * new records, so they must NOT reset the clock.
+ */
+function remainingTtlSeconds(record: AuditRecord, now: number): number {
+  const created = Date.parse(record.createdAt);
+  if (!Number.isFinite(created)) return 0;
+  const remainingMs = created + RECORD_TTL_MS - now;
+  if (remainingMs <= 0) return 0;
+  return Math.ceil(remainingMs / 1000);
+}
+
+/**
  * In-memory store. Per-instance state, reset on every serverless cold start
  * — useful for local dev and as a fail-open so the /audit page still
  * functions before Vercel KV is provisioned. Production traffic SHOULD
@@ -148,17 +170,27 @@ interface KvClient {
  * if it's missing or the env vars aren't set, the factory falls back to
  * `InMemoryAuditStore` and emits a one-time warning.
  */
-class KvAuditStore implements AuditStore {
+export class KvAuditStore implements AuditStore {
   constructor(private kv: KvClient) {}
 
   private key(auditId: string): string {
     return `audit:${auditId}`;
   }
 
-  async save(record: AuditRecord): Promise<void> {
+  /**
+   * Internal write helper. Initial saves (from `/api/audit`) get the full
+   * TTL; attach paths pass an absolute remaining TTL anchored to
+   * `createdAt` so a late mutation can't extend the window — that's the
+   * Codex P2 fix on this file.
+   */
+  private async writeWithTtl(record: AuditRecord, ttlSeconds: number): Promise<void> {
     await this.kv.set(this.key(record.auditId), JSON.stringify(record), {
-      ex: RECORD_TTL_SECONDS,
+      ex: ttlSeconds,
     });
+  }
+
+  async save(record: AuditRecord): Promise<void> {
+    await this.writeWithTtl(record, RECORD_TTL_SECONDS);
   }
 
   async get(auditId: string): Promise<AuditRecord | null> {
@@ -171,16 +203,23 @@ class KvAuditStore implements AuditStore {
   async attachEmail(auditId: string, email: string, emailedAt: string): Promise<AuditRecord | null> {
     const existing = await this.get(auditId);
     if (!existing) return null;
+    // Anchor the new EX to the record's original window. If the record
+    // is already past 90 days from createdAt, refuse the write — mirrors
+    // the in-memory store's `readFresh` semantics.
+    const ttl = remainingTtlSeconds(existing, Date.now());
+    if (ttl <= 0) return null;
     const updated: AuditRecord = { ...existing, email, emailedAt };
-    await this.save(updated);
+    await this.writeWithTtl(updated, ttl);
     return updated;
   }
 
   async attachSelfReport(auditId: string, selfReport: SelfReport): Promise<AuditRecord | null> {
     const existing = await this.get(auditId);
     if (!existing) return null;
+    const ttl = remainingTtlSeconds(existing, Date.now());
+    if (ttl <= 0) return null;
     const updated: AuditRecord = { ...existing, selfReport };
-    await this.save(updated);
+    await this.writeWithTtl(updated, ttl);
     return updated;
   }
 }
