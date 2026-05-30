@@ -31,7 +31,20 @@ export interface AuditRecord {
 export interface AuditStore {
   save(record: AuditRecord): Promise<void>;
   get(auditId: string): Promise<AuditRecord | null>;
-  attachEmail(auditId: string, email: string, emailedAt: string): Promise<AuditRecord | null>;
+  /**
+   * Attach the email-submit metadata. `userAgent` and `ipHash` are
+   * captured here — NOT on the initial save — because the privacy
+   * policy ties their collection to the email submit (the moment the
+   * user gives explicit consent). Upload-only visitors who never clear
+   * the gate must not have their UA / IP hash retained.
+   */
+  attachEmail(
+    auditId: string,
+    email: string,
+    emailedAt: string,
+    userAgent: string | null,
+    ipHash: string | null,
+  ): Promise<AuditRecord | null>;
   attachSelfReport(auditId: string, selfReport: SelfReport): Promise<AuditRecord | null>;
 }
 
@@ -142,10 +155,16 @@ class InMemoryAuditStore implements AuditStore {
     return readFresh(auditId);
   }
 
-  async attachEmail(auditId: string, email: string, emailedAt: string): Promise<AuditRecord | null> {
+  async attachEmail(
+    auditId: string,
+    email: string,
+    emailedAt: string,
+    userAgent: string | null,
+    ipHash: string | null,
+  ): Promise<AuditRecord | null> {
     const existing = readFresh(auditId);
     if (!existing) return null;
-    const updated: AuditRecord = { ...existing, email, emailedAt };
+    const updated: AuditRecord = { ...existing, email, emailedAt, userAgent, ipHash };
     inMemoryMap().set(auditId, updated);
     return updated;
   }
@@ -200,7 +219,13 @@ export class KvAuditStore implements AuditStore {
     return raw;
   }
 
-  async attachEmail(auditId: string, email: string, emailedAt: string): Promise<AuditRecord | null> {
+  async attachEmail(
+    auditId: string,
+    email: string,
+    emailedAt: string,
+    userAgent: string | null,
+    ipHash: string | null,
+  ): Promise<AuditRecord | null> {
     const existing = await this.get(auditId);
     if (!existing) return null;
     // Anchor the new EX to the record's original window. If the record
@@ -208,7 +233,7 @@ export class KvAuditStore implements AuditStore {
     // the in-memory store's `readFresh` semantics.
     const ttl = remainingTtlSeconds(existing, Date.now());
     if (ttl <= 0) return null;
-    const updated: AuditRecord = { ...existing, email, emailedAt };
+    const updated: AuditRecord = { ...existing, email, emailedAt, userAgent, ipHash };
     await this.writeWithTtl(updated, ttl);
     return updated;
   }

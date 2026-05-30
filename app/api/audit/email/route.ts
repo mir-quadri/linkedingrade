@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 
 import { sendAuditEmail } from '@/lib/email/sendAuditEmail';
 import { getAuditStore } from '@/lib/storage/auditStore';
+import { extractIp, hashIp } from '@/lib/audit/hashIp';
 
 export const runtime = 'nodejs';
 
@@ -33,7 +34,14 @@ export async function POST(request: Request) {
 
   const store = await getAuditStore();
   const emailedAt = new Date().toISOString();
-  const updated = await store.attachEmail(auditId, email, emailedAt);
+  // The email submit IS the consent moment, so this is the right
+  // place to capture user-agent and the hashed IP — matches the
+  // privacy policy's "If you submit your email, we also store ..."
+  // wording. Upload-only visitors don't reach this path and so don't
+  // have UA / IP hash retained.
+  const userAgent = request.headers.get('user-agent');
+  const ipHash = hashIp(extractIp(request.headers));
+  const updated = await store.attachEmail(auditId, email, emailedAt, userAgent, ipHash);
   if (!updated) {
     return NextResponse.json(
       {

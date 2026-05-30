@@ -5,7 +5,6 @@ import { parseLinkedInPdf } from '@/lib/pdf/parseLinkedInPdf';
 import { runScoring } from '@/lib/engine/scoring';
 import { getAuditStore } from '@/lib/storage/auditStore';
 import { buildPreview } from '@/lib/audit/buildPreview';
-import { extractIp, hashIp } from '@/lib/audit/hashIp';
 
 // Force the Node runtime: pdf-parse / pdfjs-dist depend on Node APIs and
 // cannot run on Vercel's Edge runtime.
@@ -58,8 +57,12 @@ export async function POST(request: Request) {
 
     const auditId = randomUUID();
     const store = await getAuditStore();
-    const userAgent = request.headers.get('user-agent');
-    const ipHash = hashIp(extractIp(request.headers));
+    // userAgent / ipHash are intentionally NOT captured here. The
+    // privacy policy ties their collection to the email-submit step
+    // (the moment the user gives explicit consent). An upload-only
+    // visitor who never clears the gate must not have UA / IP hash
+    // retained. The /api/audit/email route captures them from its own
+    // request headers and passes them to attachEmail.
     await store.save({
       auditId,
       createdAt: new Date().toISOString(),
@@ -68,8 +71,8 @@ export async function POST(request: Request) {
       profile,
       audit,
       selfReport: null,
-      userAgent,
-      ipHash,
+      userAgent: null,
+      ipHash: null,
     });
 
     // The response intentionally omits the full report — that's gated

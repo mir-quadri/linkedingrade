@@ -108,7 +108,7 @@ describe('KvAuditStore — retention anchored to createdAt (Codex P2)', () => {
 
     // Submit email at day 89.
     vi.setSystemTime(new Date(Date.parse(createdAt) + NINETY_DAYS_MS - 24 * 60 * 60 * 1000));
-    const updated = await store.attachEmail('aud_kv', 'late@example.com', new Date().toISOString());
+    const updated = await store.attachEmail('aud_kv', 'late@example.com', new Date().toISOString(), null, null);
     expect(updated?.email).toBe('late@example.com');
     expect(calls).toHaveLength(2);
     // The remaining TTL at day 89 must be ~1 day (86400 ± a second of
@@ -145,7 +145,7 @@ describe('KvAuditStore — retention anchored to createdAt (Codex P2)', () => {
     await store.save(baseRecord({ createdAt }));
     // Past TTL
     vi.setSystemTime(new Date(Date.parse(createdAt) + NINETY_DAYS_MS + 1));
-    const result = await store.attachEmail('aud_kv', 'too-late@example.com', new Date().toISOString());
+    const result = await store.attachEmail('aud_kv', 'too-late@example.com', new Date().toISOString(), null, null);
     expect(result).toBeNull();
     // Only the original save call — no second `set` from the rejected
     // attach. This is the meaningful guard: if the rejected write still

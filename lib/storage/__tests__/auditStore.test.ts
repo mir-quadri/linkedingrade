@@ -85,16 +85,45 @@ describe('auditStore (in-memory)', () => {
   it('attachEmail updates the email and emailedAt timestamp', async () => {
     const store = await getAuditStore();
     await store.save(fixtureRecord());
-    const updated = await store.attachEmail('aud_test', 'user@example.com', '2026-05-21T00:10:00Z');
+    const updated = await store.attachEmail('aud_test', 'user@example.com', '2026-05-21T00:10:00Z', null, null);
     expect(updated?.email).toBe('user@example.com');
     expect(updated?.emailedAt).toBe('2026-05-21T00:10:00Z');
     const refetched = await store.get('aud_test');
     expect(refetched?.email).toBe('user@example.com');
   });
 
+  // Codex P2 regression: user-agent and the hashed IP must be captured
+  // at the email-submit step, not on initial upload. The privacy copy
+  // ties their collection to the email step ("If you submit your
+  // email, we also store …"). These tests pin that the store correctly
+  // routes UA / IP through attachEmail and that an upload-only record
+  // never carries them.
+  it('save leaves userAgent and ipHash null — upload-only visitors carry no UA/IP metadata', async () => {
+    const store = await getAuditStore();
+    await store.save(fixtureRecord({ userAgent: null, ipHash: null }));
+    const fetched = await store.get('aud_test');
+    expect(fetched?.userAgent).toBeNull();
+    expect(fetched?.ipHash).toBeNull();
+  });
+
+  it('attachEmail writes userAgent and ipHash captured at gate-submit time', async () => {
+    const store = await getAuditStore();
+    await store.save(fixtureRecord());
+    const ua = 'Mozilla/5.0 (test)';
+    const hash = 'a'.repeat(64);
+    const updated = await store.attachEmail(
+      'aud_test', 'user@example.com', '2026-05-21T00:10:00Z', ua, hash,
+    );
+    expect(updated?.userAgent).toBe(ua);
+    expect(updated?.ipHash).toBe(hash);
+    const refetched = await store.get('aud_test');
+    expect(refetched?.userAgent).toBe(ua);
+    expect(refetched?.ipHash).toBe(hash);
+  });
+
   it('attachEmail returns null when the audit id does not exist', async () => {
     const store = await getAuditStore();
-    const result = await store.attachEmail('missing', 'x@y.z', '2026-05-21T00:00:00Z');
+    const result = await store.attachEmail('missing', 'x@y.z', '2026-05-21T00:00:00Z', null, null);
     expect(result).toBeNull();
   });
 
@@ -114,7 +143,7 @@ describe('auditStore (in-memory)', () => {
   it('subsequent attach calls preserve earlier attachments', async () => {
     const store = await getAuditStore();
     await store.save(fixtureRecord());
-    await store.attachEmail('aud_test', 'user@example.com', '2026-05-21T00:10:00Z');
+    await store.attachEmail('aud_test', 'user@example.com', '2026-05-21T00:10:00Z', null, null);
     const after = await store.attachSelfReport('aud_test', selfReportFixture);
     expect(after?.email).toBe('user@example.com');
     expect(after?.selfReport).toEqual(selfReportFixture);
@@ -139,7 +168,7 @@ describe('auditStore (in-memory)', () => {
   it('attachSelfReport never clears the email field — the gate cannot regress', async () => {
     const store = await getAuditStore();
     await store.save(fixtureRecord());
-    await store.attachEmail('aud_test', 'user@example.com', '2026-05-21T00:10:00Z');
+    await store.attachEmail('aud_test', 'user@example.com', '2026-05-21T00:10:00Z', null, null);
     const after = await store.attachSelfReport('aud_test', selfReportFixture);
     expect(after?.email).toBe('user@example.com');
     expect(after?.emailedAt).toBe('2026-05-21T00:10:00Z');
@@ -177,7 +206,7 @@ describe('auditStore (in-memory)', () => {
       const store = await getAuditStore();
       await store.save(fixtureRecord({ createdAt: '2026-01-01T00:00:00Z' }));
       vi.setSystemTime(new Date(Date.parse('2026-01-01T00:00:00Z') + NINETY_DAYS_MS + 1));
-      const result = await store.attachEmail('aud_test', 'late@example.com', '2026-05-01T00:00:00Z');
+      const result = await store.attachEmail('aud_test', 'late@example.com', '2026-05-01T00:00:00Z', null, null);
       expect(result).toBeNull();
     });
 
