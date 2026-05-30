@@ -6,7 +6,17 @@ interface SendAuditEmailParams {
   fullName: string | null;
   audit: AuditResult;
   resultUrl: string;
+  /**
+   * Hard timeout for the Resend request, in milliseconds. The default
+   * keeps the email-gate response time bounded even when Resend is slow
+   * — without this, a stalled Resend connection blocks the gate until
+   * the serverless function dies, even though the audit is already
+   * persisted (the Codex P2 fix on this file). Tests override.
+   */
+  timeoutMs?: number;
 }
+
+const DEFAULT_TIMEOUT_MS = 5_000;
 
 /**
  * Send the post-audit transactional email via Resend.
@@ -27,6 +37,9 @@ export async function sendAuditEmail(params: SendAuditEmailParams): Promise<bool
     return false;
   }
 
+  const controller = new AbortController();
+  const timeoutMs = params.timeoutMs ?? DEFAULT_TIMEOUT_MS;
+  const timeoutHandle = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const resp = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -41,6 +54,7 @@ export async function sendAuditEmail(params: SendAuditEmailParams): Promise<bool
         html: buildHtml(params),
         text: buildText(params),
       }),
+      signal: controller.signal,
     });
     if (!resp.ok) {
       const body = await resp.text().catch(() => '');
@@ -51,10 +65,15 @@ export async function sendAuditEmail(params: SendAuditEmailParams): Promise<bool
     }
     return true;
   } catch (err) {
-    console.error(
-      `[sendAuditEmail] resend request failed: ${err instanceof Error ? err.message : String(err)}`,
-    );
+    const reason = err instanceof Error ? err.message : String(err);
+    if ((err as { name?: string })?.name === 'AbortError') {
+      console.error(`[sendAuditEmail] resend timed out after ${timeoutMs}ms`);
+    } else {
+      console.error(`[sendAuditEmail] resend request failed: ${reason}`);
+    }
     return false;
+  } finally {
+    clearTimeout(timeoutHandle);
   }
 }
 

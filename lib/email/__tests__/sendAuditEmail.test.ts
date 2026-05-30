@@ -110,4 +110,40 @@ describe('sendAuditEmail', () => {
     });
     expect(ok).toBe(false);
   });
+
+  // Codex P2 regression: a stalled Resend connection used to block the
+  // email-gate response until the serverless function timed out, even
+  // though the audit was already persisted. The hard timeout caps the
+  // gate response time and lets the route return its full payload.
+  it('aborts the fetch after the configured timeout and returns false', async () => {
+    process.env.RESEND_API_KEY = 'rk_test';
+    process.env.EMAIL_FROM = 'audit@linkedingrade.com';
+    // Honour the AbortSignal: hang until aborted, then reject. This is
+    // what a stuck Resend connection looks like from this side.
+    fetchSpy.mockImplementationOnce((_url: unknown, init?: RequestInit) => {
+      return new Promise((_resolve, reject) => {
+        const signal = init?.signal;
+        if (!signal) return;
+        signal.addEventListener('abort', () => {
+          const err = new Error('aborted');
+          (err as { name: string }).name = 'AbortError';
+          reject(err);
+        });
+      });
+    });
+    const start = Date.now();
+    const ok = await sendAuditEmail({
+      email: 'user@example.com',
+      fullName: 'Jane Doe',
+      audit,
+      resultUrl: 'https://linkedingrade.com/audit/result/abc',
+      timeoutMs: 25,
+    });
+    const elapsed = Date.now() - start;
+    expect(ok).toBe(false);
+    // The point of the timeout: the call must return promptly, not hang
+    // until the serverless timeout. 1s is plenty of slack for CI jitter
+    // while still failing if a stuck fetch leaks through.
+    expect(elapsed).toBeLessThan(1_000);
+  });
 });
