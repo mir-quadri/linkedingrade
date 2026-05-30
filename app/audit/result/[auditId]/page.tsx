@@ -28,7 +28,13 @@ export default async function AuditResultPage({ params }: PageProps) {
   const { auditId } = await params;
   const store = await getAuditStore();
   const record = await store.get(auditId);
-  if (!record) notFound();
+  // Email gate: the auditId is returned to the browser before the email
+  // step (the client needs it to submit /api/audit/email). If this route
+  // resolved any record by id, a visitor could POST /api/audit, copy the
+  // id, and GET this page to bypass the gate entirely — the bug Codex P1
+  // flagged. Treat ungated records as not-found so the id alone is never
+  // sufficient to retrieve the full report.
+  if (!record || !record.email) notFound();
   const { profile, audit, selfReport, createdAt, email } = record;
   return (
     <>
@@ -39,7 +45,7 @@ export default async function AuditResultPage({ params }: PageProps) {
             <div className="meta-line">
               <span>§ A — AUDIT</span>
               <span>RESULT · {new Date(createdAt).toISOString().slice(0, 10)}</span>
-              {email ? <span>EMAILED TO {email}</span> : <span>NOT YET EMAILED</span>}
+              <span>EMAILED TO {email}</span>
             </div>
             <h1>
               {profile.fullName ? (

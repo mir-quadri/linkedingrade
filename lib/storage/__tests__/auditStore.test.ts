@@ -119,4 +119,29 @@ describe('auditStore (in-memory)', () => {
     expect(after?.email).toBe('user@example.com');
     expect(after?.selfReport).toEqual(selfReportFixture);
   });
+
+  // Codex P1 #3 regression: the auditId is returned to the browser before
+  // the email step (the client needs it to POST /api/audit/email), so any
+  // route that uses the id MUST check that record.email is set before
+  // revealing the full report — otherwise the id alone is sufficient to
+  // bypass the gate. The store doesn't gate reads itself (it's a dumb
+  // K/V), but its `email` field is the canonical gate-cleared signal the
+  // routes consult. These tests pin that signal: pre-gate records have
+  // null email; attachEmail flips it; nothing else clears it.
+  it('email field is null on freshly-saved records (gate-not-cleared signal)', async () => {
+    const store = await getAuditStore();
+    await store.save(fixtureRecord());
+    const fetched = await store.get('aud_test');
+    expect(fetched?.email).toBeNull();
+    expect(fetched?.emailedAt).toBeNull();
+  });
+
+  it('attachSelfReport never clears the email field — the gate cannot regress', async () => {
+    const store = await getAuditStore();
+    await store.save(fixtureRecord());
+    await store.attachEmail('aud_test', 'user@example.com', '2026-05-21T00:10:00Z');
+    const after = await store.attachSelfReport('aud_test', selfReportFixture);
+    expect(after?.email).toBe('user@example.com');
+    expect(after?.emailedAt).toBe('2026-05-21T00:10:00Z');
+  });
 });

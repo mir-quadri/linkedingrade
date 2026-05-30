@@ -42,6 +42,23 @@ export async function POST(request: Request) {
   };
 
   const store = await getAuditStore();
+  // Email gate: the self-report block is rendered inside the post-gate
+  // full report, so a write attempt for a record whose email is still
+  // null means someone is talking to the endpoint directly. Refuse, for
+  // the same reason `/audit/result/[auditId]` refuses ungated reads.
+  const existing = await store.get(auditId);
+  if (!existing) {
+    return NextResponse.json(
+      { error: 'Audit not found or expired.' },
+      { status: 404 },
+    );
+  }
+  if (!existing.email) {
+    return NextResponse.json(
+      { error: 'Submit your email first to unlock the self-assessed block.' },
+      { status: 403 },
+    );
+  }
   const updated = await store.attachSelfReport(auditId, selfReport);
   if (!updated) {
     return NextResponse.json(
