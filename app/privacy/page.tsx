@@ -95,7 +95,9 @@ export default function PrivacyPage() {
         <li>
           Audit records are stored in <b>Vercel KV</b> (Upstash Redis) with a
           90-day expiry. After 90 days the record — and your email&apos;s
-          association with it — are deleted automatically.
+          association with it — are deleted automatically. If the site is
+          ever run without KV provisioned, the in-memory fallback applies the
+          same 90-day window before evicting a record on read.
         </li>
         <li>
           You can ask us to delete your audit and email association at any

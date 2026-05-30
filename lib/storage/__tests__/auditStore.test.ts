@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   getAuditStore,
@@ -143,5 +143,64 @@ describe('auditStore (in-memory)', () => {
     const after = await store.attachSelfReport('aud_test', selfReportFixture);
     expect(after?.email).toBe('user@example.com');
     expect(after?.emailedAt).toBe('2026-05-21T00:10:00Z');
+  });
+
+  // Codex P2 regression: the in-memory fallback ran without an expiry
+  // path while the privacy copy promised 90 days. A long-lived
+  // `next start` (self-hosted) instance would have retained PII
+  // indefinitely. Lazy expiry on read + opportunistic prune on save
+  // honour the same TTL the KV implementation enforces via `ex`.
+  describe('90-day retention (Codex P2)', () => {
+    const NINETY_DAYS_MS = 90 * 24 * 60 * 60 * 1000;
+    beforeEach(() => {
+      vi.useFakeTimers();
+      vi.setSystemTime(new Date('2026-01-01T00:00:00Z'));
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it('get returns null and prunes the entry once it crosses the 90-day TTL', async () => {
+      const store = await getAuditStore();
+      await store.save(fixtureRecord({ createdAt: '2026-01-01T00:00:00Z' }));
+      // Day 89 — within window
+      vi.setSystemTime(new Date(Date.parse('2026-01-01T00:00:00Z') + NINETY_DAYS_MS - 1));
+      expect(await store.get('aud_test')).not.toBeNull();
+      // Day 90 + 1ms — expired
+      vi.setSystemTime(new Date(Date.parse('2026-01-01T00:00:00Z') + NINETY_DAYS_MS + 1));
+      expect(await store.get('aud_test')).toBeNull();
+      // Subsequent reads stay null (entry was pruned).
+      expect(await store.get('aud_test')).toBeNull();
+    });
+
+    it('attachEmail refuses to write to a record past its 90-day TTL', async () => {
+      const store = await getAuditStore();
+      await store.save(fixtureRecord({ createdAt: '2026-01-01T00:00:00Z' }));
+      vi.setSystemTime(new Date(Date.parse('2026-01-01T00:00:00Z') + NINETY_DAYS_MS + 1));
+      const result = await store.attachEmail('aud_test', 'late@example.com', '2026-05-01T00:00:00Z');
+      expect(result).toBeNull();
+    });
+
+    it('save opportunistically prunes other expired records in the map', async () => {
+      const store = await getAuditStore();
+      await store.save(fixtureRecord({ auditId: 'aud_old', createdAt: '2026-01-01T00:00:00Z' }));
+      // Move clock past the TTL of the first record, then save a fresh one
+      // — the save call should sweep `aud_old` out.
+      vi.setSystemTime(new Date(Date.parse('2026-01-01T00:00:00Z') + NINETY_DAYS_MS + 1));
+      await store.save(fixtureRecord({ auditId: 'aud_new', createdAt: new Date().toISOString() }));
+      expect(await store.get('aud_old')).toBeNull();
+      expect(await store.get('aud_new')).not.toBeNull();
+    });
+
+    it('records with a malformed createdAt are NOT silently expired', async () => {
+      const store = await getAuditStore();
+      // Pinning the conservative behaviour: if we can't parse the
+      // timestamp, we prefer to keep the record (and let an operator
+      // notice) rather than swallow data silently. The KV side has no
+      // equivalent risk since it relies on Redis's server-side EX.
+      await store.save(fixtureRecord({ createdAt: 'not-a-date' }));
+      vi.setSystemTime(new Date('2030-01-01T00:00:00Z'));
+      expect(await store.get('aud_test')).not.toBeNull();
+    });
   });
 });

@@ -36,6 +36,21 @@ export interface AuditStore {
 }
 
 const RECORD_TTL_SECONDS = 60 * 60 * 24 * 90; // 90 days
+const RECORD_TTL_MS = RECORD_TTL_SECONDS * 1000;
+
+/**
+ * Has this record passed its 90-day TTL? Compared against `createdAt`
+ * (set at audit creation) — `emailedAt` and `selfReport.submittedAt` are
+ * later mutations and don't extend the window. The same TTL bound is
+ * applied by the KV implementation via `ex`; this helper exists so the
+ * in-memory fallback can honour the same retention promise the privacy
+ * policy makes ("90 days, automatically deleted").
+ */
+function isExpired(record: AuditRecord, now: number): boolean {
+  const created = Date.parse(record.createdAt);
+  if (!Number.isFinite(created)) return false;
+  return now - created > RECORD_TTL_MS;
+}
 
 /**
  * In-memory store. Per-instance state, reset on every serverless cold start
@@ -61,17 +76,52 @@ function inMemoryMap(): Map<string, AuditRecord> {
   return g.__linkedinGradeAuditStore;
 }
 
+/**
+ * Lazy-expiry helper. Returns the record for `auditId` if present AND
+ * still within its TTL window; otherwise deletes the stale entry and
+ * returns null. This mirrors Redis's GET-on-expired semantics on the
+ * cheap, so /audit/result/<id> can't reveal a record that should have
+ * been swept after 90 days.
+ */
+function readFresh(auditId: string): AuditRecord | null {
+  const map = inMemoryMap();
+  const record = map.get(auditId);
+  if (!record) return null;
+  if (isExpired(record, Date.now())) {
+    map.delete(auditId);
+    return null;
+  }
+  return record;
+}
+
+/**
+ * Opportunistic prune. Walks the Map once and drops every expired
+ * record. We piggy-back on `save`: it's the only write path that's
+ * already touching the Map for an unrelated reason, so this adds a
+ * single scan per audit rather than a setInterval timer that would
+ * survive route reloads and leak across HMR cycles. The Map size is
+ * bounded by per-instance throughput * 90 days, so the scan is cheap.
+ */
+function pruneExpired(now: number): void {
+  const map = inMemoryMap();
+  for (const [id, record] of map) {
+    if (isExpired(record, now)) map.delete(id);
+  }
+}
+
 class InMemoryAuditStore implements AuditStore {
   async save(record: AuditRecord): Promise<void> {
-    inMemoryMap().set(record.auditId, record);
+    const map = inMemoryMap();
+    pruneExpired(Date.now());
+    map.set(record.auditId, record);
   }
 
   async get(auditId: string): Promise<AuditRecord | null> {
-    return inMemoryMap().get(auditId) ?? null;
+    return readFresh(auditId);
   }
 
   async attachEmail(auditId: string, email: string, emailedAt: string): Promise<AuditRecord | null> {
-    const existing = inMemoryMap().get(auditId);
+    const existing = readFresh(auditId);
     if (!existing) return null;
     const updated: AuditRecord = { ...existing, email, emailedAt };
     inMemoryMap().set(auditId, updated);
@@ -79,7 +129,7 @@ class InMemoryAuditStore implements AuditStore {
   }
 
   async attachSelfReport(auditId: string, selfReport: SelfReport): Promise<AuditRecord | null> {
-    const existing = inMemoryMap().get(auditId);
+    const existing = readFresh(auditId);
     if (!existing) return null;
     const updated: AuditRecord = { ...existing, selfReport };
     inMemoryMap().set(auditId, updated);
