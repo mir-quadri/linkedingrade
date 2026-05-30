@@ -88,13 +88,15 @@ export default function PrivacyPage() {
           analytics or marketing.
         </li>
         <li>
-          Email delivery uses <b>Resend</b> (resend.com) as a transactional
-          email processor. Resend is the only third party that receives your
-          email address from the audit flow.
+          Two third parties receive audit-flow data in production:{' '}
+          <b>Resend</b> (resend.com), which sends the transactional email,
+          and <b>Vercel KV</b> backed by <b>Upstash</b> (upstash.com), which
+          stores the audit record — including the email association — under
+          a 90-day expiry. No other third parties are involved.
         </li>
         <li>
-          Audit records are stored in <b>Vercel KV</b> (Upstash Redis) with a
-          90-day expiry. After 90 days the record — and your email&apos;s
+          The 90-day expiry on the stored record is enforced by Upstash via
+          Redis TTL. After 90 days the record — and your email&apos;s
           association with it — are deleted automatically. If the site is
           ever run without KV provisioned, the in-memory fallback applies the
           same 90-day window before evicting a record on read.
