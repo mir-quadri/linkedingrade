@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { randomUUID } from 'node:crypto';
 
 import { parseLinkedInPdf } from '@/lib/pdf/parseLinkedInPdf';
-import { runScoring, buildJudgeRequest } from '@/lib/engine/scoring';
+import { runScoring } from '@/lib/engine/scoring';
 import { getAuditStore } from '@/lib/storage/auditStore';
 import { buildPreview } from '@/lib/audit/buildPreview';
 import { extractIp, hashIp } from '@/lib/audit/hashIp';
@@ -72,14 +72,14 @@ export async function POST(request: Request) {
       ipHash,
     });
 
+    // The response intentionally omits the full report — that's gated
+    // behind /api/audit/email. Returning the full payload here would let a
+    // user inspect DevTools (or call the endpoint directly) and bypass
+    // the email gate entirely. The full record is persisted in the audit
+    // store; /api/audit/email looks it up and returns it on success.
     return NextResponse.json({
       auditId,
       preview: buildPreview(audit, profile.fullName),
-      fullReport: { profile, audit },
-      // The judge-request shape is returned so a future AI-judge endpoint
-      // can be invoked from the client without re-parsing the PDF. It's
-      // small and serialisable today; if it grows we'll persist it instead.
-      judgeRequest: buildJudgeRequest(profile),
     });
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);

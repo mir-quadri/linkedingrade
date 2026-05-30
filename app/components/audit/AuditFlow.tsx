@@ -70,17 +70,19 @@ export default function AuditFlow() {
       const data = (await resp.json()) as {
         auditId?: string;
         preview?: AuditPreview;
-        fullReport?: FullReport;
         error?: string;
       };
-      if (!resp.ok || !data.auditId || !data.preview || !data.fullReport) {
+      if (!resp.ok || !data.auditId || !data.preview) {
         setStage('upload');
         setUploadError(data.error ?? 'Something went wrong. Try again.');
         return;
       }
       setAuditId(data.auditId);
       setPreview(data.preview);
-      setFullReport(data.fullReport);
+      // fullReport stays null until /api/audit/email succeeds. The upload
+      // response intentionally does NOT include the full report so a user
+      // can't bypass the email gate via DevTools.
+      setFullReport(null);
       setStage('preview');
       // Scroll to the preview so the user sees the result without hunting.
       requestAnimationFrame(() => {
@@ -118,13 +120,19 @@ export default function AuditFlow() {
           success?: boolean;
           emailed?: boolean;
           resultUrl?: string;
+          profile?: FullReport['profile'];
+          audit?: FullReport['audit'];
           error?: string;
         };
-        if (!resp.ok || !data.success) {
+        if (!resp.ok || !data.success || !data.profile || !data.audit) {
           setStage('preview');
           setEmailError(data.error ?? 'Could not submit. Try again.');
           return;
         }
+        // The full report payload is gated to this response, so the gate
+        // is actually load-bearing — a DevTools inspection of the upload
+        // response leaks only the preview.
+        setFullReport({ profile: data.profile, audit: data.audit });
         setEmailDelivered(Boolean(data.emailed));
         if (data.resultUrl) setResultUrl(data.resultUrl);
         setStage('full');
@@ -157,7 +165,7 @@ export default function AuditFlow() {
         onReset={reset}
       />
 
-      {stage !== 'upload' && stage !== 'parsing' && preview && fullReport ? (
+      {stage !== 'upload' && stage !== 'parsing' && preview ? (
         <div id="audit-result" style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
           <ScoreSummary
             composite={preview.composite}
@@ -165,10 +173,10 @@ export default function AuditFlow() {
             variant={stage === 'full' ? 'full' : 'preview'}
           />
 
-          {stage !== 'full' ? (
+          {stage !== 'full' || !fullReport ? (
             <>
               <SectionPreview preview={preview} />
-              <SectionGradeList sections={fullReport.audit.sections} blurred />
+              <GatedSectionsTease count={preview.gatedSectionCount} />
               <EmailGate
                 email={email}
                 onEmail={setEmail}
@@ -287,6 +295,48 @@ function UploadCard({
         .
       </p>
     </section>
+  );
+}
+
+/**
+ * Tease the gated-section count without leaking grades. The previous shape
+ * blurred a real `SectionGradeList` over the full report client-side,
+ * which only worked because the upload response carried the full report —
+ * exactly the leak Codex flagged. The full data now arrives in the gate's
+ * own response; before that, all the user sees is the count.
+ */
+function GatedSectionsTease({ count }: { count: number }) {
+  if (count <= 0) return null;
+  return (
+    <div
+      style={{
+        background: 'var(--surface)',
+        border: '1px dashed var(--border-2)',
+        borderRadius: 'var(--r-lg)',
+        padding: '22px 24px',
+        textAlign: 'center',
+        color: 'var(--text-2)',
+      }}
+    >
+      <div
+        className="font-mono"
+        style={{
+          fontSize: 11,
+          letterSpacing: '0.08em',
+          color: 'var(--text-3)',
+          textTransform: 'uppercase',
+          marginBottom: 8,
+        }}
+      >
+        Gated · {count} section{count === 1 ? '' : 's'}
+      </div>
+      <div style={{ fontSize: 14.5, lineHeight: 1.55 }}>
+        Headline / About / Current Experience above are 3 of {count + 3} sections.
+        The remaining {count} — Experience History, Skills, Education, Photo, Banner, Activity,
+        Recommendations, Featured, Keyword Health — plus top wins and your three highest-leverage
+        fixes unlock when you submit your email.
+      </div>
+    </div>
   );
 }
 

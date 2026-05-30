@@ -55,5 +55,15 @@ export async function POST(request: Request) {
     resultUrl,
   });
 
-  return NextResponse.json({ success: true, emailed, resultUrl });
+  // Return the full report payload here — the email submit IS the gate,
+  // so the client receives the gated data in the response to the
+  // gate-clearing request. Without this, AuditFlow would have no way to
+  // reveal the full report inline without a second authenticated lookup.
+  return NextResponse.json({
+    success: true,
+    emailed,
+    resultUrl,
+    profile: updated.profile,
+    audit: updated.audit,
+  });
 }
