@@ -1,15 +1,12 @@
-// Side-effect import: must be the FIRST import in this file, BEFORE
-// anything that might transitively touch pdfjs-dist. The module body
-// of `./installCanvasStubs` installs no-op DOMMatrix / Path2D /
-// ImageData on `globalThis` at module-load time, so by the time the
-// `await import('pdf-parse')` below runs, the polyfills are already
-// in place and `pdfjs-dist`'s module-level `new DOMMatrix()` cannot
-// throw a ReferenceError. The named export is imported in addition
-// to the bare side-effect import so the import line cannot be tree-
-// shaken — a bare `import './installCanvasStubs'` is technically
-// preserved by modern bundlers but the named import is belt-and-
-// suspenders for any future bundler config quirk.
+// Side-effect imports: must be the FIRST imports in this file, BEFORE
+// anything that might transitively touch pdfjs-dist. They install
+// canvas-globals stubs (DOMMatrix / Path2D / ImageData) and the
+// pdfjsWorker handler (so pdfjs-dist's fake-worker setup skips its
+// runtime dynamic import of pdf.worker.mjs, which Vercel can't
+// resolve). Named exports are imported in addition to the bare
+// side-effect import so the lines cannot be tree-shaken.
 import { installCanvasStubs, canvasGlobalsState } from './installCanvasStubs';
+import { ensurePdfjsWorkerHandler, pdfjsWorkerState } from './disablePdfjsWorker';
 
 import type { ProfileData } from '@/lib/engine/types';
 import { parseLinkedInText, type ParseLinkedInOptions } from './parseLinkedInText';
@@ -31,21 +28,30 @@ export async function parseLinkedInPdf(
   pdfBuffer: ArrayBuffer | Uint8Array | Buffer,
   options: ParseLinkedInOptions = {},
 ): Promise<ProfileData> {
-  // In-function belt-and-suspenders install. If the module-load
+  // In-function belt-and-suspenders installs. If a module-load
   // side-effect above somehow didn't run (cold-start ordering,
-  // bundler-induced re-instantiation, dev HMR), this catches it
-  // before the dynamic pdf-parse import below.
-  const installResult = installCanvasStubs();
-  const before = canvasGlobalsState();
+  // bundler-induced re-instantiation, dev HMR), these catch the
+  // gap before the dynamic pdf-parse import below.
+  const canvasInstall = installCanvasStubs();
+  const workerInstall = ensurePdfjsWorkerHandler();
+  const canvasBefore = canvasGlobalsState();
+  const workerBefore = pdfjsWorkerState();
   console.log(
-    `[parseLinkedInPdf] pre-import canvas state: ${JSON.stringify(before)} (function-call install: installed=[${installResult.installed.join(',')}] preExisting=[${installResult.preExisting.join(',')}])`,
+    `[parseLinkedInPdf] pre-import canvas state: ${JSON.stringify(canvasBefore)} (function-call install: installed=[${canvasInstall.installed.join(',')}] preExisting=[${canvasInstall.preExisting.join(',')}])`,
+  );
+  console.log(
+    `[parseLinkedInPdf] pre-import worker state: ${JSON.stringify(workerBefore)} (function-call install: installed=${workerInstall.installed} preExisting=${workerInstall.preExisting})`,
   );
 
   const { PDFParse } = await import('pdf-parse');
 
-  const after = canvasGlobalsState();
+  const canvasAfter = canvasGlobalsState();
+  const workerAfter = pdfjsWorkerState();
   console.log(
-    `[parseLinkedInPdf] post-import canvas state: ${JSON.stringify(after)}`,
+    `[parseLinkedInPdf] post-import canvas state: ${JSON.stringify(canvasAfter)}`,
+  );
+  console.log(
+    `[parseLinkedInPdf] post-import worker state: ${JSON.stringify(workerAfter)}`,
   );
 
   const data =

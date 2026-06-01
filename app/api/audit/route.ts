@@ -1,10 +1,13 @@
-// Side-effect import: installs the canvas globals pdfjs-dist needs
-// at module-load time. Must be the FIRST import in this file — before
-// `parseLinkedInPdf` (whose module also imports it, but importing it
-// here too means the stubs are in place even if a future refactor
-// changes the module-load order, and it makes the dependency
+// Side-effect imports: install the canvas globals pdfjs-dist needs
+// AND the pdfjsWorker handler that lets pdfjs-dist's fake-worker
+// setup skip its runtime dynamic import of pdf.worker.mjs (which
+// Vercel can't resolve). Must be the FIRST imports in this file —
+// before `parseLinkedInPdf` (whose module also imports them, but
+// importing here too means they're in place even if a future
+// refactor changes the module-load order, and makes the dependency
 // observable at the route level for anyone reading the route).
 import '@/lib/pdf/installCanvasStubs';
+import '@/lib/pdf/disablePdfjsWorker';
 
 import { NextResponse } from 'next/server';
 import { randomUUID } from 'node:crypto';
