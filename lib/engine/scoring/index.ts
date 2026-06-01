@@ -1,7 +1,12 @@
 import type { ProfileData, AuditResult, SectionScore, SectionId } from '@/lib/engine/types';
 import type { Judge, JudgeRequest, JudgeResponse } from '@/lib/engine/types/judge';
+import type { SelfReport } from '@/lib/storage/auditStore';
 import { NullJudge } from '@/lib/engine/types/judge';
 import { SECTIONS, sectionMeta } from './weights';
+import {
+  PDF_INVISIBLE_NO_SELF_REPORT_MESSAGE,
+  scoreSelfReportSection,
+} from './pdfCompositeConfig';
 import { scoreToLetter } from './letters';
 import { applySeniorityModifier, inferSeniority, TIER_LABEL } from './seniority';
 import { computeComposite } from './composite';
@@ -160,12 +165,23 @@ function expectedJudgeKeys(profile: ProfileData): (keyof JudgeResponse)[] {
 }
 
 /**
- * Pure scoring. Takes a ProfileData and a JudgeResponse (which may be empty
- * if the AI layer is unavailable). Returns a complete AuditResult.
+ * Pure scoring. Takes a ProfileData, a JudgeResponse (which may be
+ * empty if the AI layer is unavailable), and an optional self-assessed
+ * checklist. Returns a complete AuditResult.
+ *
+ * The `selfReport` argument changes the composite-calc behaviour:
+ *   - `null` / undefined → PDF-invisible sections are excluded from
+ *     the composite and re-labelled "Not visible to this audit". This
+ *     is the right default for a freshly-uploaded PDF.
+ *   - present → PDF-invisible sections with an answer are scored from
+ *     the answer (see `scoreSelfReportSection`) and included at the
+ *     capped reduced weight. A poor self-report never lowers the
+ *     composite below the visible-only baseline.
  */
 export function runScoring(
   profile: ProfileData,
   judgeResponse: JudgeResponse = {},
+  selfReport: SelfReport | null = null,
 ): AuditResult {
   const seniority = inferSeniority(profile);
   const warnings: string[] = [];
@@ -189,8 +205,45 @@ export function runScoring(
     keywordHealth: scoreKeywordHealth(profile, judgeResponse.buzzwords, judgeResponse.keywords),
   };
 
+  const hasSelfReport = selfReport !== null;
   const sections: SectionScore[] = SECTIONS.map((meta) => {
-    const raw = rawByID[meta.id]!;
+    let raw = rawByID[meta.id]!;
+    // PDF-invisible section post-processing. The section scorers ran
+    // against an empty ProfileData branch (the parser can't see these
+    // sections) and returned their fallback "could not extract" output.
+    // Replace that output with either:
+    //   - the self-report-derived score, when an answer exists, OR
+    //   - a clear "Not visible to this audit" label, when no answer.
+    // The composite already excludes unanswered invisible sections; the
+    // label change is so the section grade card on the report doesn't
+    // present a parser-fallback C/D as a verdict.
+    if (!meta.pdfVisible) {
+      if (hasSelfReport) {
+        const fromSelfReport = scoreSelfReportSection(meta.id, selfReport);
+        if (fromSelfReport) {
+          raw = {
+            rawScore: fromSelfReport.rawScore,
+            reasons: [fromSelfReport.oneLineWhy],
+            oneLineWhy: fromSelfReport.oneLineWhy,
+            needsReview: false,
+          };
+        } else {
+          raw = {
+            rawScore: raw.rawScore,
+            reasons: [PDF_INVISIBLE_NO_SELF_REPORT_MESSAGE],
+            oneLineWhy: PDF_INVISIBLE_NO_SELF_REPORT_MESSAGE,
+            needsReview: true,
+          };
+        }
+      } else {
+        raw = {
+          rawScore: raw.rawScore,
+          reasons: [PDF_INVISIBLE_NO_SELF_REPORT_MESSAGE],
+          oneLineWhy: PDF_INVISIBLE_NO_SELF_REPORT_MESSAGE,
+          needsReview: true,
+        };
+      }
+    }
     const adjusted = applySeniorityModifier(raw.rawScore, seniority.modifier);
     return {
       id: meta.id,
@@ -206,7 +259,9 @@ export function runScoring(
     };
   });
 
-  const composite = computeComposite(sections, seniority.tier, seniority.assumed);
+  const composite = computeComposite(sections, seniority.tier, seniority.assumed, {
+    hasSelfReport,
+  });
   const wins = pickWins(sections);
   const fixes = pickFixes(sections, judgeResponse.rewrites);
 

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 
+import { runScoring } from '@/lib/engine/scoring';
 import { getAuditStore, type SelfReport } from '@/lib/storage/auditStore';
 
 export const runtime = 'nodejs';
@@ -59,12 +60,23 @@ export async function POST(request: Request) {
       { status: 403 },
     );
   }
-  const updated = await store.attachSelfReport(auditId, selfReport);
+  // Recompute the audit against the new self-report. The PDF-composite
+  // calc folds the answered PDF-invisible sections in at reduced
+  // weight (see `lib/engine/scoring/composite.ts`), so the stored
+  // composite now reflects the user's self-assessment. A poor
+  // self-report can never lower the composite — that's the invariant
+  // the composite calc enforces — so this is purely additive signal.
+  const recomputedAudit = runScoring(existing.profile, {}, selfReport);
+  const updated = await store.attachSelfReport(auditId, selfReport, recomputedAudit);
   if (!updated) {
     return NextResponse.json(
       { error: 'Audit not found or expired.' },
       { status: 404 },
     );
   }
-  return NextResponse.json({ success: true, selfReport });
+  return NextResponse.json({
+    success: true,
+    selfReport,
+    audit: updated.audit,
+  });
 }

@@ -45,7 +45,19 @@ export interface AuditStore {
     userAgent: string | null,
     ipHash: string | null,
   ): Promise<AuditRecord | null>;
-  attachSelfReport(auditId: string, selfReport: SelfReport): Promise<AuditRecord | null>;
+  /**
+   * Attach the self-assessed checklist and (optionally) the recomputed
+   * AuditResult. The recomputed audit is the one whose composite
+   * reflects the freshly-submitted self-report — passed in by the route
+   * so the storage layer doesn't have to know about scoring. When
+   * omitted, the existing stored audit is left untouched (used by the
+   * older callers / tests that don't recompute).
+   */
+  attachSelfReport(
+    auditId: string,
+    selfReport: SelfReport,
+    recomputedAudit?: AuditResult,
+  ): Promise<AuditRecord | null>;
 }
 
 const RECORD_TTL_SECONDS = 60 * 60 * 24 * 90; // 90 days
@@ -174,10 +186,18 @@ class InMemoryAuditStore implements AuditStore {
     return updated;
   }
 
-  async attachSelfReport(auditId: string, selfReport: SelfReport): Promise<AuditRecord | null> {
+  async attachSelfReport(
+    auditId: string,
+    selfReport: SelfReport,
+    recomputedAudit?: AuditResult,
+  ): Promise<AuditRecord | null> {
     const existing = readFresh(auditId);
     if (!existing) return null;
-    const updated: AuditRecord = { ...existing, selfReport };
+    const updated: AuditRecord = {
+      ...existing,
+      selfReport,
+      audit: recomputedAudit ?? existing.audit,
+    };
     inMemoryMap().set(auditId, updated);
     return updated;
   }
@@ -292,12 +312,20 @@ export class KvAuditStore implements AuditStore {
     return updated;
   }
 
-  async attachSelfReport(auditId: string, selfReport: SelfReport): Promise<AuditRecord | null> {
+  async attachSelfReport(
+    auditId: string,
+    selfReport: SelfReport,
+    recomputedAudit?: AuditResult,
+  ): Promise<AuditRecord | null> {
     const existing = await this.get(auditId);
     if (!existing) return null;
     const ttl = remainingTtlSeconds(existing, Date.now());
     if (ttl <= 0) return null;
-    const updated: AuditRecord = { ...existing, selfReport };
+    const updated: AuditRecord = {
+      ...existing,
+      selfReport,
+      audit: recomputedAudit ?? existing.audit,
+    };
     await this.writeWithTtl(updated, ttl);
     return updated;
   }
