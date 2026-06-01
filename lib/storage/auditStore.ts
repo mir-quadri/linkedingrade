@@ -183,9 +183,19 @@ class InMemoryAuditStore implements AuditStore {
   }
 }
 
+/**
+ * Subset of Upstash / @vercel/kv we use. `set` with `nx: true` returns
+ * 'OK' on first write and null when the key already exists — that's the
+ * atomic claim the email gate relies on.
+ */
 interface KvClient {
-  set(key: string, value: string, opts?: { ex?: number }): Promise<unknown>;
+  set(
+    key: string,
+    value: string,
+    opts?: { ex?: number; nx?: boolean },
+  ): Promise<string | null | unknown>;
   get<T = unknown>(key: string): Promise<T | null>;
+  del(key: string): Promise<unknown>;
 }
 
 /**
@@ -199,6 +209,17 @@ export class KvAuditStore implements AuditStore {
 
   private key(auditId: string): string {
     return `audit:${auditId}`;
+  }
+
+  /**
+   * Per-audit "gate-cleared" claim key. SET NX on this key is the
+   * atomic primitive that makes the email gate race-safe: only the
+   * first concurrent `/api/audit/email` caller wins; everyone else
+   * gets null back from the claim and bails out before touching the
+   * main record.
+   */
+  private claimKey(auditId: string): string {
+    return `audit:${auditId}:claim`;
   }
 
   /**
@@ -234,16 +255,40 @@ export class KvAuditStore implements AuditStore {
     const existing = await this.get(auditId);
     if (!existing) return null;
     // Email gate is one-way: refuse to overwrite an already-set email.
-    // Defends against a stale auditId from the result-page URL being
-    // used to re-target the audit to a different recipient.
+    // The read-then-check below is a fast path; the SET NX claim below
+    // is the atomic guard that makes the gate race-safe.
     if (existing.email) return null;
     // Anchor the new EX to the record's original window. If the record
     // is already past 90 days from createdAt, refuse the write — mirrors
     // the in-memory store's `readFresh` semantics.
     const ttl = remainingTtlSeconds(existing, Date.now());
     if (ttl <= 0) return null;
+
+    // Atomic claim. Two concurrent `/api/audit/email` requests for the
+    // same fresh audit would both pass the `existing.email` check above
+    // (a non-atomic read-then-write) and both proceed to send /
+    // persist. SET NX on a per-audit claim key is the single Redis
+    // primitive that lets only the first caller win — losers get null
+    // here and return without writing or invoking Resend. The claim
+    // key takes the same TTL as the record so it can never outlive the
+    // data it gates.
+    const claimed = await this.kv.set(this.claimKey(auditId), email, {
+      ex: ttl,
+      nx: true,
+    });
+    if (claimed !== 'OK') return null;
+
     const updated: AuditRecord = { ...existing, email, emailedAt, userAgent, ipHash };
-    await this.writeWithTtl(updated, ttl);
+    try {
+      await this.writeWithTtl(updated, ttl);
+    } catch (err) {
+      // If the main-record write failed, release the claim so a retry
+      // can succeed. Otherwise the audit would be permanently stuck
+      // un-emailable, which is worse than the rare-failure case it'd
+      // protect against.
+      await this.kv.del(this.claimKey(auditId)).catch(() => undefined);
+      throw err;
+    }
     return updated;
   }
 

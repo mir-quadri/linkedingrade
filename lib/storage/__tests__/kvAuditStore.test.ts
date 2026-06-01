@@ -5,7 +5,7 @@ import { KvAuditStore, type AuditRecord, type SelfReport } from '../auditStore';
 interface SetCall {
   key: string;
   value: string;
-  opts?: { ex?: number };
+  opts?: { ex?: number; nx?: boolean };
 }
 
 /**
@@ -19,13 +19,28 @@ function fakeKv() {
   const map = new Map<string, string>();
   const calls: SetCall[] = [];
   const client = {
-    async set(key: string, value: string, opts?: { ex?: number }) {
+    async set(
+      key: string,
+      value: string,
+      opts?: { ex?: number; nx?: boolean },
+    ): Promise<string | null> {
+      // Honour NX so the email-gate claim test exercises the real
+      // path: existing key + nx === null return without mutation.
+      if (opts?.nx && map.has(key)) {
+        calls.push({ key, value, opts });
+        return null;
+      }
       calls.push({ key, value, opts });
       map.set(key, value);
+      return 'OK';
     },
     async get<T = unknown>(key: string): Promise<T | null> {
       const v = map.get(key);
       return (v ?? null) as T | null;
+    },
+    async del(key: string): Promise<number> {
+      const had = map.delete(key);
+      return had ? 1 : 0;
     },
   };
   return { client, calls };
@@ -110,15 +125,17 @@ describe('KvAuditStore — retention anchored to createdAt (Codex P2)', () => {
     vi.setSystemTime(new Date(Date.parse(createdAt) + NINETY_DAYS_MS - 24 * 60 * 60 * 1000));
     const updated = await store.attachEmail('aud_kv', 'late@example.com', new Date().toISOString(), null, null);
     expect(updated?.email).toBe('late@example.com');
-    expect(calls).toHaveLength(2);
+    // Three set calls now: initial save (no NX), claim (NX), record write.
+    expect(calls).toHaveLength(3);
     // The remaining TTL at day 89 must be ~1 day (86400 ± a second of
     // jitter from Math.ceil), NOT a fresh 90 days. The pre-fix bug
     // re-set this to RECORD_TTL_SECONDS, extending retention by ~89
     // days past the original window.
-    const ex = calls[1]!.opts?.ex ?? 0;
+    const recordWrite = calls.find((c) => c.key === 'audit:aud_kv' && !c.opts?.nx && c.opts?.ex !== NINETY_DAYS_S);
+    expect(recordWrite).toBeDefined();
+    const ex = recordWrite!.opts?.ex ?? 0;
     expect(ex).toBeGreaterThan(86_390);
     expect(ex).toBeLessThanOrEqual(86_400);
-    // Sanity: definitely not the full TTL.
     expect(ex).toBeLessThan(NINETY_DAYS_S);
   });
 
@@ -163,5 +180,74 @@ describe('KvAuditStore — retention anchored to createdAt (Codex P2)', () => {
     const result = await store.attachSelfReport('aud_kv', selfReport);
     expect(result).toBeNull();
     expect(calls).toHaveLength(1);
+  });
+
+  // Codex P2 regression: the email-gate guard was a non-atomic
+  // read-then-write — two concurrent /api/audit/email requests could
+  // both observe `email: null`, both pass the check, both persist /
+  // send. The SET NX claim makes the gate atomic at the Redis level.
+  it('attachEmail loses race when the claim key already exists — no record write, no Resend payload', async () => {
+    const createdAt = '2026-01-01T00:00:00Z';
+    vi.setSystemTime(new Date(createdAt));
+    const { client, calls } = fakeKv();
+    const store = new KvAuditStore(client);
+    await store.save(baseRecord({ createdAt }));
+
+    // Simulate the concurrent winner: pre-set the claim key.
+    await client.set('audit:aud_kv:claim', 'winner@example.com', { ex: 86_400, nx: true });
+    const callsBefore = calls.length;
+
+    const result = await store.attachEmail(
+      'aud_kv', 'loser@example.com', new Date().toISOString(), 'ua', 'hash',
+    );
+    expect(result).toBeNull();
+    // The losing caller attempted ONE more set — the NX claim, which
+    // failed — and bailed without touching the main record.
+    expect(calls.length).toBe(callsBefore + 1);
+    const last = calls[calls.length - 1]!;
+    expect(last.opts?.nx).toBe(true);
+    expect(last.key).toBe('audit:aud_kv:claim');
+
+    // The stored record's email is still null — the claim alone never
+    // mutates the main record, so the losing caller can't leave a
+    // partial state behind.
+    const stored = await store.get('aud_kv');
+    expect(stored?.email).toBeNull();
+  });
+
+  it('releases the claim if the main-record write throws — retry can succeed', async () => {
+    const createdAt = '2026-01-01T00:00:00Z';
+    vi.setSystemTime(new Date(createdAt));
+    const { client } = fakeKv();
+    const store = new KvAuditStore(client);
+    await store.save(baseRecord({ createdAt }));
+
+    // Inject a failure on the record write — the claim write is fine,
+    // but the subsequent main-record set throws. Without the
+    // cleanup in attachEmail, the claim would remain set and the
+    // audit would be permanently un-emailable. setCalls counts only
+    // sets that go through the patched function (the initial save
+    // above ran with the original).
+    const originalSet = client.set;
+    let setCalls = 0;
+    client.set = async (key: string, value: string, opts?: { ex?: number; nx?: boolean }) => {
+      setCalls += 1;
+      // Call 1 inside attachEmail is the claim (succeeds via original).
+      // Call 2 is the main-record write — throw here.
+      if (setCalls === 2) throw new Error('kv write failed');
+      return originalSet(key, value, opts);
+    };
+
+    await expect(
+      store.attachEmail('aud_kv', 'user@example.com', new Date().toISOString(), null, null),
+    ).rejects.toThrow('kv write failed');
+
+    // Restore the spy so we can probe the resulting state and try again.
+    client.set = originalSet;
+    // The claim must have been released.
+    expect(await client.get('audit:aud_kv:claim')).toBeNull();
+    // A retry now succeeds, proving the audit isn't permanently stuck.
+    const retry = await store.attachEmail('aud_kv', 'user@example.com', new Date().toISOString(), null, null);
+    expect(retry?.email).toBe('user@example.com');
   });
 });

@@ -37,25 +37,23 @@ export default function PrivacyPage() {
         sites.
       </p>
 
-      <h2>Why we collect it</h2>
+      <h2>The waitlist email</h2>
       <p>
-        Your email is used for one thing: to email you about LinkedInGrade —
-        when the extension launches, how to install it, and occasional updates
-        about the product. No newsletters about unrelated topics. No selling
-        your address. No sharing it with anyone outside the email-sending
-        processor below.
+        Email addresses submitted through the waitlist form are used for one
+        thing: to email you about LinkedInGrade — when the extension launches,
+        how to install it, and occasional updates about the product. No
+        newsletters about unrelated topics. No selling your address.
       </p>
-
-      <h2>Who else touches your email</h2>
       <p>
         Waitlist emails are stored and sent via <b>Kit</b> (kit.com, the email
-        service formerly known as ConvertKit). Kit is the only third party that
-        receives your email. Their privacy policy covers how they store and
-        process it.
+        service formerly known as ConvertKit). For waitlist sign-ups, Kit is
+        the only third party that receives your email — they don&apos;t flow
+        through the audit-flow processors described below.
       </p>
       <p>
-        That&apos;s the full list. We do not sell email addresses. We do not
-        share them with advertisers, data brokers, or any other party.
+        That&apos;s the full list for the waitlist flow. We do not sell email
+        addresses. We do not share them with advertisers, data brokers, or any
+        other party.
       </p>
 
       <h2>The /audit page on this site</h2>
