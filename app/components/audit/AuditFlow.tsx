@@ -18,7 +18,12 @@ interface FullReport {
   audit: AuditResult;
 }
 
-const MAX_MB = 5;
+// Vercel Functions reject request bodies over 4.5 MB before the route
+// handler runs, returning a non-JSON 413 the client can't surface as a
+// nice error. The cap below sits well under that, leaving headroom for
+// multipart-form overhead. Must stay in sync with MAX_PDF_BYTES in
+// `app/api/audit/route.ts`.
+const MAX_MB = 4;
 const ACCEPT = '.pdf,application/pdf';
 
 export default function AuditFlow() {

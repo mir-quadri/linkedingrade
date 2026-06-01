@@ -10,7 +10,14 @@ import { buildPreview } from '@/lib/audit/buildPreview';
 // cannot run on Vercel's Edge runtime.
 export const runtime = 'nodejs';
 
-const MAX_PDF_BYTES = 5 * 1024 * 1024; // 5 MB
+// Vercel Functions cap request bodies at 4.5 MB and reject anything
+// larger before the route handler runs (returns a non-JSON 413
+// FUNCTION_PAYLOAD_TOO_LARGE the client can't parse cleanly). Keeping
+// the server cap well under that — with headroom for multipart-form
+// overhead — means anything that reaches this handler is something we
+// can actually surface a clean error for. Must stay in sync with
+// MAX_MB in `app/components/audit/AuditFlow.tsx`.
+const MAX_PDF_BYTES = 4 * 1024 * 1024; // 4 MB
 
 const GENERIC_ERROR = "We couldn't read that PDF. Make sure it's the LinkedIn 'Save to PDF' export and try again.";
 
