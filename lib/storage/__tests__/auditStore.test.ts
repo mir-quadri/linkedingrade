@@ -106,6 +106,27 @@ describe('auditStore (in-memory)', () => {
     expect(fetched?.ipHash).toBeNull();
   });
 
+  // Codex P2 regression: once a record has been gated, attachEmail must
+  // refuse subsequent writes. Otherwise anyone who later sees the
+  // result-page URL could re-target the audit to their own email via a
+  // POST to /api/audit/email. Both layers (route + store) check; this
+  // test pins the store-level guard.
+  it('attachEmail refuses to overwrite an already-gated record', async () => {
+    const store = await getAuditStore();
+    await store.save(fixtureRecord());
+    await store.attachEmail('aud_test', 'first@example.com', '2026-05-21T00:10:00Z', 'ua-first', 'hash-first');
+    const result = await store.attachEmail(
+      'aud_test', 'attacker@example.com', '2026-05-21T01:00:00Z', 'ua-second', 'hash-second',
+    );
+    expect(result).toBeNull();
+    const after = await store.get('aud_test');
+    // Original email / UA / IP-hash unchanged.
+    expect(after?.email).toBe('first@example.com');
+    expect(after?.emailedAt).toBe('2026-05-21T00:10:00Z');
+    expect(after?.userAgent).toBe('ua-first');
+    expect(after?.ipHash).toBe('hash-first');
+  });
+
   it('attachEmail writes userAgent and ipHash captured at gate-submit time', async () => {
     const store = await getAuditStore();
     await store.save(fixtureRecord());

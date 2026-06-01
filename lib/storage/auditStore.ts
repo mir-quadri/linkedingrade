@@ -164,6 +164,11 @@ class InMemoryAuditStore implements AuditStore {
   ): Promise<AuditRecord | null> {
     const existing = readFresh(auditId);
     if (!existing) return null;
+    // Email gate is one-way: refuse to overwrite an already-set email.
+    // The route layer also checks this and returns 409, but the store
+    // enforces the invariant too so any future caller can't accidentally
+    // re-target a gated record.
+    if (existing.email) return null;
     const updated: AuditRecord = { ...existing, email, emailedAt, userAgent, ipHash };
     inMemoryMap().set(auditId, updated);
     return updated;
@@ -228,6 +233,10 @@ export class KvAuditStore implements AuditStore {
   ): Promise<AuditRecord | null> {
     const existing = await this.get(auditId);
     if (!existing) return null;
+    // Email gate is one-way: refuse to overwrite an already-set email.
+    // Defends against a stale auditId from the result-page URL being
+    // used to re-target the audit to a different recipient.
+    if (existing.email) return null;
     // Anchor the new EX to the record's original window. If the record
     // is already past 90 days from createdAt, refuse the write — mirrors
     // the in-memory store's `readFresh` semantics.

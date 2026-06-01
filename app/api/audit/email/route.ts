@@ -33,6 +33,34 @@ export async function POST(request: Request) {
   }
 
   const store = await getAuditStore();
+  // Once a record has been gated (email set on the record), the gate is
+  // a one-way transition: subsequent attach attempts must be refused.
+  // Otherwise anyone with the permanent /audit/result/<id> URL could
+  // POST here with that auditId, replace the stored email + UA + IP
+  // hash, and trigger a fresh Resend send to themselves — effectively a
+  // "send this audit to any email" capability for whoever sees the
+  // link (forwarded email, shared URL, browser history). The result URL
+  // is intended to be a read-only permanent link, not a re-send button.
+  const existing = await store.get(auditId);
+  if (!existing) {
+    return NextResponse.json(
+      {
+        error:
+          "We couldn't find that audit — it may have expired. Re-upload your PDF to start again.",
+      },
+      { status: 404 },
+    );
+  }
+  if (existing.email) {
+    return NextResponse.json(
+      {
+        error:
+          'This audit has already been emailed. Re-upload your PDF to run a fresh audit.',
+      },
+      { status: 409 },
+    );
+  }
+
   const emailedAt = new Date().toISOString();
   // The email submit IS the consent moment, so this is the right
   // place to capture user-agent and the hashed IP — matches the
@@ -43,6 +71,8 @@ export async function POST(request: Request) {
   const ipHash = hashIp(extractIp(request.headers));
   const updated = await store.attachEmail(auditId, email, emailedAt, userAgent, ipHash);
   if (!updated) {
+    // attachEmail returns null only when the record has expired between
+    // the `get` above and this write — vanishingly rare but possible.
     return NextResponse.json(
       {
         error:
