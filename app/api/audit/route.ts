@@ -1,3 +1,14 @@
+// Side-effect imports: install the canvas globals pdfjs-dist needs
+// AND the pdfjsWorker handler that lets pdfjs-dist's fake-worker
+// setup skip its runtime dynamic import of pdf.worker.mjs (which
+// Vercel can't resolve). Must be the FIRST imports in this file —
+// before `parseLinkedInPdf` (whose module also imports them, but
+// importing here too means they're in place even if a future
+// refactor changes the module-load order, and makes the dependency
+// observable at the route level for anyone reading the route).
+import '@/lib/pdf/installCanvasStubs';
+import '@/lib/pdf/disablePdfjsWorker';
+
 import { NextResponse } from 'next/server';
 import { randomUUID } from 'node:crypto';
 
@@ -92,8 +103,14 @@ export async function POST(request: Request) {
       preview: buildPreview(audit, profile.fullName),
     });
   } catch (err) {
+    // Log both message and stack so Vercel runtime logs surface the
+    // real failure site, not just the generic message. Earlier
+    // deploys swallowed the underlying ReferenceError for
+    // `DOMMatrix` behind the catch's flattened message and made the
+    // root cause invisible until we added module-level logging.
     const reason = err instanceof Error ? err.message : String(err);
-    console.error(`[api/audit] parse/score failed: ${reason}`);
+    const stack = err instanceof Error ? err.stack : undefined;
+    console.error(`[api/audit] parse/score failed: ${reason}\n${stack ?? ''}`);
     return NextResponse.json({ error: GENERIC_ERROR }, { status: 422 });
   }
 }
