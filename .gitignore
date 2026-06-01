@@ -130,3 +130,4 @@ next-env.d.ts
 
 # Generated OG renderer font cache
 scripts/.font-cache/
+Profile.pdf
