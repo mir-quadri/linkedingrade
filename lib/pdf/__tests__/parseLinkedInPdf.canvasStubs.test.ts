@@ -1,28 +1,33 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-
-import { parseLinkedInPdf } from '../parseLinkedInPdf';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
  * Codex Vercel-runtime regression: pdfjs-dist (loaded via pdf-parse)
  * evaluates a module-level `const SCALE_MATRIX = new DOMMatrix();`
  * during initialisation. When `@napi-rs/canvas` isn't installed
  * (Vercel's serverless runtime), the polyfill code can't populate
- * `globalThis.DOMMatrix`, and the constructor call throws a
- * ReferenceError that surfaces to /api/audit as a 422.
+ * `globalThis.DOMMatrix`, the constructor call throws a
+ * ReferenceError, the pdf-parse module load fails, and /api/audit
+ * returns 422.
  *
- * `parseLinkedInPdf` installs no-op stubs on globalThis for DOMMatrix /
- * Path2D / ImageData BEFORE the dynamic `pdf-parse` import to keep
- * module initialisation safe. These tests pin that behaviour.
+ * The previous in-function-only stub install passed local tests but
+ * still 422'd on Vercel — most likely import-order on the bundled
+ * lambda. The fix lifts the install to a module-load side-effect
+ * (`./installCanvasStubs`) so the globals are in place before any
+ * other module imports `pdf-parse`. These tests pin:
  *
- * We force-delete the globals inside the test so the assertion is
- * meaningful in both environments — locally `@napi-rs/canvas` already
- * populated them, so without this teardown the stub path wouldn't fire.
+ *   1. The module-load install runs as a side-effect on import, with
+ *      no explicit call.
+ *   2. The exported `installCanvasStubs()` is idempotent and safe
+ *      to call from inside the audit handler too (belt-and-braces).
+ *   3. A pre-existing real DOMMatrix is NOT clobbered (locally, the
+ *      @napi-rs/canvas polyfills win).
  */
+
 type GlobalShape = Record<string, unknown>;
 
 const TARGETS = ['DOMMatrix', 'Path2D', 'ImageData'] as const;
 
-describe('parseLinkedInPdf — canvas global stubs (Vercel runtime fix)', () => {
+describe('installCanvasStubs — module-load side-effect (Vercel runtime fix)', () => {
   const originals = new Map<string, unknown>();
 
   beforeEach(() => {
@@ -31,6 +36,11 @@ describe('parseLinkedInPdf — canvas global stubs (Vercel runtime fix)', () => 
       originals.set(name, g[name]);
       delete g[name];
     }
+    // Reset the module registry so the side-effect re-runs on each
+    // import. Without this the first test would install the stubs
+    // and the rest would see the cached module without the side
+    // effect re-firing.
+    vi.resetModules();
   });
   afterEach(() => {
     const g = globalThis as GlobalShape;
@@ -45,20 +55,45 @@ describe('parseLinkedInPdf — canvas global stubs (Vercel runtime fix)', () => 
     originals.clear();
   });
 
-  it('installs DOMMatrix / Path2D / ImageData on globalThis before pdf-parse loads', async () => {
-    // Calling with an obviously invalid buffer will fail downstream
-    // inside pdf-parse, but ensurePdfjsCanvasGlobals runs synchronously
-    // before that — so the globals must be set even when the parse
-    // throws.
-    await parseLinkedInPdf(new Uint8Array([0, 1, 2, 3])).catch(() => undefined);
+  it('installs DOMMatrix / Path2D / ImageData on globalThis at module-load time (side-effect import)', async () => {
+    // No named import — just the side-effect import. If the install
+    // is at module top-level, the bindings must be installed by the
+    // time `await import(...)` resolves.
+    await import('../installCanvasStubs');
     const g = globalThis as GlobalShape;
     expect(typeof g.DOMMatrix).toBe('function');
     expect(typeof g.Path2D).toBe('function');
     expect(typeof g.ImageData).toBe('function');
   });
 
+  it('exports installCanvasStubs() as an idempotent re-install entry point', async () => {
+    const { installCanvasStubs } = await import('../installCanvasStubs');
+    // The module-load install already ran above; a second explicit
+    // call must NOT throw and must NOT clobber.
+    const g = globalThis as GlobalShape;
+    const firstDOMMatrix = g.DOMMatrix;
+    const result = installCanvasStubs();
+    expect(g.DOMMatrix).toBe(firstDOMMatrix);
+    // After two installs everything is already set, so a third call
+    // reports all targets pre-existing.
+    expect(installCanvasStubs().installed).toEqual([]);
+    expect(installCanvasStubs().preExisting).toEqual(['DOMMatrix', 'Path2D', 'ImageData']);
+    // First call (from this `it`) ran against the pristine state set
+    // up by beforeEach — module load already filled everything in, so
+    // the function-call install also reports everything pre-existing.
+    expect(result.installed).toEqual([]);
+  });
+
+  it('canvasGlobalsState() reports the live typeof each target', async () => {
+    const { canvasGlobalsState } = await import('../installCanvasStubs');
+    const state = canvasGlobalsState();
+    expect(state.DOMMatrix).toBe('function');
+    expect(state.Path2D).toBe('function');
+    expect(state.ImageData).toBe('function');
+  });
+
   it('stub constructors accept the argument shapes pdfjs-dist module init calls them with', async () => {
-    await parseLinkedInPdf(new Uint8Array([0, 1, 2, 3])).catch(() => undefined);
+    await import('../installCanvasStubs');
     const g = globalThis as GlobalShape;
     const DOMMatrix = g.DOMMatrix as new (input?: unknown) => unknown;
     const Path2D = g.Path2D as new (input?: unknown) => unknown;
@@ -73,13 +108,22 @@ describe('parseLinkedInPdf — canvas global stubs (Vercel runtime fix)', () => 
     expect(() => new ImageData(1, 1)).not.toThrow();
   });
 
-  it('does not clobber a pre-existing DOMMatrix (real canvas wins)', async () => {
+  it('does not clobber a pre-existing DOMMatrix (real canvas wins on local / future installs)', async () => {
     const g = globalThis as GlobalShape;
     class FakeRealDOMMatrix {
       tag = 'real';
     }
     g.DOMMatrix = FakeRealDOMMatrix;
-    await parseLinkedInPdf(new Uint8Array([0, 1, 2, 3])).catch(() => undefined);
+    await import('../installCanvasStubs');
     expect(g.DOMMatrix).toBe(FakeRealDOMMatrix);
+  });
+
+  it('parseLinkedInPdf re-imports the stub module — globals must be set even if the parse throws', async () => {
+    const { parseLinkedInPdf } = await import('../parseLinkedInPdf');
+    await parseLinkedInPdf(new Uint8Array([0, 1, 2, 3])).catch(() => undefined);
+    const g = globalThis as GlobalShape;
+    expect(typeof g.DOMMatrix).toBe('function');
+    expect(typeof g.Path2D).toBe('function');
+    expect(typeof g.ImageData).toBe('function');
   });
 });
