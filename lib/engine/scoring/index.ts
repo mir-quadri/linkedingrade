@@ -254,12 +254,17 @@ export function runScoring(
   // In PDF mode the fix ranking (and reported `pointsGain`) must use the PDF
   // 25% weights, not the original 12-section rubric weights — otherwise
   // Career Arc (0.10) is understated against its real 0.25 share and the
-  // "highest-leverage" ordering can be wrong.
+  // "highest-leverage" ordering can be wrong. The PDF display label is applied
+  // here too so wins / fixes / the transactional email show "Career Arc"
+  // rather than "Experience (full history)", matching the section cards.
   const scoredFor =
     mode === 'pdf'
       ? sections
           .filter((s) => PDF_AUDIT_SECTION_IDS.includes(s.id))
-          .map((s) => ({ ...s, weight: gradedWeights!.get(s.id) ?? s.weight }))
+          .map((s) => {
+            const meta = PDF_AUDIT_SECTIONS.find((m) => m.id === s.id)!;
+            return { ...s, weight: meta.weight, label: meta.displayLabel };
+          })
       : sections;
 
   const composite = computeComposite(sections, seniority.tier, seniority.assumed, gradedWeights);

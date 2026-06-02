@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { runScoring, runPdfAudit, PDF_AUDIT_SECTION_IDS, PDF_NON_GRADED_SECTION_IDS } from '@/lib/engine/scoring';
+import { runScoring, runPdfAudit, PDF_AUDIT_SECTIONS, PDF_AUDIT_SECTION_IDS, PDF_NON_GRADED_SECTION_IDS } from '@/lib/engine/scoring';
 import { computeComposite } from '@/lib/engine/scoring/composite';
 import { scoreToNextLetterThreshold } from '@/lib/engine/scoring/letters';
 import type { SectionId, SectionScore } from '@/lib/engine/types';
-import { CAPTURED_PROFILES } from './fixtures';
+import { CAPTURED_PROFILES, makeProfile, entry } from './fixtures';
 
 describe('PDF composite scope — 4 graded sections only', () => {
   it('still returns all 12 sections on the audit object', () => {
@@ -38,6 +38,41 @@ describe('PDF composite scope — 4 graded sections only', () => {
       // pointsGain = weight × gap, and in PDF mode every graded section weighs
       // 0.25 — not its 0.16/0.18/0.14/0.10 full-rubric weight.
       expect(fix.pointsGain).toBeCloseTo(Math.round(0.25 * gap * 100) / 100, 5);
+    }
+  });
+
+  it('labels PDF wins/fixes with the PDF display label (Career Arc, not "Experience (full history)")', () => {
+    // Strong everything except a stub-only history → Career Arc is a top fix.
+    const profile = makeProfile({
+      headline: {
+        data: 'Head of Product | Driving Growth Strategy | Building High-Performing Teams across Markets',
+        confidence: 'high',
+      },
+      about: { data: CAPTURED_PROFILES.John.about.data, confidence: 'high' },
+      currentExperience: {
+        data: entry({
+          title: 'Head of Product',
+          description: 'Led a team of 25 and grew revenue 40% to $12M while shipping 4 products.',
+        }),
+        confidence: 'high',
+      },
+      experienceHistory: {
+        data: [
+          entry({ title: 'Head of Product', description: 'Current rich role.' }),
+          entry({ title: 'Analyst', description: null }),
+          entry({ title: 'Intern', description: null }),
+        ],
+        confidence: 'high',
+      },
+    });
+    const { audit } = runPdfAudit(profile);
+    const arcFix = audit.fixes.find((f) => f.sectionId === 'experienceHistory');
+    expect(arcFix).toBeDefined();
+    expect(arcFix!.label).toBe('Career Arc');
+    // Every PDF fix carries its PDF display label, not the 12-section label.
+    const labelById = new Map(PDF_AUDIT_SECTIONS.map((s) => [s.id, s.displayLabel]));
+    for (const f of audit.fixes) {
+      expect(f.label).toBe(labelById.get(f.sectionId));
     }
   });
 
