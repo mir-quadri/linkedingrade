@@ -5,6 +5,7 @@ import { NullJudge } from '@/lib/engine/types/judge';
 import { SECTIONS, sectionMeta } from './weights';
 import {
   PDF_INVISIBLE_NO_SELF_REPORT_MESSAGE,
+  PDF_INVISIBLE_WEIGHT_CAP,
   scoreSelfReportSection,
 } from './pdfCompositeConfig';
 import { scoreToLetter } from './letters';
@@ -268,14 +269,54 @@ export function runScoring(
   });
   // PDF-invisible sections without a self-report answer aren't in the
   // composite — surfacing them as "fixes" or "wins" would mislead users
-  // about composite-point gains. Codex P2 on PR #15: exclude them.
+  // about composite-point gains. Codex P2 on PR #15 (round 2): exclude
+  // them.
   const excludeFromActionable = new Set<SectionId>();
   for (const meta of SECTIONS) {
     if (!meta.pdfVisible && !invisibleSelfReportedIds.has(meta.id)) {
       excludeFromActionable.add(meta.id);
     }
   }
-  const pickOptions = { excludeSectionIds: excludeFromActionable };
+  // Effective composite weights for the fix-leverage estimate.
+  // computeComposite renormalises the visible-section weights to
+  // sum to 1.0 of `visibleFraction` (= 1 - 15% when at least one
+  // invisible section is answered, else 1.0); answered invisible
+  // sections split 15% among themselves. pickFixes used to read
+  // `s.weight` (the nominal RUBRIC weight) directly, which under-
+  // reported visible-section gains and mis-ranked invisibles —
+  // Codex P2 on PR #15 (round 3). Build the same effective-weight
+  // map computeComposite uses so the action plan reflects the score
+  // it claims to improve.
+  const effectiveWeights = new Map<SectionId, number>();
+  const visibleSectionsForWeights = sections.filter((s) => sectionMeta(s.id).pdfVisible);
+  const visibleNominalSum = visibleSectionsForWeights.reduce((sum, s) => sum + s.weight, 0);
+  const answeredInvisibleSectionsForWeights = sections.filter(
+    (s) => !sectionMeta(s.id).pdfVisible && invisibleSelfReportedIds.has(s.id),
+  );
+  const answeredInvisibleNominalSum = answeredInvisibleSectionsForWeights.reduce(
+    (sum, s) => sum + s.weight,
+    0,
+  );
+  const visibleFraction = invisibleSelfReportedIds.size > 0
+    ? 1 - PDF_INVISIBLE_WEIGHT_CAP
+    : 1.0;
+  if (visibleNominalSum > 0) {
+    for (const s of visibleSectionsForWeights) {
+      effectiveWeights.set(s.id, (s.weight / visibleNominalSum) * visibleFraction);
+    }
+  }
+  if (answeredInvisibleNominalSum > 0) {
+    for (const s of answeredInvisibleSectionsForWeights) {
+      effectiveWeights.set(
+        s.id,
+        (s.weight / answeredInvisibleNominalSum) * PDF_INVISIBLE_WEIGHT_CAP,
+      );
+    }
+  }
+  const pickOptions = {
+    excludeSectionIds: excludeFromActionable,
+    effectiveWeights,
+  };
   const wins = pickWins(sections, pickOptions);
   const fixes = pickFixes(sections, judgeResponse.rewrites, pickOptions);
 

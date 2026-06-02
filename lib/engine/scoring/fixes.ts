@@ -31,15 +31,33 @@ const EFFORT_MULTIPLIER: Record<'low' | 'medium' | 'high', number> = {
 export interface PickOptions {
   /**
    * Sections excluded from the composite — i.e. PDF-invisible sections
-   * the user hasn't self-reported. The Codex P2 fix on this file: these
-   * sections must NOT surface as fixes or wins, because their
-   * `pointsGain` against the composite is zero (the composite excludes
-   * them entirely). Without this filter, a freshly-uploaded PDF would
-   * present "improve your Photo (+0.8 pts)" as a top fix even though
-   * fixing the photo wouldn't move the composite without also filling
-   * in the self-assessed block.
+   * the user hasn't self-reported. The first Codex P2 fix on this
+   * file: these sections must NOT surface as fixes or wins, because
+   * their `pointsGain` against the composite is zero (the composite
+   * excludes them entirely). Without this filter, a freshly-uploaded
+   * PDF would present "improve your Photo (+0.8 pts)" as a top fix
+   * even though fixing the photo wouldn't move the composite without
+   * also filling in the self-assessed block.
    */
   excludeSectionIds?: ReadonlySet<SectionId>;
+
+  /**
+   * Effective per-section composite weights, after the visible/
+   * invisible renormalisation `computeComposite` does. Used by
+   * `pickFixes` to estimate `pointsGain` accurately. When omitted,
+   * pickFixes falls back to each section's nominal RUBRIC.md weight —
+   * which is wrong post-recalibration because:
+   *   - With no self-report, visible sections claim 100% of the
+   *     composite renormalised from ~72% → About's effective weight
+   *     is 0.18 / 0.72 = 0.25, not the nominal 0.18.
+   *   - With a self-report, visible sections claim (1 - 15%) of the
+   *     composite and answered invisibles split 15% among themselves.
+   * Without the effective weights the displayed `+X points` gains
+   * and the leverage ordering can be materially wrong. The second
+   * Codex P2 fix on this file: thread the effective weights through
+   * so the action plan matches the score it claims to improve.
+   */
+  effectiveWeights?: ReadonlyMap<SectionId, number>;
 }
 
 /**
@@ -71,7 +89,7 @@ export function pickFixes(
   rewrites?: Partial<Record<string, Rewrite>>,
   options: PickOptions = {},
 ): FixSuggestion[] {
-  const { excludeSectionIds } = options;
+  const { excludeSectionIds, effectiveWeights } = options;
   const candidates = sections
     .filter((s) => s.adjustedScore < 90) // skip A- and above
     // Codex P2: drop sections that aren't in the composite. Their
@@ -83,8 +101,13 @@ export function pickFixes(
       const gap = Math.max(1, nextThreshold - s.adjustedScore);
       const effort = EFFORT_BY_SECTION[s.id] ?? 'medium';
       const effortMult = EFFORT_MULTIPLIER[effort];
-      // Composite-points gained = weight × gap. Effort divides that.
-      const pointsGain = s.weight * gap;
+      // Composite-points gained = (effective weight) × gap. The
+      // effective weight reflects `computeComposite`'s renormalised /
+      // capped weighting; falling back to nominal RUBRIC weight here
+      // would under-report visible sections and mis-rank invisible
+      // ones. See PickOptions docstring.
+      const weight = effectiveWeights?.get(s.id) ?? s.weight;
+      const pointsGain = weight * gap;
       const leverage = pointsGain * effortMult;
       const targetLetter = scoreToLetter(s.adjustedScore + gap);
       const rewrite = rewrites?.[s.id];

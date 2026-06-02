@@ -81,9 +81,10 @@ export default function PrivacyPage() {
         <li>
           If you fill in the optional self-assessed checklist (photo, banner,
           activity, recommendations, featured), those answers are saved on the
-          same audit record. They are recorded for the report only; they are{' '}
-          <b>not folded into your composite score</b> and are not used for
-          analytics or marketing.
+          same audit record and contribute{' '}
+          <b>up to 15% of the composite, capped</b> — and only ever upward.
+          A poor self-report can never lower the composite below the parser-
+          verified baseline. They are not used for analytics or marketing.
         </li>
         <li>
           Two third parties receive audit-flow data in production:{' '}

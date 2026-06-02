@@ -8,6 +8,7 @@ import {
   scoreSelfReportSection,
 } from '@/lib/engine/scoring/pdfCompositeConfig';
 import { PDF_INVISIBLE_SECTION_IDS } from '@/lib/engine/scoring/weights';
+import { scoreToNextLetterThreshold } from '@/lib/engine/scoring/letters';
 
 /**
  * Calibration snapshot for the PDF composite recalibration.
@@ -580,6 +581,43 @@ describe('PDF composite recalibration — calibration snapshot', () => {
           fix.sectionId,
         );
       }
+    }
+  });
+
+  it("pickFixes uses renormalised composite weights, not nominal RUBRIC weights (Codex P2)", () => {
+    // computeComposite renormalises visible-section weights to sum
+    // to 1.0 of `1 - cap` (or 1.0 when no invisible answered). Before
+    // this fix, pickFixes claimed gains using each section's nominal
+    // RUBRIC weight, which is wrong post-recalibration. With no self-
+    // report the effective weight for a visible section is
+    // nominal / 0.72 — strictly larger than nominal. So:
+    //   nominalGain  = s.weight * gap  (pre-fix value)
+    //   effectiveGain = (s.weight / 0.72) * gap  (post-fix value)
+    // Post-fix gains for visible sections must exceed the pre-fix
+    // nominal computation by ~38% (1/0.72 ≈ 1.39).
+    const audit = runScoring(michaelProfile);
+    // Use a robust check: for at least one visible section that made
+    // the fix list, the reported pointsGain must be larger than a
+    // hypothetical "nominal" calculation using s.weight. Math.round to
+    // 2dp + clamp arithmetic mean we allow a thin tolerance window.
+    const visibleFix = audit.fixes.find((f) =>
+      PDF_INVISIBLE_SECTION_IDS.includes(f.sectionId) === false,
+    );
+    expect(visibleFix).toBeDefined();
+    // Recover the gap pickFixes used by reverse-engineering from the
+    // section's current adjustedScore; if pickFixes had used nominal
+    // weight we'd see s.weight × gap. We assert pointsGain is
+    // SIGNIFICANTLY larger than that.
+    if (visibleFix) {
+      const section = audit.sections.find((s) => s.id === visibleFix.sectionId)!;
+      // gap is the actual distance to the next letter, capped at >=1
+      // — pickFixes uses Max(1, nextThreshold - adjustedScore).
+      const gap = Math.max(1, scoreToNextLetterThreshold(section.adjustedScore) - section.adjustedScore);
+      const nominalGain = section.weight * gap;
+      // Effective weight no-self-report = nominal / 0.72 ≈ 1.39 ×
+      // nominal. Require pointsGain comfortably above the nominal
+      // value to prove the renormalised weight is in play.
+      expect(visibleFix.pointsGain).toBeGreaterThan(nominalGain * 1.2);
     }
   });
 

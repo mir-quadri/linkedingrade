@@ -56,8 +56,9 @@ export default async function AuditResultPage({ params }: PageProps) {
             </h1>
             <p className="deck">
               Permanent link. The full grade breakdown, top wins, and highest-leverage fixes.
-              Self-assessed sections (photo, banner, activity, recommendations, featured) are
-              recorded separately and never folded into the composite.
+              Self-assessed sections (photo, banner, activity, recommendations, featured) contribute
+              up to 15% of the composite, capped — and only ever upward. A poor self-report can never
+              lower the composite below the parser-verified baseline.
             </p>
           </header>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>

@@ -163,9 +163,10 @@ export default function SelfAssessedBlock({ auditId, initial, onAuditUpdated }: 
       </h3>
       <p style={{ margin: '0 0 18px', color: 'var(--text-2)', fontSize: 14.5, lineHeight: 1.55 }}>
         LinkedIn&apos;s PDF export drops photo composition, banner, activity, recommendations, and the
-        Featured section. Your answers here are recorded but{' '}
-        <b style={{ color: 'var(--text)', fontWeight: 500 }}>never folded into your composite score</b>
-        {' '}— the grade above stays an objective read of what we can verify.
+        Featured section. Your answers here contribute{' '}
+        <b style={{ color: 'var(--text)', fontWeight: 500 }}>up to 15% of the composite, capped</b>
+        {' '}— and only ever upward. A poor self-report can never lower the grade below the parser-verified
+        baseline. Answering nothing is the same as the baseline; answering well can only help.
       </p>
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
