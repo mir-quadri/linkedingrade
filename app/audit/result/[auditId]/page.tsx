@@ -6,6 +6,7 @@ import SiteFooter from '@/app/components/SiteFooter';
 import SiteNav from '@/app/components/SiteNav';
 import ScoreSummary from '@/app/components/audit/ScoreSummary';
 import PdfAuditReport from '@/app/components/audit/PdfAuditReport';
+import { runPdfAudit } from '@/lib/engine/scoring';
 import { getAuditStore } from '@/lib/storage/auditStore';
 
 export const dynamic = 'force-dynamic';
@@ -33,7 +34,17 @@ export default async function AuditResultPage({ params }: PageProps) {
   // flagged. Treat ungated records as not-found so the id alone is never
   // sufficient to retrieve the full report.
   if (!record || !record.email) notFound();
-  const { profile, audit, selfReport, createdAt, email } = record;
+  const { selfReport, createdAt, email } = record;
+  // New records are stamped `auditMode: 'pdf'` and already carry the focused
+  // 4-section audit. Legacy records (saved before this renderer shipped) hold
+  // a full 12-section composite/wins/fixes that can't reconcile with the
+  // 4-section page — recompute the focused audit from their stored profile so
+  // the permanent link stays consistent. (No AI judge is involved yet, so the
+  // recompute is lossless.)
+  const { profile, audit } =
+    record.auditMode === 'pdf'
+      ? { profile: record.profile, audit: record.audit }
+      : runPdfAudit(record.profile);
   const nameTrusted = profile.fullName && profile.nameConfidence !== 'low';
   return (
     <>

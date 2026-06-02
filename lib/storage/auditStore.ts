@@ -26,6 +26,14 @@ export interface AuditRecord {
   selfReport: SelfReport | null;
   userAgent: string | null;
   ipHash: string | null;
+  /**
+   * Which audit engine produced `audit`. `'pdf'` is the focused 4-section
+   * Sample Audit (the current `/api/audit` path). Records persisted before
+   * that shipped have no marker — the result page treats those as legacy
+   * full (12-section) audits and recomputes the focused audit from `profile`
+   * so the permanent page stays consistent with the 4-section renderer.
+   */
+  auditMode?: 'pdf' | 'full';
 }
 
 export interface AuditStore {

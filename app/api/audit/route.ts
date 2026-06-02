@@ -94,6 +94,9 @@ export async function POST(request: Request) {
       selfReport: null,
       userAgent: null,
       ipHash: null,
+      // Stamp the engine that produced `audit` so the permanent result page
+      // can tell new focused-audit records from legacy 12-section ones.
+      auditMode: 'pdf',
     });
 
     // The response intentionally omits the full report — that's gated
