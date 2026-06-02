@@ -540,6 +540,49 @@ describe('PDF composite recalibration — calibration snapshot', () => {
     );
   });
 
+  it('PDF-invisible sections without a self-report answer never surface as fixes (Codex P2)', () => {
+    // Pre-fix: pickFixes ranked Photo / Banner / Featured among top
+    // fixes for a freshly-uploaded PDF because their nominal weight
+    // and "could not extract" 60/65 fallback gave them a plausible
+    // pointsGain — even though computeComposite excludes them from
+    // the composite entirely. That was misleading: "improve your
+    // Photo (+0.8 pts)" without also filling in the self-assessed
+    // block wouldn't move the composite at all.
+    const audit = runScoring(johnProfile);
+    for (const fix of audit.fixes) {
+      expect(PDF_INVISIBLE_SECTION_IDS).not.toContain(fix.sectionId);
+    }
+    for (const win of audit.wins) {
+      expect(PDF_INVISIBLE_SECTION_IDS).not.toContain(win.sectionId);
+    }
+  });
+
+  it('an ANSWERED PDF-invisible section is allowed to appear as a fix', () => {
+    // The exclusion is gated on the "no self-report for this
+    // section" condition — once the user answers, the section IS
+    // in the composite and a "fix this" suggestion is honest. Use
+    // a profile + self-report where the answered invisible section
+    // has a low rawScore (photo='no' → 30) and verify it can show
+    // up among the fixes.
+    const photoNo: SelfReport = {
+      photo: 'no',
+      banner: null,
+      activity: null,
+      recommendations: null,
+      featured: null,
+      submittedAt: '2026-06-01T00:00:00Z',
+    };
+    const audit = runScoring(johnProfile, {}, photoNo);
+    // The unanswered invisible sections still must NOT appear.
+    for (const fix of audit.fixes) {
+      if (fix.sectionId !== 'photo') {
+        expect(['banner', 'activity', 'recommendations', 'featured']).not.toContain(
+          fix.sectionId,
+        );
+      }
+    }
+  });
+
   it('snapshot — the four composite scores are within the documented bands', () => {
     // Snapshot the actual values so any future scorer change that
     // shifts these numbers shows up as a flagged regression rather

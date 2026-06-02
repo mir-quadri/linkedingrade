@@ -1,4 +1,4 @@
-import type { SectionScore, FixSuggestion, WinHighlight } from '@/lib/engine/types';
+import type { SectionScore, FixSuggestion, WinHighlight, SectionId } from '@/lib/engine/types';
 import type { Rewrite } from '@/lib/engine/types/judge';
 import { scoreToLetter, scoreToNextLetterThreshold } from './letters';
 
@@ -28,13 +28,29 @@ const EFFORT_MULTIPLIER: Record<'low' | 'medium' | 'high', number> = {
   high: 0.35,
 };
 
+export interface PickOptions {
+  /**
+   * Sections excluded from the composite — i.e. PDF-invisible sections
+   * the user hasn't self-reported. The Codex P2 fix on this file: these
+   * sections must NOT surface as fixes or wins, because their
+   * `pointsGain` against the composite is zero (the composite excludes
+   * them entirely). Without this filter, a freshly-uploaded PDF would
+   * present "improve your Photo (+0.8 pts)" as a top fix even though
+   * fixing the photo wouldn't move the composite without also filling
+   * in the self-assessed block.
+   */
+  excludeSectionIds?: ReadonlySet<SectionId>;
+}
+
 /**
  * Pick the top 3 wins — sections scoring highest, stated as strengths to keep.
  * Only A− or better qualifies as a "win"; if fewer than 3 qualify, return what we have.
  */
-export function pickWins(sections: SectionScore[]): WinHighlight[] {
+export function pickWins(sections: SectionScore[], options: PickOptions = {}): WinHighlight[] {
+  const { excludeSectionIds } = options;
   return [...sections]
     .filter((s) => s.adjustedScore >= 90)
+    .filter((s) => !excludeSectionIds?.has(s.id))
     .sort((a, b) => b.adjustedScore - a.adjustedScore)
     .slice(0, 3)
     .map((s) => ({
@@ -53,9 +69,15 @@ export function pickWins(sections: SectionScore[]): WinHighlight[] {
 export function pickFixes(
   sections: SectionScore[],
   rewrites?: Partial<Record<string, Rewrite>>,
+  options: PickOptions = {},
 ): FixSuggestion[] {
+  const { excludeSectionIds } = options;
   const candidates = sections
     .filter((s) => s.adjustedScore < 90) // skip A- and above
+    // Codex P2: drop sections that aren't in the composite. Their
+    // `pointsGain` claim would be misleading because the composite
+    // doesn't include them.
+    .filter((s) => !excludeSectionIds?.has(s.id))
     .map((s) => {
       const nextThreshold = scoreToNextLetterThreshold(s.adjustedScore);
       const gap = Math.max(1, nextThreshold - s.adjustedScore);

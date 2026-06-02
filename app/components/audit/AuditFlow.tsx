@@ -198,6 +198,15 @@ export default function AuditFlow() {
               resultUrl={resultUrl}
               emailDelivered={emailDelivered}
               onReset={reset}
+              onAuditUpdated={(audit) => {
+                // Apply the recomputed audit returned by
+                // /api/audit/self-report so the displayed score
+                // summary + section grades + wins + fixes update
+                // immediately rather than going stale until reload.
+                setFullReport((prev) =>
+                  prev ? { profile: prev.profile, audit } : prev,
+                );
+              }}
             />
           )}
         </div>
@@ -457,12 +466,14 @@ function FullReportView({
   resultUrl,
   emailDelivered,
   onReset,
+  onAuditUpdated,
 }: {
   auditId: string;
   fullReport: FullReport;
   resultUrl: string | null;
   emailDelivered: boolean | null;
   onReset: () => void;
+  onAuditUpdated: (audit: FullReport['audit']) => void;
 }) {
   return (
     <div id="audit-full" style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
@@ -479,7 +490,11 @@ function FullReportView({
       </div>
       <SectionGradeList sections={fullReport.audit.sections} />
       <WinsAndFixes wins={fullReport.audit.wins} fixes={fullReport.audit.fixes} />
-      <SelfAssessedBlock auditId={auditId} initial={null} />
+      <SelfAssessedBlock
+        auditId={auditId}
+        initial={null}
+        onAuditUpdated={onAuditUpdated}
+      />
       <div
         style={{
           padding: '16px 18px',

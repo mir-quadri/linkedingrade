@@ -1,7 +1,9 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 
+import type { AuditResult } from '@/lib/engine/types';
 import type { SelfReport } from '@/lib/storage/auditStore';
 
 type Field = keyof Omit<SelfReport, 'submittedAt'>;
@@ -61,9 +63,23 @@ const QUESTIONS: Array<{
 interface Props {
   auditId: string;
   initial: SelfReport | null;
+  /**
+   * Optional callback fired with the recomputed audit returned by
+   * `/api/audit/self-report`. The route now re-runs `runScoring`
+   * with the new self-report and persists the resulting AuditResult
+   * (composite + section grades + fixes + wins) — clients that
+   * surface those fields elsewhere on the page need to apply the
+   * fresh payload, otherwise the displayed score stays stale until
+   * a full reload. Inline use in AuditFlow updates the in-memory
+   * `fullReport`; the permanent-link result page triggers a
+   * `router.refresh()` so the server component re-renders against
+   * the new stored audit.
+   */
+  onAuditUpdated?: (audit: AuditResult) => void;
 }
 
-export default function SelfAssessedBlock({ auditId, initial }: Props) {
+export default function SelfAssessedBlock({ auditId, initial, onAuditUpdated }: Props) {
+  const router = useRouter();
   const [answers, setAnswers] = useState<Partial<Record<Field, string>>>(() => {
     if (!initial) return {};
     return {
@@ -87,13 +103,33 @@ export default function SelfAssessedBlock({ auditId, initial }: Props) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ auditId, selfReport: answers }),
       });
-      const data = (await resp.json()) as { success?: boolean; error?: string };
+      const data = (await resp.json()) as {
+        success?: boolean;
+        error?: string;
+        audit?: AuditResult;
+      };
       if (!resp.ok || !data.success) {
         setStatus('error');
         setError(data.error ?? 'Could not save your responses.');
         return;
       }
       setStatus('saved');
+      // Wire the recomputed audit back into the displayed report:
+      //   - The inline AuditFlow view consumes the optional callback
+      //     and merges the new audit into its in-memory `fullReport`,
+      //     so the score summary + section grades update without a
+      //     server round-trip.
+      //   - The permanent-link result page is a server component,
+      //     so it can't subscribe to the callback. `router.refresh()`
+      //     re-fetches the server-side audit (which the route just
+      //     re-saved) and re-renders the page. The refresh is also
+      //     safe in AuditFlow's /audit route — the visible server
+      //     components there don't depend on the auditId, so the
+      //     refresh is a no-op for the displayed data.
+      if (data.audit && onAuditUpdated) {
+        onAuditUpdated(data.audit);
+      }
+      router.refresh();
     } catch {
       setStatus('error');
       setError('Network error. Try again.');

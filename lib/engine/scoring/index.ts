@@ -266,8 +266,18 @@ export function runScoring(
   const composite = computeComposite(sections, seniority.tier, seniority.assumed, {
     invisibleSelfReportedIds,
   });
-  const wins = pickWins(sections);
-  const fixes = pickFixes(sections, judgeResponse.rewrites);
+  // PDF-invisible sections without a self-report answer aren't in the
+  // composite — surfacing them as "fixes" or "wins" would mislead users
+  // about composite-point gains. Codex P2 on PR #15: exclude them.
+  const excludeFromActionable = new Set<SectionId>();
+  for (const meta of SECTIONS) {
+    if (!meta.pdfVisible && !invisibleSelfReportedIds.has(meta.id)) {
+      excludeFromActionable.add(meta.id);
+    }
+  }
+  const pickOptions = { excludeSectionIds: excludeFromActionable };
+  const wins = pickWins(sections, pickOptions);
+  const fixes = pickFixes(sections, judgeResponse.rewrites, pickOptions);
 
   // Heat map: above-the-fold first, then below-the-fold, each in display order.
   const heatMap = [...sections]
