@@ -5,7 +5,6 @@ import { NullJudge } from '@/lib/engine/types/judge';
 import { SECTIONS, sectionMeta } from './weights';
 import {
   PDF_INVISIBLE_NO_SELF_REPORT_MESSAGE,
-  PDF_INVISIBLE_WEIGHT_CAP,
   scoreSelfReportSection,
 } from './pdfCompositeConfig';
 import { scoreToLetter } from './letters';
@@ -277,45 +276,56 @@ export function runScoring(
       excludeFromActionable.add(meta.id);
     }
   }
-  // Effective composite weights for the fix-leverage estimate.
-  // computeComposite renormalises the visible-section weights to
-  // sum to 1.0 of `visibleFraction` (= 1 - 15% when at least one
-  // invisible section is answered, else 1.0); answered invisible
-  // sections split 15% among themselves. pickFixes used to read
-  // `s.weight` (the nominal RUBRIC weight) directly, which under-
-  // reported visible-section gains and mis-ranked invisibles —
-  // Codex P2 on PR #15 (round 3). Build the same effective-weight
-  // map computeComposite uses so the action plan reflects the score
-  // it claims to improve.
-  const effectiveWeights = new Map<SectionId, number>();
-  const visibleSectionsForWeights = sections.filter((s) => sectionMeta(s.id).pdfVisible);
-  const visibleNominalSum = visibleSectionsForWeights.reduce((sum, s) => sum + s.weight, 0);
-  const answeredInvisibleSectionsForWeights = sections.filter(
-    (s) => !sectionMeta(s.id).pdfVisible && invisibleSelfReportedIds.has(s.id),
-  );
-  const answeredInvisibleNominalSum = answeredInvisibleSectionsForWeights.reduce(
-    (sum, s) => sum + s.weight,
-    0,
-  );
-  const visibleFraction = invisibleSelfReportedIds.size > 0
-    ? 1 - PDF_INVISIBLE_WEIGHT_CAP
-    : 1.0;
-  if (visibleNominalSum > 0) {
-    for (const s of visibleSectionsForWeights) {
-      effectiveWeights.set(s.id, (s.weight / visibleNominalSum) * visibleFraction);
+  // Per-section marginal gain rate: "how much does the composite move
+  // per 1-point bump in this section's adjustedScore?"
+  //
+  // This replaces the earlier "effective renormalised weight"
+  // approximation, which was correct only when none of `computeComposite`'s
+  // branch logic was active — but the calc has two non-linearities:
+  //
+  //   1. The `max(visible_only, blended)` floor: an answered-invisible
+  //      section whose score is below `visible_only` contributes ZERO
+  //      to the composite until the invisible average climbs past
+  //      `visible_only`. Codex P2 on PR #15 (round 4): pickFixes used
+  //      to claim "+X points" for these sections (e.g. fixing
+  //      photo='no' → 'somewhat') even when the gain was actually 0
+  //      because the floor swallowed the change.
+  //   2. Cross-effects between visible / invisible: bumping a visible
+  //      section can shift the floor itself, which changes whether
+  //      invisible improvements are visible.
+  //
+  // Computing the marginal rate by re-running `computeComposite` with
+  // a 10-point bump on each section in turn is exact: the rate is
+  // whatever the actual composite math produces. Bumping by 10 rather
+  // than 1 stays above the composite's 1-decimal-place rounding and
+  // smooths over letter-band rounding inside individual section
+  // scorers (though those scorers aren't re-invoked here; we mutate
+  // `adjustedScore` directly).
+  const BUMP_POINTS = 10;
+  const baselineCompositeScore = composite.score;
+  const marginalGainRates = new Map<SectionId, number>();
+  for (const s of sections) {
+    const newAdjusted = Math.min(100, s.adjustedScore + BUMP_POINTS);
+    const actualBump = newAdjusted - s.adjustedScore;
+    if (actualBump <= 0) {
+      marginalGainRates.set(s.id, 0);
+      continue;
     }
-  }
-  if (answeredInvisibleNominalSum > 0) {
-    for (const s of answeredInvisibleSectionsForWeights) {
-      effectiveWeights.set(
-        s.id,
-        (s.weight / answeredInvisibleNominalSum) * PDF_INVISIBLE_WEIGHT_CAP,
-      );
-    }
+    const bumpedSections = sections.map((sec) =>
+      sec.id === s.id ? { ...sec, adjustedScore: newAdjusted } : sec,
+    );
+    const bumpedComposite = computeComposite(
+      bumpedSections,
+      seniority.tier,
+      seniority.assumed,
+      { invisibleSelfReportedIds },
+    ).score;
+    const totalGain = Math.max(0, bumpedComposite - baselineCompositeScore);
+    marginalGainRates.set(s.id, totalGain / actualBump);
   }
   const pickOptions = {
     excludeSectionIds: excludeFromActionable,
-    effectiveWeights,
+    effectiveWeights: marginalGainRates,
   };
   const wins = pickWins(sections, pickOptions);
   const fixes = pickFixes(sections, judgeResponse.rewrites, pickOptions);

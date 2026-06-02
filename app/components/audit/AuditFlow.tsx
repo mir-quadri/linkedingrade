@@ -173,7 +173,17 @@ export default function AuditFlow() {
       {stage !== 'upload' && stage !== 'parsing' && preview ? (
         <div id="audit-result" style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
           <ScoreSummary
-            composite={preview.composite}
+            // Once we have the gated full report, prefer ITS composite —
+            // self-report submissions update `fullReport.audit.composite`
+            // via the onAuditUpdated callback, so reading from preview
+            // would leave the headline score stale while section grades
+            // and fixes update. Pre-gate, preview.composite is the only
+            // composite we have, so use it.
+            composite={
+              stage === 'full' && fullReport
+                ? fullReport.audit.composite
+                : preview.composite
+            }
             fullName={preview.fullName}
             variant={stage === 'full' ? 'full' : 'preview'}
           />

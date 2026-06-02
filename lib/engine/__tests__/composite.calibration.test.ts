@@ -584,6 +584,35 @@ describe('PDF composite recalibration — calibration snapshot', () => {
     }
   });
 
+  it("answered-invisible fixes show 0 points-gain when the blend floor swallows the improvement (Codex P2)", () => {
+    // Construct a profile + self-report where the answered invisible
+    // sections sit well below the visible-only baseline. The composite
+    // is `max(visible_only, blended)` and the blend is dominated by
+    // the visible-only floor — so bumping a low-scored invisible
+    // section to the next letter doesn't actually move the composite.
+    // Pre-fix, pickFixes claimed `effective_weight × gap` regardless
+    // of whether the gain was real.
+    const badInvisibles: SelfReport = {
+      photo: 'no',
+      banner: 'no',
+      activity: 'no',
+      recommendations: 'none',
+      featured: 'no',
+      submittedAt: '2026-06-01T00:00:00Z',
+    };
+    const audit = runScoring(johnProfile, {}, badInvisibles);
+    // The blended composite sits below the visible-only baseline, so
+    // every invisible fix should report `pointsGain = 0` — improving
+    // any single one of them can't push the blended above the floor
+    // by itself. If pickFixes still claimed nominal weights it would
+    // report ~0.15 / answered × gap per section.
+    for (const fix of audit.fixes) {
+      if (PDF_INVISIBLE_SECTION_IDS.includes(fix.sectionId)) {
+        expect(fix.pointsGain).toBe(0);
+      }
+    }
+  });
+
   it("pickFixes uses renormalised composite weights, not nominal RUBRIC weights (Codex P2)", () => {
     // computeComposite renormalises visible-section weights to sum
     // to 1.0 of `1 - cap` (or 1.0 when no invisible answered). Before

@@ -42,20 +42,27 @@ export interface PickOptions {
   excludeSectionIds?: ReadonlySet<SectionId>;
 
   /**
-   * Effective per-section composite weights, after the visible/
-   * invisible renormalisation `computeComposite` does. Used by
-   * `pickFixes` to estimate `pointsGain` accurately. When omitted,
-   * pickFixes falls back to each section's nominal RUBRIC.md weight —
-   * which is wrong post-recalibration because:
-   *   - With no self-report, visible sections claim 100% of the
-   *     composite renormalised from ~72% → About's effective weight
-   *     is 0.18 / 0.72 = 0.25, not the nominal 0.18.
-   *   - With a self-report, visible sections claim (1 - 15%) of the
-   *     composite and answered invisibles split 15% among themselves.
-   * Without the effective weights the displayed `+X points` gains
-   * and the leverage ordering can be materially wrong. The second
-   * Codex P2 fix on this file: thread the effective weights through
-   * so the action plan matches the score it claims to improve.
+   * Per-section MARGINAL GAIN RATES — "how much does the composite
+   * move per 1-point bump in this section's adjusted score?"
+   *
+   * Used by `pickFixes` to compute `pointsGain = rate × gap`. When
+   * omitted, pickFixes falls back to each section's nominal RUBRIC.md
+   * weight, which is wrong in two ways post-recalibration:
+   *
+   *   1. Visible sections' nominal RUBRIC weight (e.g. About = 0.18)
+   *      under-reports their effective contribution after the
+   *      visible-only renormalisation (About post-fix = 0.25).
+   *   2. Answered-invisible sections' nominal weight overstates their
+   *      effect when the `max(visible_only, blended)` floor is
+   *      active: a section whose answered score sits below the
+   *      visible baseline contributes nothing to the composite until
+   *      the invisible average climbs past the floor. Reporting "+X
+   *      points" for those fixes misranks the action plan.
+   *
+   * Computing the rate by re-running computeComposite with a 10-point
+   * bump per section is exact for both cases — the rate is whatever
+   * the actual composite math produces. See `runScoring` for the
+   * construction.
    */
   effectiveWeights?: ReadonlyMap<SectionId, number>;
 }
