@@ -8,8 +8,7 @@ import type { AuditPreview } from '@/lib/audit/buildPreview';
 
 import ScoreSummary from './ScoreSummary';
 import SectionGradeList from './SectionGradeList';
-import WinsAndFixes from './WinsAndFixes';
-import SelfAssessedBlock from './SelfAssessedBlock';
+import PdfAuditReport from './PdfAuditReport';
 
 type Stage = 'upload' | 'parsing' | 'preview' | 'submitting-email' | 'full';
 
@@ -175,13 +174,14 @@ export default function AuditFlow() {
           <ScoreSummary
             composite={preview.composite}
             fullName={preview.fullName}
+            nameConfidence={preview.nameConfidence}
             variant={stage === 'full' ? 'full' : 'preview'}
           />
 
           {stage !== 'full' || !fullReport ? (
             <>
               <SectionPreview preview={preview} />
-              <GatedSectionsTease count={preview.gatedSectionCount} />
+              <GatedSectionsTease />
               <EmailGate
                 email={email}
                 onEmail={setEmail}
@@ -194,7 +194,7 @@ export default function AuditFlow() {
           ) : (
             <FullReportView
               auditId={auditId!}
-              fullReport={fullReport}
+              audit={fullReport.audit}
               resultUrl={resultUrl}
               emailDelivered={emailDelivered}
               onReset={reset}
@@ -310,8 +310,7 @@ function UploadCard({
  * exactly the leak Codex flagged. The full data now arrives in the gate's
  * own response; before that, all the user sees is the count.
  */
-function GatedSectionsTease({ count }: { count: number }) {
-  if (count <= 0) return null;
+function GatedSectionsTease() {
   return (
     <div
       style={{
@@ -333,13 +332,14 @@ function GatedSectionsTease({ count }: { count: number }) {
           marginBottom: 8,
         }}
       >
-        Gated · {count} section{count === 1 ? '' : 's'}
+        Gated · 1 of 4 graded sections
       </div>
       <div style={{ fontSize: 14.5, lineHeight: 1.55 }}>
-        Headline / About / Current Experience above are 3 of {count + 3} sections.
-        The remaining {count} — Experience History, Skills, Education, Photo, Banner, Activity,
-        Recommendations, Featured, Keyword Health — plus top wins and your three highest-leverage
-        fixes unlock when you submit your email.
+        Headline / About / Current Role above are 3 of the 4 sections we grade.
+        Career Arc, your top wins, and your three highest-leverage fixes unlock when you
+        submit your email. (8 more sections — Photo, Banner, Featured, Activity,
+        Recommendations, Skills, Education, Keyword Health — audit in the full Chrome
+        extension.)
       </div>
     </div>
   );
@@ -358,7 +358,7 @@ function SectionPreview({ preview }: { preview: AuditPreview }) {
           marginBottom: 10,
         }}
       >
-        Preview · {preview.previewSections.length} of {preview.previewSections.length + preview.gatedSectionCount} sections
+        Preview · {preview.previewSections.length} of 4 graded sections
       </div>
       <SectionGradeList sections={preview.previewSections} />
     </div>
@@ -453,13 +453,13 @@ function EmailGate({
 
 function FullReportView({
   auditId,
-  fullReport,
+  audit,
   resultUrl,
   emailDelivered,
   onReset,
 }: {
   auditId: string;
-  fullReport: FullReport;
+  audit: AuditResult;
   resultUrl: string | null;
   emailDelivered: boolean | null;
   onReset: () => void;
@@ -477,9 +477,7 @@ function FullReportView({
       >
         Step 3 · Your full audit
       </div>
-      <SectionGradeList sections={fullReport.audit.sections} />
-      <WinsAndFixes wins={fullReport.audit.wins} fixes={fullReport.audit.fixes} />
-      <SelfAssessedBlock auditId={auditId} initial={null} />
+      <PdfAuditReport auditId={auditId} audit={audit} selfReport={null} />
       <div
         style={{
           padding: '16px 18px',

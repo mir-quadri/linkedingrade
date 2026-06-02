@@ -68,6 +68,13 @@ export interface ProfileData {
   url: string;
   extractedAt: string; // ISO timestamp
   fullName: string | null;
+  // Confidence in the parsed `fullName`. The PDF audit runs a name-suspicion
+  // heuristic (see `runPdfAudit`) that downgrades obviously-misparsed names
+  // (pipes, headline-like patterns) to 'low' and replaces `fullName` with a
+  // neutral placeholder. Absent/`'high'` means the name is trusted. This is a
+  // belt-and-suspenders guard against the Publications-in-contact-column
+  // parser bug fixed separately.
+  nameConfidence?: 'high' | 'low';
   headline: SectionExtraction<string>;
   photo: SectionExtraction<PhotoData>;
   banner: SectionExtraction<BannerData>;

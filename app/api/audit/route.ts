@@ -13,7 +13,7 @@ import { NextResponse } from 'next/server';
 import { randomUUID } from 'node:crypto';
 
 import { parseLinkedInPdf } from '@/lib/pdf/parseLinkedInPdf';
-import { runScoring } from '@/lib/engine/scoring';
+import { runPdfAudit } from '@/lib/engine/scoring';
 import { getAuditStore } from '@/lib/storage/auditStore';
 import { buildPreview } from '@/lib/audit/buildPreview';
 
@@ -67,11 +67,14 @@ export async function POST(request: Request) {
   }
 
   try {
-    const profile = await parseLinkedInPdf(buffer);
-    // Score with an empty JudgeResponse — the AI judge ships in PR B3.
-    // Sections that depend on AI judgment surface their structural grade
-    // and `needsReview: true`, which the UI renders with a "*" marker.
-    const audit = runScoring(profile);
+    const parsed = await parseLinkedInPdf(buffer);
+    // Focused 4-section PDF audit. `runPdfAudit` also applies the name-
+    // suspicion guard, returning a normalised profile (name corrected to a
+    // neutral placeholder when the parse looks misparsed) — persist THAT
+    // profile so storage and the preview share the same fullName. Scores
+    // with an empty JudgeResponse: the AI judge ships in PR B3, so AI-pending
+    // sections surface their structural grade with `needsReview: true`.
+    const { profile, audit } = runPdfAudit(parsed);
 
     const auditId = randomUUID();
     const store = await getAuditStore();
@@ -100,7 +103,7 @@ export async function POST(request: Request) {
     // store; /api/audit/email looks it up and returns it on success.
     return NextResponse.json({
       auditId,
-      preview: buildPreview(audit, profile.fullName),
+      preview: buildPreview(audit, profile.fullName, profile.nameConfidence),
     });
   } catch (err) {
     // Log both message and stack so Vercel runtime logs surface the

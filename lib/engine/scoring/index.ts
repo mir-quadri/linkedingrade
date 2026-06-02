@@ -1,9 +1,19 @@
 import type { ProfileData, AuditResult, SectionScore, SectionId } from '@/lib/engine/types';
 import type { Judge, JudgeRequest, JudgeResponse } from '@/lib/engine/types/judge';
 import { NullJudge } from '@/lib/engine/types/judge';
-import { SECTIONS, sectionMeta } from './weights';
-import { scoreToLetter } from './letters';
-import { applySeniorityModifier, inferSeniority, TIER_LABEL } from './seniority';
+import {
+  SECTIONS,
+  sectionMeta,
+  PDF_AUDIT_SECTIONS,
+  PDF_AUDIT_SECTION_IDS,
+} from './weights';
+import { scoreToLetter, B_PLUS_CEILING } from './letters';
+import {
+  applySeniorityModifier,
+  bandedTierModifier,
+  inferSeniority,
+  TIER_LABEL,
+} from './seniority';
 import { computeComposite } from './composite';
 import { pickFixes, pickWins } from './fixes';
 import { scoreHeadline } from './sections/headline';
@@ -21,11 +31,30 @@ import { scoreKeywordHealth } from './sections/keywordHealth';
 
 export { inferSeniority } from './seniority';
 export { scoreToLetter, LETTER_BOUNDARIES } from './letters';
-export { SECTIONS } from './weights';
+export {
+  SECTIONS,
+  PDF_AUDIT_SECTIONS,
+  PDF_AUDIT_SECTION_IDS,
+  PDF_NON_GRADED_SECTION_IDS,
+} from './weights';
 
 export interface RunScoringOptions {
   judge?: Judge;
 }
+
+/**
+ * Scoring mode.
+ *
+ *  - `'full'` (default): the 12-section audit (the Chrome extension's surface).
+ *    The composite is the weighted average of all 12 sections.
+ *  - `'pdf'`: the focused 4-section "Sample Audit" the PDF flow ships. The
+ *    `sections` array still carries all 12 entries (the 8 non-graded sections
+ *    are parsed and returned for reference), but the composite, top wins and
+ *    highest-leverage fixes are computed from the 4 graded sections only —
+ *    Headline, About, Current Experience and Career Arc (`experienceHistory`),
+ *    each at 25% weight.
+ */
+export type ScoringMode = 'full' | 'pdf';
 
 /**
  * Build the JudgeRequest the AI layer needs from the extracted profile.
@@ -166,6 +195,7 @@ function expectedJudgeKeys(profile: ProfileData): (keyof JudgeResponse)[] {
 export function runScoring(
   profile: ProfileData,
   judgeResponse: JudgeResponse = {},
+  mode: ScoringMode = 'full',
 ): AuditResult {
   const seniority = inferSeniority(profile);
   const warnings: string[] = [];
@@ -191,7 +221,16 @@ export function runScoring(
 
   const sections: SectionScore[] = SECTIONS.map((meta) => {
     const raw = rawByID[meta.id]!;
-    const adjusted = applySeniorityModifier(raw.rawScore, seniority.modifier);
+    // Asymmetric, banded tier modifier: depends on the tier AND this section's
+    // raw score so excellence is never penalised for being senior (and strong
+    // early-career work is actively rewarded). Replaces the old flat modifier.
+    const modifier = bandedTierModifier(seniority.tier, raw.rawScore);
+    let adjusted = applySeniorityModifier(raw.rawScore, modifier);
+    // B+ ceiling: a structural-only (AI-pending) section can't exceed the B+
+    // band — structural cues can't distinguish A-grade originality from clever
+    // cliché-stuffing. The AI judge lifts B+ → A later; it never drops a
+    // structural grade. See `lib/engine/README.md`.
+    if (raw.needsReview) adjusted = Math.min(adjusted, B_PLUS_CEILING);
     return {
       id: meta.id,
       label: meta.label,
@@ -206,9 +245,20 @@ export function runScoring(
     };
   });
 
-  const composite = computeComposite(sections, seniority.tier, seniority.assumed);
-  const wins = pickWins(sections);
-  const fixes = pickFixes(sections, judgeResponse.rewrites);
+  // PDF audit: the composite, wins and fixes are scoped to the 4 graded
+  // sections only (each 25%). The full audit weights all 12 sections.
+  const gradedWeights =
+    mode === 'pdf'
+      ? new Map<SectionId, number>(PDF_AUDIT_SECTIONS.map((s) => [s.id, s.weight]))
+      : undefined;
+  const scoredFor =
+    mode === 'pdf'
+      ? sections.filter((s) => PDF_AUDIT_SECTION_IDS.includes(s.id))
+      : sections;
+
+  const composite = computeComposite(sections, seniority.tier, seniority.assumed, gradedWeights);
+  const wins = pickWins(scoredFor);
+  const fixes = pickFixes(scoredFor, judgeResponse.rewrites);
 
   // Heat map: above-the-fold first, then below-the-fold, each in display order.
   const heatMap = [...sections]
@@ -252,6 +302,71 @@ export function runScoring(
     judgeStatus,
     warnings,
   };
+}
+
+/**
+ * Heuristic: does a parsed `fullName` look like a misparse rather than a real
+ * name? LinkedIn's PDF export occasionally bleeds the headline (or a
+ * Publications/contact column) into the name slot, producing strings with
+ * pipes, far too many words, or headline-like phrasing. This is a belt-and-
+ * suspenders guard alongside the parser fix.
+ */
+export function isSuspiciousName(name: string | null | undefined): boolean {
+  if (!name) return false;
+  const trimmed = name.trim();
+  if (!trimmed) return false;
+  // Pipes never appear in real names but are the canonical headline separator.
+  if (trimmed.includes('|')) return true;
+  // Real names are short. More than 5 whitespace-delimited words reads as a
+  // headline or a run-together column, not a person's name.
+  if (trimmed.split(/\s+/).length > 5) return true;
+  // Common headline punctuation / connectors that don't belong in a name.
+  if (/[•·@/&]/.test(trimmed)) return true;
+  if (/\bat\b/i.test(trimmed)) return true;
+  return false;
+}
+
+/**
+ * Normalise a profile for the PDF audit. When `fullName` looks misparsed, the
+ * name is replaced with a neutral placeholder ("Your audit") and
+ * `nameConfidence` is set to `'low'` so the UI can render a name-free header.
+ * Returns a new profile object; the input is not mutated.
+ */
+export function normalizeProfileForPdfAudit(profile: ProfileData): ProfileData {
+  if (isSuspiciousName(profile.fullName)) {
+    return { ...profile, fullName: 'Your audit', nameConfidence: 'low' };
+  }
+  return { ...profile, nameConfidence: profile.nameConfidence ?? 'high' };
+}
+
+/**
+ * The 4 graded sections of the PDF audit, in display order, with their PDF
+ * display labels applied (notably `experienceHistory` → "Career Arc"). The
+ * section IDs are unchanged — only the user-facing label differs. Used by the
+ * result page and the audit flow to render the 4 section cards.
+ */
+export function selectGradedPdfSections(sections: SectionScore[]): SectionScore[] {
+  return PDF_AUDIT_SECTIONS.flatMap((meta) => {
+    const s = sections.find((x) => x.id === meta.id);
+    if (!s) return [];
+    return [{ ...s, label: meta.displayLabel }];
+  });
+}
+
+/**
+ * Run the focused 4-section PDF "Sample Audit". Applies the name-suspicion
+ * guard, then scores in `'pdf'` mode (composite/wins/fixes from the 4 graded
+ * sections only). Returns the audit AND the normalised profile so the caller
+ * can persist the (possibly name-corrected) profile and build the preview from
+ * the same `fullName`.
+ */
+export function runPdfAudit(
+  profile: ProfileData,
+  judgeResponse: JudgeResponse = {},
+): { profile: ProfileData; audit: AuditResult } {
+  const normalized = normalizeProfileForPdfAudit(profile);
+  const audit = runScoring(normalized, judgeResponse, 'pdf');
+  return { profile: normalized, audit };
 }
 
 /**

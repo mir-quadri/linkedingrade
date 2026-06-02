@@ -9,6 +9,9 @@ export interface AboutScore {
   needsReview: boolean;
 }
 
+/** Cap on the cliché-opener penalty (raw points). See `scoreAbout`. */
+export const CLICHE_OPENER_PENALTY = 5;
+
 export function scoreAbout(
   profile: ProfileData,
   judgment: AboutJudgment | undefined,
@@ -51,7 +54,11 @@ export function scoreAbout(
 
   const cliche = startsWithCliche(text);
   if (cliche) {
-    score -= 8;
+    // Cliché-opener penalty is capped at -5 raw. A cliché opener is real
+    // feedback, but on a 25%-weighted section it shouldn't single-handedly
+    // tank an otherwise substantive About (the old -8 dropped a raw 72 to 64,
+    // a D→F swing off one phrase).
+    score -= CLICHE_OPENER_PENALTY;
     reasons.push(`Opens with cliché phrase ("${cliche}").`);
   }
 

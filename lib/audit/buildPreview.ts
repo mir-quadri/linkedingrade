@@ -16,6 +16,8 @@ export const PREVIEW_SECTION_IDS: SectionId[] = [
 export interface AuditPreview {
   url: string;
   fullName: string | null;
+  /** Mirrors `profile.nameConfidence` — 'low' when the name looks misparsed. */
+  nameConfidence?: 'high' | 'low';
   composite: AuditResult['composite'];
   /** Always exactly the sections in `PREVIEW_SECTION_IDS`. */
   previewSections: SectionScore[];
@@ -27,6 +29,7 @@ export interface AuditPreview {
 export function buildPreview(
   audit: AuditResult,
   fullName: string | null,
+  nameConfidence?: 'high' | 'low',
 ): AuditPreview {
   const previewSections = PREVIEW_SECTION_IDS
     .map((id) => audit.sections.find((s) => s.id === id))
@@ -34,6 +37,7 @@ export function buildPreview(
   return {
     url: audit.url,
     fullName,
+    nameConfidence,
     composite: audit.composite,
     previewSections,
     gatedSectionCount: Math.max(0, audit.sections.length - previewSections.length),

@@ -24,6 +24,20 @@ export const LETTER_BOUNDARIES: readonly LetterBoundary[] = [
   { letter: 'F', min: 0, max: 59 },
 ];
 
+/**
+ * The highest adjusted score a structural-only (AI-pending, `needsReview`)
+ * section may reach. Equals the top of the B+ band — structural signals alone
+ * cannot honestly tell A-grade originality from clever cliché-stuffing, so the
+ * grade is capped at B+ until the AI judge (B3) can lift it. See the "B+
+ * ceiling" policy in `lib/engine/README.md`.
+ *
+ * Note: the recalibration spec referred to this as "85"; the authoritative
+ * intent is the *B+ band*, whose top is 89 — using 89 lets a genuinely strong
+ * structural headline read B+ in the final report (the stated goal) rather
+ * than capping it down to a B.
+ */
+export const B_PLUS_CEILING = 89;
+
 export function scoreToLetter(score: number): Letter {
   const clamped = Math.max(0, Math.min(100, Math.round(score)));
   for (const b of LETTER_BOUNDARIES) {

@@ -4,13 +4,18 @@ import { TIER_LABEL } from '@/lib/engine/scoring';
 interface Props {
   composite: CompositeResult;
   fullName: string | null;
+  /** 'low' when the parsed name looks misparsed — render a name-free header. */
+  nameConfidence?: 'high' | 'low';
   /** "preview" trims subtitle / supporting copy for the smaller preview card. */
   variant?: 'preview' | 'full';
 }
 
-export default function ScoreSummary({ composite, fullName, variant = 'full' }: Props) {
+export default function ScoreSummary({ composite, fullName, nameConfidence, variant = 'full' }: Props) {
   const band = letterBand(composite.letter);
   const tier = TIER_LABEL[composite.tier];
+  // When the name is low-confidence (parser bleed), don't show a misparsed
+  // string as the person's name — render a neutral "Your audit" header.
+  const displayName = nameConfidence === 'low' ? 'Your audit' : fullName ?? 'Anonymous profile';
   return (
     <div
       style={{
@@ -42,7 +47,7 @@ export default function ScoreSummary({ composite, fullName, variant = 'full' }: 
           {variant === 'preview' ? 'Preview · Composite' : 'Composite grade'}
         </div>
         <div style={{ fontWeight: 500, fontSize: variant === 'full' ? 22 : 18, letterSpacing: '-0.015em' }}>
-          {fullName ?? 'Anonymous profile'}
+          {displayName}
         </div>
         <div style={{ color: 'var(--text-2)', fontSize: 14 }}>
           Seniority tier: <b style={{ color: 'var(--text)', fontWeight: 500 }}>{tier}</b>
