@@ -172,9 +172,11 @@ export default function AuditFlow() {
       {stage !== 'upload' && stage !== 'parsing' && preview ? (
         <div id="audit-result" style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
           <ScoreSummary
-            composite={preview.composite}
-            fullName={preview.fullName}
-            nameConfidence={preview.nameConfidence}
+            composite={stage === 'full' && fullReport ? fullReport.audit.composite : preview.composite}
+            fullName={stage === 'full' && fullReport ? fullReport.profile.fullName : preview.fullName}
+            nameConfidence={
+              stage === 'full' && fullReport ? fullReport.profile.nameConfidence : preview.nameConfidence
+            }
             variant={stage === 'full' ? 'full' : 'preview'}
           />
 

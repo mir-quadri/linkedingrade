@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { sendAuditEmail } from '@/lib/email/sendAuditEmail';
+import { runPdfAudit } from '@/lib/engine/scoring';
 import { getAuditStore } from '@/lib/storage/auditStore';
 import { extractIp, hashIp } from '@/lib/audit/hashIp';
 
@@ -82,14 +83,24 @@ export async function POST(request: Request) {
     );
   }
 
+  // New records are stamped `auditMode: 'pdf'`. Legacy records (saved before
+  // the focused audit shipped) hold a full 12-section audit; recompute the
+  // focused 4-section audit from their stored profile so the email and the
+  // inline report stay consistent with the 4-section renderer. Mirrors the
+  // result page's fallback. No AI judge is involved yet, so it's lossless.
+  const { profile: reportProfile, audit: reportAudit } =
+    updated.auditMode === 'pdf'
+      ? { profile: updated.profile, audit: updated.audit }
+      : runPdfAudit(updated.profile);
+
   // Fire-and-fail-soft. The audit is already persisted; the report renders
   // on-page either way. An email-send failure must not block the gate.
   const origin = new URL(request.url).origin;
   const resultUrl = `${origin}/audit/result/${auditId}`;
   const emailed = await sendAuditEmail({
     email,
-    fullName: updated.profile.fullName,
-    audit: updated.audit,
+    fullName: reportProfile.fullName,
+    audit: reportAudit,
     resultUrl,
   });
 
@@ -101,7 +112,7 @@ export async function POST(request: Request) {
     success: true,
     emailed,
     resultUrl,
-    profile: updated.profile,
-    audit: updated.audit,
+    profile: reportProfile,
+    audit: reportAudit,
   });
 }
