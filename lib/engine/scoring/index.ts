@@ -251,9 +251,15 @@ export function runScoring(
     mode === 'pdf'
       ? new Map<SectionId, number>(PDF_AUDIT_SECTIONS.map((s) => [s.id, s.weight]))
       : undefined;
+  // In PDF mode the fix ranking (and reported `pointsGain`) must use the PDF
+  // 25% weights, not the original 12-section rubric weights — otherwise
+  // Career Arc (0.10) is understated against its real 0.25 share and the
+  // "highest-leverage" ordering can be wrong.
   const scoredFor =
     mode === 'pdf'
-      ? sections.filter((s) => PDF_AUDIT_SECTION_IDS.includes(s.id))
+      ? sections
+          .filter((s) => PDF_AUDIT_SECTION_IDS.includes(s.id))
+          .map((s) => ({ ...s, weight: gradedWeights!.get(s.id) ?? s.weight }))
       : sections;
 
   const composite = computeComposite(sections, seniority.tier, seniority.assumed, gradedWeights);
@@ -328,13 +334,16 @@ export function isSuspiciousName(name: string | null | undefined): boolean {
 
 /**
  * Normalise a profile for the PDF audit. When `fullName` looks misparsed, the
- * name is replaced with a neutral placeholder ("Your audit") and
- * `nameConfidence` is set to `'low'` so the UI can render a name-free header.
- * Returns a new profile object; the input is not mutated.
+ * name is cleared (set to `null`) and `nameConfidence` is set to `'low'`. The
+ * UI renders a neutral "Your audit" header from `nameConfidence` — the name is
+ * NOT stored as a placeholder string, so downstream consumers that treat a
+ * non-null name as a real person (e.g. the email greeting) fall back to their
+ * neutral path rather than emitting "Hi Your,". Returns a new profile object;
+ * the input is not mutated.
  */
 export function normalizeProfileForPdfAudit(profile: ProfileData): ProfileData {
   if (isSuspiciousName(profile.fullName)) {
-    return { ...profile, fullName: 'Your audit', nameConfidence: 'low' };
+    return { ...profile, fullName: null, nameConfidence: 'low' };
   }
   return { ...profile, nameConfidence: profile.nameConfidence ?? 'high' };
 }

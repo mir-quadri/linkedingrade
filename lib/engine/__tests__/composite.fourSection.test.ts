@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import { runScoring, runPdfAudit, PDF_AUDIT_SECTION_IDS, PDF_NON_GRADED_SECTION_IDS } from '@/lib/engine/scoring';
 import { computeComposite } from '@/lib/engine/scoring/composite';
+import { scoreToNextLetterThreshold } from '@/lib/engine/scoring/letters';
 import type { SectionId, SectionScore } from '@/lib/engine/types';
 import { CAPTURED_PROFILES } from './fixtures';
 
@@ -26,6 +27,18 @@ describe('PDF composite scope — 4 graded sections only', () => {
     // The 8 non-graded sections (photo/banner/etc) drag the full composite
     // down; the focused composite ignores them.
     expect(pdf.composite.score).not.toBe(full.composite.score);
+  });
+
+  it('ranks PDF fixes by the equal 25% graded weight, not the 12-section rubric weight', () => {
+    const { audit } = runPdfAudit(CAPTURED_PROFILES.Mir);
+    expect(audit.fixes.length).toBeGreaterThan(0);
+    for (const fix of audit.fixes) {
+      const s = audit.sections.find((x) => x.id === fix.sectionId)!;
+      const gap = Math.max(1, scoreToNextLetterThreshold(s.adjustedScore) - s.adjustedScore);
+      // pointsGain = weight × gap, and in PDF mode every graded section weighs
+      // 0.25 — not its 0.16/0.18/0.14/0.10 full-rubric weight.
+      expect(fix.pointsGain).toBeCloseTo(Math.round(0.25 * gap * 100) / 100, 5);
+    }
   });
 
   it('ignores non-graded sections in computeComposite when graded weights are supplied', () => {

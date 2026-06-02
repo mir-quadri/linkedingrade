@@ -27,10 +27,13 @@ describe('isSuspiciousName', () => {
 });
 
 describe('normalizeProfileForPdfAudit', () => {
-  it('replaces a suspicious name with a neutral placeholder and low confidence', () => {
+  it('clears a suspicious name and marks it low confidence', () => {
     const profile = makeProfile({ fullName: 'Senior Director | Building AI Platforms' });
     const normalized = normalizeProfileForPdfAudit(profile);
-    expect(normalized.fullName).toBe('Your audit');
+    // Cleared to null (not a placeholder string) so downstream consumers like
+    // the email greeting don't treat it as a real name. The UI renders the
+    // neutral "Your audit" header from nameConfidence.
+    expect(normalized.fullName).toBeNull();
     expect(normalized.nameConfidence).toBe('low');
     // Input is not mutated.
     expect(profile.fullName).toBe('Senior Director | Building AI Platforms');

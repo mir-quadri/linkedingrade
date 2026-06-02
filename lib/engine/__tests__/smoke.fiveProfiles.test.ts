@@ -34,7 +34,7 @@ describe('5-profile smoke test (PR #15 recalibration)', () => {
     // Erum's profile carries the parser-bug name bleed; the audit must not
     // surface a garbage name.
     expect(results.Erum.profile.nameConfidence).toBe('low');
-    expect(results.Erum.profile.fullName).toBe('Your audit');
+    expect(results.Erum.profile.fullName).toBeNull();
   });
 
   it('keeps trusted names intact', () => {
