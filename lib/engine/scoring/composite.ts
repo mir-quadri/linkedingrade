@@ -1,4 +1,4 @@
-import type { Letter, SectionScore, CompositeResult, SeniorityTier } from '@/lib/engine/types';
+import type { Letter, SectionScore, CompositeResult, SeniorityTier, SectionId } from '@/lib/engine/types';
 import { scoreToLetter } from './letters';
 import { sectionMeta } from './weights';
 import { PDF_INVISIBLE_WEIGHT_CAP } from './pdfCompositeConfig';
@@ -14,12 +14,19 @@ import { PDF_INVISIBLE_WEIGHT_CAP } from './pdfCompositeConfig';
  *     composite they're allowed to claim.
  *
  *   PDF-INVISIBLE — Photo, Banner, Featured, Activity,
- *     Recommendations. EXCLUDED entirely from the composite when the
- *     user hasn't filled in the self-assessed checklist. Included at
- *     reduced weight (capped at `PDF_INVISIBLE_WEIGHT_CAP` of the
- *     composite, currently 15%) when the user has — and even then a
- *     poor self-report can never lower the composite below the
- *     visible-only baseline. See `pdfCompositeConfig.ts`.
+ *     Recommendations. Included ONLY when the user has actually
+ *     answered the corresponding self-assessed checklist question.
+ *     The set of answered invisible section IDs is passed via
+ *     `invisibleSelfReportedIds`. Unanswered invisible sections are
+ *     excluded so their section-scorer parser-fallback values
+ *     (60/65 — "could not extract") never leak into the composite
+ *     under the guise of self-report signal.
+ *
+ *   Even when at least one invisible section is answered, the
+ *   combined contribution is capped at `PDF_INVISIBLE_WEIGHT_CAP`
+ *   of the composite, and a poor self-report can never lower the
+ *   composite below the visible-only baseline. See
+ *   `pdfCompositeConfig.ts`.
  *
  * The split fixes a product-defining miscalibration: under the
  * RUBRIC.md nominal weights, the PDF-invisible sections claimed ~28%
@@ -38,34 +45,29 @@ export function computeComposite(
   tierAssumed: boolean,
   options: ComputeCompositeOptions = {},
 ): CompositeResult {
-  const { hasSelfReport = false } = options;
+  const { invisibleSelfReportedIds } = options;
 
   const visibleSections: SectionScore[] = [];
   const invisibleSections: SectionScore[] = [];
   for (const s of sections) {
     if (sectionMeta(s.id).pdfVisible) {
       visibleSections.push(s);
-    } else if (hasSelfReport) {
-      // Only the user-answered invisible sections are flagged via
-      // `inComposite` upstream in `runScoring` — runScoring sets the
-      // section's `oneLineWhy` to the no-self-report message and
-      // clears its data for unanswered invisible sections, but the
-      // selector here is simpler: invisible sections enter the
-      // composite when ANY self-report exists, and the invisible
-      // weighted average naturally drops anyone who hasn't been
-      // answered (their rawScore reverts to the section scorer's
-      // fallback, but their weight is renormalised against only the
-      // sections that ARE in this list).
+    } else if (invisibleSelfReportedIds?.has(s.id)) {
+      // Only include the specific invisible sections the user actually
+      // answered. A partial / empty self-report would otherwise drag
+      // unanswered sections' parser-fallback scores (60 / 65 — the
+      // section scorers' "could not extract" defaults) into the
+      // invisible average and present them as verified signal.
       invisibleSections.push(s);
     }
   }
 
   const visibleScore = weightedAverage(visibleSections);
-  if (!hasSelfReport || invisibleSections.length === 0) {
+  if (invisibleSections.length === 0) {
     return finalize(visibleScore, tier, tierAssumed);
   }
 
-  // hasSelfReport branch: the invisible sections get up to
+  // At-least-one-answered branch: the invisible sections get up to
   // `PDF_INVISIBLE_WEIGHT_CAP` combined. The visible sections claim
   // `1 - cap`. Compute the blended composite, then floor at the
   // visible-only score so a poor self-report can NEVER lower the
@@ -81,13 +83,16 @@ export function computeComposite(
 
 export interface ComputeCompositeOptions {
   /**
-   * Whether the audit has self-assessed checklist data attached.
-   * Drives whether PDF-invisible sections enter the composite at all.
-   * Defaults to false — runScoring callers that don't pass a
-   * selfReport get the visible-only composite, which is the right
-   * default for a freshly-uploaded PDF.
+   * The set of PDF-invisible section IDs the user has actually
+   * answered in the self-assessed checklist. Only sections in this
+   * set enter the composite as invisible signal — unanswered
+   * sections are excluded entirely so the section scorers' parser-
+   * fallback "could not extract" defaults never leak into the
+   * invisible average. Omit or pass an empty set when no self-report
+   * is attached: the composite falls through to the visible-only
+   * weighted average.
    */
-  hasSelfReport?: boolean;
+  invisibleSelfReportedIds?: ReadonlySet<SectionId>;
 }
 
 /**

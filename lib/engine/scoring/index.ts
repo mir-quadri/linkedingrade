@@ -205,7 +205,13 @@ export function runScoring(
     keywordHealth: scoreKeywordHealth(profile, judgeResponse.buzzwords, judgeResponse.keywords),
   };
 
-  const hasSelfReport = selfReport !== null;
+  // Track which PDF-invisible sections the user actually answered.
+  // Only those enter the composite — see `computeComposite` and the
+  // Codex P2 fix on this PR. An unanswered self-report field falls
+  // through to the "Not visible to this audit" label below and is
+  // excluded from the invisible average so a parser-fallback 60/65
+  // doesn't get presented as verified signal.
+  const invisibleSelfReportedIds = new Set<SectionId>();
   const sections: SectionScore[] = SECTIONS.map((meta) => {
     let raw = rawByID[meta.id]!;
     // PDF-invisible section post-processing. The section scorers ran
@@ -218,24 +224,22 @@ export function runScoring(
     // label change is so the section grade card on the report doesn't
     // present a parser-fallback C/D as a verdict.
     if (!meta.pdfVisible) {
-      if (hasSelfReport) {
-        const fromSelfReport = scoreSelfReportSection(meta.id, selfReport);
-        if (fromSelfReport) {
-          raw = {
-            rawScore: fromSelfReport.rawScore,
-            reasons: [fromSelfReport.oneLineWhy],
-            oneLineWhy: fromSelfReport.oneLineWhy,
-            needsReview: false,
-          };
-        } else {
-          raw = {
-            rawScore: raw.rawScore,
-            reasons: [PDF_INVISIBLE_NO_SELF_REPORT_MESSAGE],
-            oneLineWhy: PDF_INVISIBLE_NO_SELF_REPORT_MESSAGE,
-            needsReview: true,
-          };
-        }
+      const fromSelfReport = selfReport
+        ? scoreSelfReportSection(meta.id, selfReport)
+        : null;
+      if (fromSelfReport) {
+        raw = {
+          rawScore: fromSelfReport.rawScore,
+          reasons: [fromSelfReport.oneLineWhy],
+          oneLineWhy: fromSelfReport.oneLineWhy,
+          needsReview: false,
+        };
+        invisibleSelfReportedIds.add(meta.id);
       } else {
+        // No self-report at all OR self-report present but this
+        // specific section unanswered. Either way, the section is
+        // excluded from the composite below and surfaces the
+        // "Not visible to this audit" label instead of a verdict.
         raw = {
           rawScore: raw.rawScore,
           reasons: [PDF_INVISIBLE_NO_SELF_REPORT_MESSAGE],
@@ -260,7 +264,7 @@ export function runScoring(
   });
 
   const composite = computeComposite(sections, seniority.tier, seniority.assumed, {
-    hasSelfReport,
+    invisibleSelfReportedIds,
   });
   const wins = pickWins(sections);
   const fixes = pickFixes(sections, judgeResponse.rewrites);

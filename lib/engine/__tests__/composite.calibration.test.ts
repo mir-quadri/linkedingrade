@@ -450,6 +450,72 @@ describe('PDF composite recalibration — calibration snapshot', () => {
     expect(withWorstSelfReport).toBeGreaterThanOrEqual(baseline);
   });
 
+  // Codex P2 regression: a partial self-report used to drag unanswered
+  // invisible sections' parser-fallback scores (60/65) into the
+  // invisible average alongside the one real answer, presenting
+  // unverified extraction defaults as self-report signal. The fix
+  // excludes unanswered sections from the composite entirely so an
+  // empty / partial self-report behaves like no self-report for the
+  // unanswered sections, and only the truly-answered ones contribute.
+  it('an empty self-report (all-null answers) yields the same composite as no self-report', () => {
+    const baseline = compositeOf(johnProfile);
+    const emptyReport: SelfReport = {
+      photo: null,
+      banner: null,
+      activity: null,
+      recommendations: null,
+      featured: null,
+      submittedAt: '2026-06-01T00:00:00Z',
+    };
+    expect(compositeOf(johnProfile, emptyReport)).toBe(baseline);
+  });
+
+  it('a partial self-report (one answer) contributes ONLY the answered section, not parser fallbacks', () => {
+    // Construct two self-reports that share one answer (photo='no')
+    // but differ in the OTHER sections (one all-null, one all-no).
+    // Pre-fix: the all-no report would have a much lower invisible
+    // average than the partial report (because the partial picked up
+    // the 60/65 parser fallbacks for the unanswered sections). After
+    // the fix: the composite from photo-only-no is at least as high
+    // as the composite from all-no, because parser fallbacks no
+    // longer get to claim "self-reported" weight.
+    const photoOnlyNo: SelfReport = {
+      photo: 'no',
+      banner: null,
+      activity: null,
+      recommendations: null,
+      featured: null,
+      submittedAt: '2026-06-01T00:00:00Z',
+    };
+    const allNo: SelfReport = {
+      photo: 'no',
+      banner: 'no',
+      activity: 'no',
+      recommendations: 'none',
+      featured: 'no',
+      submittedAt: '2026-06-01T00:00:00Z',
+    };
+    expect(compositeOf(johnProfile, photoOnlyNo)).toBeGreaterThanOrEqual(
+      compositeOf(johnProfile, allNo),
+    );
+  });
+
+  it('a partial self-report ALSO obeys the floor invariant — never below visible-only baseline', () => {
+    const baseline = compositeOf(johnProfile);
+    // One bad answer, rest null. Must not pull composite below the
+    // visible-only baseline because the floor in computeComposite is
+    // `max(visibleScore, blended)`.
+    const partialBad: SelfReport = {
+      photo: 'no',
+      banner: null,
+      activity: null,
+      recommendations: null,
+      featured: null,
+      submittedAt: '2026-06-01T00:00:00Z',
+    };
+    expect(compositeOf(johnProfile, partialBad)).toBeGreaterThanOrEqual(baseline);
+  });
+
   it('self-report with strong answers raises the composite, bounded by the cap', () => {
     const baseline = compositeOf(johnProfile);
     const strongSelfReport: SelfReport = {
