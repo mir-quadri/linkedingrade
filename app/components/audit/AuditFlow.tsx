@@ -8,7 +8,9 @@ import type { AuditPreview } from '@/lib/audit/buildPreview';
 
 import ScoreSummary from './ScoreSummary';
 import SectionGradeList from './SectionGradeList';
-import PdfAuditReport from './PdfAuditReport';
+import ExtensionCallout from './ExtensionCallout';
+import WinsAndFixes from './WinsAndFixes';
+import SelfAssessedBlock from './SelfAssessedBlock';
 
 type Stage = 'upload' | 'parsing' | 'preview' | 'submitting-email' | 'full';
 
@@ -171,28 +173,43 @@ export default function AuditFlow() {
 
       {stage !== 'upload' && stage !== 'parsing' && preview ? (
         <div id="audit-result" style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+          {/* The composite and all 4 grades are revealed pre-gate and are
+              byte-identical after the email — they come from `preview` in both
+              stages, never from the gated full-report payload, so a grade can
+              never change after submission. The email unlocks the *report*
+              (top wins, highest-leverage fixes), not the grades. */}
           <ScoreSummary
-            composite={stage === 'full' && fullReport ? fullReport.audit.composite : preview.composite}
-            fullName={stage === 'full' && fullReport ? fullReport.profile.fullName : preview.fullName}
-            nameConfidence={
-              stage === 'full' && fullReport ? fullReport.profile.nameConfidence : preview.nameConfidence
-            }
+            composite={preview.composite}
+            fullName={preview.fullName}
+            nameConfidence={preview.nameConfidence}
             variant={stage === 'full' ? 'full' : 'preview'}
           />
+          <div>
+            <div
+              className="font-mono"
+              style={{
+                fontSize: 11,
+                letterSpacing: '0.08em',
+                color: 'var(--text-3)',
+                textTransform: 'uppercase',
+                marginBottom: 10,
+              }}
+            >
+              Your 4 section grades
+            </div>
+            <SectionGradeList sections={preview.previewSections} />
+          </div>
+          <ExtensionCallout />
 
           {stage !== 'full' || !fullReport ? (
-            <>
-              <SectionPreview preview={preview} />
-              <GatedSectionsTease />
-              <EmailGate
-                email={email}
-                onEmail={setEmail}
-                emailInputId={emailInputId}
-                onSubmit={handleEmailSubmit}
-                submitting={stage === 'submitting-email'}
-                error={emailError}
-              />
-            </>
+            <EmailGate
+              email={email}
+              onEmail={setEmail}
+              emailInputId={emailInputId}
+              onSubmit={handleEmailSubmit}
+              submitting={stage === 'submitting-email'}
+              error={emailError}
+            />
           ) : (
             <FullReportView
               auditId={auditId!}
@@ -305,68 +322,6 @@ function UploadCard({
   );
 }
 
-/**
- * Tease the gated-section count without leaking grades. The previous shape
- * blurred a real `SectionGradeList` over the full report client-side,
- * which only worked because the upload response carried the full report —
- * exactly the leak Codex flagged. The full data now arrives in the gate's
- * own response; before that, all the user sees is the count.
- */
-function GatedSectionsTease() {
-  return (
-    <div
-      style={{
-        background: 'var(--surface)',
-        border: '1px dashed var(--border-2)',
-        borderRadius: 'var(--r-lg)',
-        padding: '22px 24px',
-        textAlign: 'center',
-        color: 'var(--text-2)',
-      }}
-    >
-      <div
-        className="font-mono"
-        style={{
-          fontSize: 11,
-          letterSpacing: '0.08em',
-          color: 'var(--text-3)',
-          textTransform: 'uppercase',
-          marginBottom: 8,
-        }}
-      >
-        Gated · 1 of 4 graded sections
-      </div>
-      <div style={{ fontSize: 14.5, lineHeight: 1.55 }}>
-        Headline / About / Current Role above are 3 of the 4 sections we grade.
-        Career Arc, your top wins, and your three highest-leverage fixes unlock when you
-        submit your email. (8 more sections — Photo, Banner, Featured, Activity,
-        Recommendations, Skills, Education, Keyword Health — audit in the full Chrome
-        extension.)
-      </div>
-    </div>
-  );
-}
-
-function SectionPreview({ preview }: { preview: AuditPreview }) {
-  return (
-    <div>
-      <div
-        className="font-mono"
-        style={{
-          fontSize: 11,
-          letterSpacing: '0.08em',
-          color: 'var(--text-3)',
-          textTransform: 'uppercase',
-          marginBottom: 10,
-        }}
-      >
-        Preview · {preview.previewSections.length} of 4 graded sections
-      </div>
-      <SectionGradeList sections={preview.previewSections} />
-    </div>
-  );
-}
-
 function EmailGate({
   email,
   emailInputId,
@@ -401,14 +356,14 @@ function EmailGate({
           marginBottom: 8,
         }}
       >
-        Step 2 · See the full audit
+        Step 2 · Unlock your report
       </div>
       <h3 style={{ margin: '0 0 6px', fontSize: 22, letterSpacing: '-0.015em', fontWeight: 500 }}>
-        Enter your email to unlock the full report.
+        Your grades are above. Enter your email for the fixes.
       </h3>
       <p style={{ margin: '0 0 16px', color: 'var(--text-2)', fontSize: 14.5, lineHeight: 1.55 }}>
-        You&apos;ll see the full grade breakdown, top wins, and your three highest-leverage fixes — on this page and in your inbox.
-        One email. No newsletter signup, no marketing drip.
+        The email unlocks your top wins and your three highest-leverage fixes — on this page and in your inbox,
+        with a permanent link. Your grades won&apos;t change. One email. No newsletter signup, no marketing drip.
       </p>
       <form onSubmit={onSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 520 }}>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -477,9 +432,13 @@ function FullReportView({
           textTransform: 'uppercase',
         }}
       >
-        Step 3 · Your full audit
+        Step 3 · Your report
       </div>
-      <PdfAuditReport auditId={auditId} audit={audit} selfReport={null} />
+      {/* Grades + extension callout are already shown above; the gate adds
+          the actionable report: top wins and highest-leverage fixes, plus the
+          self-check and the permanent link. */}
+      <WinsAndFixes wins={audit.wins} fixes={audit.fixes} />
+      <SelfAssessedBlock auditId={auditId} initial={null} />
       <div
         style={{
           padding: '16px 18px',

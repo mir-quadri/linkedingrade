@@ -1,7 +1,16 @@
 import type { SectionScore } from '@/lib/engine/types';
 
+/**
+ * Only the fields this list renders. Both the full `SectionScore` and the
+ * trimmed preview section (no numeric scores) satisfy it.
+ */
+export type SectionGradeRow = Pick<
+  SectionScore,
+  'id' | 'label' | 'letter' | 'oneLineWhy' | 'needsReview' | 'aboveTheFold'
+>;
+
 interface Props {
-  sections: SectionScore[];
+  sections: SectionGradeRow[];
   /** When true the list is blurred for the email-gate preview. */
   blurred?: boolean;
 }
