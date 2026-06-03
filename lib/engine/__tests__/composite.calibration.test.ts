@@ -651,6 +651,29 @@ describe('PDF composite recalibration — calibration snapshot', () => {
     expect(banner.ungraded).toBe(true);
   });
 
+  it("zero-gain fixes are dropped — pickFixes never returns a 'highest-leverage' fix that can't move the composite (Codex P2 round 7)", () => {
+    // Construct a self-report whose invisible answers are deep
+    // below the visible-only baseline. The floor swallows their
+    // single-section bumps, so each invisible section's marginal
+    // rate is 0 and pickFixes' pointsGain would round to 0. The
+    // pre-fix behaviour would still surface them as "highest-
+    // leverage fixes" with `pointsGain: 0` if visible candidates
+    // were exhausted. The post-fix contract: any fix returned
+    // MUST have pointsGain > 0.
+    const allBad: SelfReport = {
+      photo: 'no',
+      banner: 'no',
+      activity: 'no',
+      recommendations: 'none',
+      featured: 'no',
+      submittedAt: '2026-06-01T00:00:00Z',
+    };
+    const audit = runScoring(johnProfile, {}, allBad);
+    for (const fix of audit.fixes) {
+      expect(fix.pointsGain).toBeGreaterThan(0);
+    }
+  });
+
   it("the PDF-invisible cap is PRORATED by answered count — a lone strong answer can't claim the full 15% (Codex P2 round 5)", () => {
     // Pre-fix: a single strong photo='yes' answer claimed the full
     // 15% cap and could lift the composite about as much as all five

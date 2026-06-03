@@ -130,6 +130,14 @@ export function pickFixes(
         _leverage: leverage,
       };
     })
+    // Codex P2 (round 7): drop zero-gain fixes. When the
+    // self-report floor swallows an invisible-section bump, the
+    // marginal gain rate is 0 and pointsGain rounds to 0. Surfacing
+    // those as "highest-leverage fixes" misleads users — the
+    // advertised next-letter step won't move the composite. Better
+    // to return fewer fixes (or none) than a fix the math
+    // explicitly says can't help.
+    .filter((c) => c.pointsGain > 0)
     .sort((a, b) => b._leverage - a._leverage);
 
   return candidates.slice(0, 3).map(({ _leverage, ...fix }) => fix as FixSuggestion);
