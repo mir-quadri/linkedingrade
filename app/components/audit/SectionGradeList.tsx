@@ -119,10 +119,16 @@ export default function SectionGradeList({ sections, blurred }: Props) {
                 fontWeight: 500,
                 textAlign: 'right',
                 letterSpacing: '-0.02em',
-                color: gradeColor(s.letter),
+                color: s.ungraded ? 'var(--text-3)' : gradeColor(s.letter),
               }}
+              // For ungraded sections (PDF-invisible + no self-report
+              // answer), suppress the parser-fallback letter — the
+              // section card's `oneLineWhy` already explains "Not
+              // visible to this audit", so showing a concrete D/F next
+              // to it would contradict the recalibration's promise.
+              title={s.ungraded ? 'Not graded — see self-assessed block below' : undefined}
             >
-              {s.letter}
+              {s.ungraded ? '—' : s.letter}
             </div>
           </div>
         ))}

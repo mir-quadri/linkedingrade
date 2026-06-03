@@ -613,6 +613,44 @@ describe('PDF composite recalibration — calibration snapshot', () => {
     }
   });
 
+  it('unreported PDF-invisible sections are flagged ungraded (Codex P2 round 6)', () => {
+    // Pre-fix: the section scorers' parser-fallback rawScores
+    // (~60/65) carried through to `letter`, so a PDF-invisible
+    // section with no self-report answer rendered as a concrete
+    // D / F next to the "Not visible to this audit" oneLineWhy.
+    // That contradicted the recalibration's promise that these
+    // sections are ungraded.
+    //
+    // After the fix: runScoring sets `ungraded: true` on the
+    // SectionScore, and SectionGradeList renders "—" (em dash)
+    // in place of the letter.
+    const audit = runScoring(johnProfile);
+    for (const s of audit.sections) {
+      if (PDF_INVISIBLE_SECTION_IDS.includes(s.id)) {
+        expect(s.ungraded).toBe(true);
+      } else {
+        expect(s.ungraded ?? false).toBe(false);
+      }
+    }
+  });
+
+  it("an ANSWERED PDF-invisible section is graded (not ungraded)", () => {
+    const photoYes: SelfReport = {
+      photo: 'yes',
+      banner: null,
+      activity: null,
+      recommendations: null,
+      featured: null,
+      submittedAt: '2026-06-01T00:00:00Z',
+    };
+    const audit = runScoring(johnProfile, {}, photoYes);
+    const photo = audit.sections.find((s) => s.id === 'photo')!;
+    const banner = audit.sections.find((s) => s.id === 'banner')!;
+    // Photo was answered → graded. Banner was not → ungraded.
+    expect(photo.ungraded).toBe(false);
+    expect(banner.ungraded).toBe(true);
+  });
+
   it("the PDF-invisible cap is PRORATED by answered count — a lone strong answer can't claim the full 15% (Codex P2 round 5)", () => {
     // Pre-fix: a single strong photo='yes' answer claimed the full
     // 15% cap and could lift the composite about as much as all five

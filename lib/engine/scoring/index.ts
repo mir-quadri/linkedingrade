@@ -249,6 +249,15 @@ export function runScoring(
       }
     }
     const adjusted = applySeniorityModifier(raw.rawScore, seniority.modifier);
+    // A section is "ungraded" when it's PDF-invisible AND the user
+    // hasn't answered the matching self-report question — the parser
+    // can't see it and the user hasn't told us. The section card
+    // still renders (with the "Not visible to this audit" label) but
+    // the letter is suppressed at render time so we don't present
+    // an apparent verdict (F / D) for a section we can't score.
+    // Codex P2 on PR #15 (round 6).
+    const ungraded =
+      !meta.pdfVisible && !invisibleSelfReportedIds.has(meta.id);
     return {
       id: meta.id,
       label: meta.label,
@@ -260,6 +269,7 @@ export function runScoring(
       oneLineWhy: raw.oneLineWhy,
       aboveTheFold: meta.aboveTheFold,
       needsReview: raw.needsReview,
+      ungraded,
     };
   });
 

@@ -34,6 +34,14 @@ export interface SectionScore {
   oneLineWhy: string; // single line explainer for the report
   aboveTheFold: boolean;
   needsReview: boolean; // true if AI judgment was unavailable
+  /**
+   * True when this section has no displayable grade — the parser
+   * cannot see it and no self-report answer is available. The card
+   * still renders (with the "Not visible to this audit" oneLineWhy)
+   * but the letter is suppressed so we don't present an apparent
+   * verdict for a section we can't actually score.
+   */
+  ungraded?: boolean;
 }
 
 export interface CompositeResult {
