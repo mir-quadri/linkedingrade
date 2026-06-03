@@ -1,6 +1,6 @@
 import type { Letter, SectionScore, CompositeResult, SeniorityTier, SectionId } from '@/lib/engine/types';
 import { scoreToLetter } from './letters';
-import { sectionMeta } from './weights';
+import { sectionMeta, PDF_INVISIBLE_SECTION_IDS } from './weights';
 import { PDF_INVISIBLE_WEIGHT_CAP } from './pdfCompositeConfig';
 
 /**
@@ -68,15 +68,26 @@ export function computeComposite(
   }
 
   // At-least-one-answered branch: the invisible sections get up to
-  // `PDF_INVISIBLE_WEIGHT_CAP` combined. The visible sections claim
-  // `1 - cap`. Compute the blended composite, then floor at the
-  // visible-only score so a poor self-report can NEVER lower the
-  // composite below the no-self-report baseline. This is the
-  // "self-report only ever adds" invariant.
+  // `PDF_INVISIBLE_WEIGHT_CAP`, PRORATED by the fraction of invisible
+  // sections the user actually answered. Without proration a lone
+  // strong photo answer would lift the composite about as much as
+  // all five strong self-assessed sections — overstating partial
+  // signal. With proration:
+  //
+  //   proratedCap = cap × (answered / total_invisible_sections)
+  //
+  // 1 answer (of 5) gets 0.15 × 1/5 = 3% weight; 5 answers gets the
+  // full 15%. Unanswered sections are treated as neutral (their
+  // share of the cap is reclaimed by the visible-only fraction
+  // rather than redistributed across the answered subset).
+  //
+  // Then the floor: a poor self-report can NEVER lower the composite
+  // below the no-self-report baseline — that's the "self-report
+  // only ever adds" invariant.
+  const proratedCap =
+    PDF_INVISIBLE_WEIGHT_CAP * (invisibleSections.length / PDF_INVISIBLE_SECTION_IDS.length);
   const invisibleScore = weightedAverage(invisibleSections);
-  const blended =
-    visibleScore * (1 - PDF_INVISIBLE_WEIGHT_CAP) +
-    invisibleScore * PDF_INVISIBLE_WEIGHT_CAP;
+  const blended = visibleScore * (1 - proratedCap) + invisibleScore * proratedCap;
   const finalScore = Math.max(visibleScore, blended);
   return finalize(finalScore, tier, tierAssumed);
 }

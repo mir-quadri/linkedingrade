@@ -230,7 +230,7 @@ export default function SelfAssessedBlock({ auditId, initial, onAuditUpdated }: 
                 textTransform: 'uppercase',
               }}
             >
-              recorded · not in composite
+              recorded · folded in, capped at 15%
             </span>
           ) : null}
           {status === 'error' && error ? (

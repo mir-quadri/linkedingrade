@@ -613,6 +613,44 @@ describe('PDF composite recalibration — calibration snapshot', () => {
     }
   });
 
+  it("the PDF-invisible cap is PRORATED by answered count — a lone strong answer can't claim the full 15% (Codex P2 round 5)", () => {
+    // Pre-fix: a single strong photo='yes' answer claimed the full
+    // 15% cap and could lift the composite about as much as all five
+    // strong answers (banner + activity + recommendations + featured
+    // also strong). That overstates the signal — answering one of
+    // five questions shouldn't carry the same weight as answering
+    // all five.
+    //
+    // After the prorate, the cap scales with the answered fraction:
+    //   1 of 5 answered → 0.15 × 1/5 = 3% weight,
+    //   5 of 5 answered → 15% weight (unchanged at full).
+    // So the lift from a single strong answer must be STRICTLY
+    // SMALLER than the lift from five strong answers.
+    const photoOnlyYes: SelfReport = {
+      photo: 'yes',
+      banner: null,
+      activity: null,
+      recommendations: null,
+      featured: null,
+      submittedAt: '2026-06-01T00:00:00Z',
+    };
+    const allYes: SelfReport = {
+      photo: 'yes',
+      banner: 'yes',
+      activity: 'yes',
+      recommendations: 'yes',
+      featured: 'yes',
+      submittedAt: '2026-06-01T00:00:00Z',
+    };
+    const baseline = compositeOf(michaelProfile);
+    const liftOne = compositeOf(michaelProfile, photoOnlyYes) - baseline;
+    const liftFive = compositeOf(michaelProfile, allYes) - baseline;
+    // Pre-fix: liftOne ≈ liftFive (both used the full 15% cap).
+    // After fix: liftOne < liftFive because one section claims 3%
+    // and five claim 15%.
+    expect(liftFive).toBeGreaterThan(liftOne);
+  });
+
   it("an answered-invisible fix that CROSSES the floor on the way to next letter still surfaces (Codex P2 round 5)", () => {
     // Construct a profile where the visible-only baseline sits in
     // the F band (~50) but a single answered invisible section is
