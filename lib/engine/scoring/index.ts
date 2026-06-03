@@ -7,7 +7,7 @@ import {
   PDF_INVISIBLE_NO_SELF_REPORT_MESSAGE,
   scoreSelfReportSection,
 } from './pdfCompositeConfig';
-import { scoreToLetter } from './letters';
+import { scoreToLetter, scoreToNextLetterThreshold } from './letters';
 import { applySeniorityModifier, inferSeniority, TIER_LABEL } from './seniority';
 import { computeComposite } from './composite';
 import { pickFixes, pickWins } from './fixes';
@@ -276,12 +276,13 @@ export function runScoring(
       excludeFromActionable.add(meta.id);
     }
   }
-  // Per-section marginal gain rate: "how much does the composite move
-  // per 1-point bump in this section's adjustedScore?"
-  //
-  // This replaces the earlier "effective renormalised weight"
-  // approximation, which was correct only when none of `computeComposite`'s
-  // branch logic was active — but the calc has two non-linearities:
+  // Per-section marginal gain RATES — calibrated so that
+  // `rate × gap` (the formula pickFixes uses) equals the EXACT
+  // composite gain that hitting the next-letter threshold would
+  // produce. This replaces the earlier "effective renormalised
+  // weight" approximation, which was correct only when none of
+  // `computeComposite`'s branch logic was active. The calc has two
+  // non-linearities:
   //
   //   1. The `max(visible_only, blended)` floor: an answered-invisible
   //      section whose score is below `visible_only` contributes ZERO
@@ -291,21 +292,28 @@ export function runScoring(
   //      photo='no' → 'somewhat') even when the gain was actually 0
   //      because the floor swallowed the change.
   //   2. Cross-effects between visible / invisible: bumping a visible
-  //      section can shift the floor itself, which changes whether
-  //      invisible improvements are visible.
+  //      section can shift the floor itself.
   //
-  // Computing the marginal rate by re-running `computeComposite` with
-  // a 10-point bump on each section in turn is exact: the rate is
-  // whatever the actual composite math produces. Bumping by 10 rather
-  // than 1 stays above the composite's 1-decimal-place rounding and
-  // smooths over letter-band rounding inside individual section
-  // scorers (though those scorers aren't re-invoked here; we mutate
-  // `adjustedScore` directly).
-  const BUMP_POINTS = 10;
+  // The round-4 attempt used a uniform 10-point probe per section to
+  // derive a per-point rate. Codex P2 (round 5) caught the next
+  // wrinkle: with the floor active, a 10-point probe is often still
+  // swallowed even though the actual fix to the next letter is
+  // 30+ points and would cross above the floor. The rate then comes
+  // out 0 and a legitimately-actionable self-report fix drops off
+  // the highest-leverage list.
+  //
+  // The fix: probe each section with EXACTLY the same gap that
+  // `pickFixes` will advertise — `nextThreshold - adjustedScore`.
+  // The rate `gain / actualBump` then multiplies back out to the
+  // true composite gain at that exact gap inside pickFixes
+  // (and approximates well for nearby gaps too, but pickFixes only
+  // ever uses the same gap).
   const baselineCompositeScore = composite.score;
   const marginalGainRates = new Map<SectionId, number>();
   for (const s of sections) {
-    const newAdjusted = Math.min(100, s.adjustedScore + BUMP_POINTS);
+    const nextThreshold = scoreToNextLetterThreshold(s.adjustedScore);
+    const gapForProbe = Math.max(1, nextThreshold - s.adjustedScore);
+    const newAdjusted = Math.min(100, s.adjustedScore + gapForProbe);
     const actualBump = newAdjusted - s.adjustedScore;
     if (actualBump <= 0) {
       marginalGainRates.set(s.id, 0);
