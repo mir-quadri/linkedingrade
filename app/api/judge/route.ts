@@ -20,8 +20,9 @@ export const runtime = 'nodejs';
 // requests against that id 404 with model-not-found, which the catch
 // degrades to `judge_unavailable`, so the proxy looked configured but
 // could never actually call. Operators can pin a specific dated id
-// (e.g. `claude-sonnet-4-5-20250929`) via JUDGE_MODEL.
-const DEFAULT_MODEL = 'claude-sonnet-4-5';
+// via JUDGE_MODEL. Bump this alias as Anthropic ships new minor
+// versions of the Sonnet 4.x line.
+const DEFAULT_MODEL = 'claude-sonnet-4-6';
 const DEFAULT_MAX_OUTPUT_TOKENS = 1500;
 const DEFAULT_RATE_LIMIT_PER_DAY = 50;
 
