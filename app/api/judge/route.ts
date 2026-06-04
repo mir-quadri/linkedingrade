@@ -140,13 +140,19 @@ export async function POST(request: Request) {
   const ipKey = hashed ? `hash:${hashed}` : ip ? `raw:${ip}` : 'no-ip';
   const rateLimitKey = `judge:${ipKey}`;
   const memoryOnly = hashed === null; // pepper-missing OR no IP at all
+  // Codex Round 5 P2: never log the rate-limit key directly — when
+  // pepper is unset it embeds the raw IP, and Vercel/runtime logs are
+  // persistent (same contract `lib/audit/hashIp.ts` enforces for KV).
+  // Emit the key SHAPE only; that's enough to diagnose abuse (which
+  // partition is over-limit) without persisting the identifier.
+  const keyShape = hashed ? 'hash' : ip ? 'raw' : 'no-ip';
   const limit = numericEnv('JUDGE_RATE_LIMIT_PER_DAY', DEFAULT_RATE_LIMIT_PER_DAY);
   const decision = await consumeJudgeRateLimit(rateLimitKey, limit, undefined, {
     memoryOnly,
   });
   if (!decision.allowed) {
     console.warn(
-      `[api/judge] rate-limited key=${rateLimitKey} count=${decision.count} limit=${decision.limit} backend=${decision.backend}`,
+      `[api/judge] rate-limited keyShape=${keyShape} count=${decision.count} limit=${decision.limit} backend=${decision.backend}`,
     );
     return withCors(
       judgeUnavailable('rate_limited', { auditId: judgeRequest.auditId }),

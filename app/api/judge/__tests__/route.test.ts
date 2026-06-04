@@ -368,6 +368,41 @@ describe('POST /api/judge — rate-limit key partitioning (Codex Round 3 P2)', (
     __resetJudgeRateLimitForTests();
   });
 
+  it('rate-limited warn log never includes the raw IP (Codex Round 5 P2)', async () => {
+    // With pepper unset, rateLimitKey embeds raw IP; the over-limit
+    // console.warn must NOT echo that IP into Vercel/runtime logs
+    // (which are persistent). Same `hashIp` contract that keeps raw
+    // IPs out of KV applies to log output.
+    fetchSpy.mockResolvedValue(makeAnthropicResponse(STRICT_OK_BODY));
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      // Burn the single quota for this IP.
+      await POST(
+        makeRequest(VALID_REQUEST, {
+          'x-judge-auth': 'super-secret',
+          'x-forwarded-for': '203.0.113.42',
+        }),
+      );
+      // Second call → over limit → warn fires.
+      await POST(
+        makeRequest(VALID_REQUEST, {
+          'x-judge-auth': 'super-secret',
+          'x-forwarded-for': '203.0.113.42',
+        }),
+      );
+      const logged = warnSpy.mock.calls.map((c) => String(c[0])).join('\n');
+      expect(logged).toContain('rate-limited');
+      // Raw IP MUST NOT appear in the warn output. Neither the IP
+      // itself nor the `raw:` prefix shape that carries it.
+      expect(logged).not.toContain('203.0.113.42');
+      expect(logged).not.toContain('judge:raw:');
+      // Diagnostic signal still useful — the shape is logged.
+      expect(logged).toMatch(/keyShape=(hash|raw|no-ip)/);
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
   it('different IPs land in different buckets even when IP_HASH_PEPPER is unset', async () => {
     // With pepper missing, hashIp() returns null. The earlier route
     // collapsed every caller into a single literal `unhashed` bucket,
