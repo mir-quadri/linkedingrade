@@ -63,4 +63,28 @@ describe('buildJudgePrompt', () => {
     });
     expect(approximatePromptChars).toBeGreaterThan(0);
   });
+
+  it('bounds rewrites so a long input cannot blow the output-token budget (Codex Round 6 P2)', () => {
+    // Previously the prompt told the model to echo the original
+    // verbatim into both `before` and `after` when there was nothing
+    // to rewrite around. For an About near the 5000-char input cap,
+    // that meant ~10000 chars of duplicated text in the response —
+    // enough to exceed the 1500-token output cap on its own, truncate
+    // the JSON, and degrade the audit to `judge_unavailable` for a
+    // payload the route accepted as valid. New rules: `before` is a
+    // SHORT excerpt only; omit the rewrite when there's nothing
+    // honest to add; never echo the original into `after`.
+    const { user } = buildJudgePrompt({
+      headline: { text: 'X' },
+      about: { text: 'Y' },
+      rewriteTargets: ['headline', 'about'],
+    });
+    // The leaky instruction is gone.
+    expect(user).not.toMatch(/output\s*\{\s*"before":\s*<original>,\s*"after":\s*<original>\s*\}/);
+    // The new guards are present.
+    expect(user).toMatch(/SHORT EXCERPT/);
+    expect(user).toMatch(/≤200 chars/);
+    expect(user).toMatch(/OMIT/);
+    expect(user).toMatch(/Never echo the original verbatim/);
+  });
 });
