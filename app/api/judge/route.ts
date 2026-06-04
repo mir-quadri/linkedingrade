@@ -2,7 +2,16 @@ import { NextResponse } from 'next/server';
 
 import { extractIp, hashIp } from '@/lib/audit/hashIp';
 import { callJudge } from '@/lib/judge/callJudge';
-import { MAX_QUESTIONS, isOriginAllowed } from '@/lib/judge/config';
+import {
+  MAX_AUDIT_ID_CHARS,
+  MAX_CONTEXT_CHARS,
+  MAX_QUESTION_CHARS,
+  MAX_QUESTION_ID_CHARS,
+  MAX_QUESTIONS,
+  MAX_SECTION_ID_CHARS,
+  MAX_TOTAL_REQUEST_CHARS,
+  isOriginAllowed,
+} from '@/lib/judge/config';
 import { getRateLimiter } from '@/lib/judge/rateLimit';
 import type { JudgeFailureReason, JudgeQuestion, JudgeRequest, JudgeResponse } from '@/lib/judge/types';
 
@@ -39,15 +48,28 @@ function parseJudgeRequest(payload: unknown): JudgeRequest | null {
   if (!Array.isArray(questions) || questions.length === 0 || questions.length > MAX_QUESTIONS) {
     return null;
   }
+  if (typeof auditId === 'string' && auditId.length > MAX_AUDIT_ID_CHARS) return null;
 
   const clean: JudgeQuestion[] = [];
+  const seenIds = new Set<string>();
+  let totalChars = 0;
   for (const q of questions) {
     if (typeof q !== 'object' || q === null) return null;
     const { id, sectionId, question, context } = q as Record<string, unknown>;
-    if (typeof id !== 'string' || !id) return null;
-    if (typeof sectionId !== 'string' || !sectionId) return null;
-    if (typeof question !== 'string' || !question) return null;
-    if (typeof context !== 'string') return null; // may be empty, must be a string
+    if (typeof id !== 'string' || !id || id.length > MAX_QUESTION_ID_CHARS) return null;
+    if (typeof sectionId !== 'string' || !sectionId || sectionId.length > MAX_SECTION_ID_CHARS) {
+      return null;
+    }
+    if (typeof question !== 'string' || !question || question.length > MAX_QUESTION_CHARS) return null;
+    // context may be empty, but must be a string and within the cap.
+    if (typeof context !== 'string' || context.length > MAX_CONTEXT_CHARS) return null;
+    // Question ids must be unique — the answer-coverage check downstream relies
+    // on a 1:1 id mapping, and duplicates would make coverage ambiguous.
+    if (seenIds.has(id)) return null;
+    seenIds.add(id);
+    // Bound the total payload size forwarded to the paid upstream.
+    totalChars += id.length + sectionId.length + question.length + context.length;
+    if (totalChars > MAX_TOTAL_REQUEST_CHARS) return null;
     clean.push({ id, sectionId, question, context });
   }
 

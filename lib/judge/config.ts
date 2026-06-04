@@ -33,6 +33,21 @@ export const UPSTREAM_TIMEOUT_MS = 30_000;
 export const MAX_QUESTIONS = 40;
 
 /**
+ * Per-field and total character caps on the request body. `max_tokens` only
+ * bounds OUTPUT cost — without these, a single allowed caller could forward a
+ * multi-MB body and run up large INPUT-token charges. Enforced during
+ * validation, before the paid upstream call. Generous enough for a real audit
+ * (a few sections of profile text), tight enough to bound abuse.
+ */
+export const MAX_QUESTION_ID_CHARS = 200;
+export const MAX_SECTION_ID_CHARS = 100;
+export const MAX_QUESTION_CHARS = 2_000;
+export const MAX_CONTEXT_CHARS = 8_000;
+export const MAX_AUDIT_ID_CHARS = 200;
+/** Cap on the summed length of all question fields across the whole request. */
+export const MAX_TOTAL_REQUEST_CHARS = 100_000;
+
+/**
  * Sonnet 4.6 pricing, USD per 1M tokens, for $/audit logging. Cache reads bill
  * at ~0.1x input; cache writes at ~1.25x input. Kept here so the cost log
  * stays accurate if we change the model.

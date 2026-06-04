@@ -172,6 +172,24 @@ export async function callJudge(req: JudgeRequest, deps: JudgeDeps = {}): Promis
   if (!answers) {
     return { ok: false, reason: 'parse_error', message: 'Judge response was not valid JSON.' };
   }
+  // Coverage check: the answers must map 1:1 onto the requested question ids —
+  // no missing, extra, duplicated, or invented ids. A partial/mismatched
+  // upstream response is a `parse_error` the engine routes to needsReview, not
+  // a silent `ok: true` that a caller would mis-map. (Request ids are unique;
+  // the route enforces that.)
+  const requestedIds = new Set(req.questions.map((q) => q.id));
+  const answeredIds = new Set(answers.map((a) => a.id));
+  const covers =
+    answers.length === requestedIds.size &&
+    answeredIds.size === requestedIds.size &&
+    [...answeredIds].every((id) => requestedIds.has(id));
+  if (!covers) {
+    return {
+      ok: false,
+      reason: 'parse_error',
+      message: 'Judge answers did not match the requested question ids.',
+    };
+  }
 
   const usage: JudgeUsage = {
     model: message.model ?? JUDGE_MODEL,

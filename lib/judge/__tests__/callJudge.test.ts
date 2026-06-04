@@ -73,7 +73,15 @@ describe('callJudge', () => {
         context: 'ctx',
       })),
     };
-    const messages2 = vi.fn().mockResolvedValue(fakeMessage(JSON.stringify({ answers: [] })));
+    const manyAnswers = JSON.stringify({
+      answers: many.questions.map((q) => ({
+        id: q.id,
+        verdict: 'pass',
+        rationale: 'ok',
+        confidence: 0.5,
+      })),
+    });
+    const messages2 = vi.fn().mockResolvedValue(fakeMessage(manyAnswers));
     await callJudge(many, { messages: messages2 });
     expect(messages2).toHaveBeenCalledTimes(1);
   });
@@ -127,6 +135,61 @@ describe('callJudge', () => {
 
   it('rejects a structurally-wrong body (answers missing) as parse_error', async () => {
     const messages = vi.fn().mockResolvedValue(fakeMessage(JSON.stringify({ nope: true })));
+    const res = await callJudge(REQUEST, { messages });
+    expect(res.ok).toBe(false);
+    if (res.ok) throw new Error('expected failure');
+    expect(res.reason).toBe('parse_error');
+  });
+
+  it('rejects an empty answers array (no coverage) as parse_error', async () => {
+    const messages = vi.fn().mockResolvedValue(fakeMessage(JSON.stringify({ answers: [] })));
+    const res = await callJudge(REQUEST, { messages });
+    expect(res.ok).toBe(false);
+    if (res.ok) throw new Error('expected failure');
+    expect(res.reason).toBe('parse_error');
+  });
+
+  it('rejects answers that omit a requested id as parse_error', async () => {
+    // REQUEST asks q1 + q2; only q1 comes back.
+    const messages = vi.fn().mockResolvedValue(
+      fakeMessage(
+        JSON.stringify({ answers: [{ id: 'q1', verdict: 'pass', rationale: 'x', confidence: 1 }] }),
+      ),
+    );
+    const res = await callJudge(REQUEST, { messages });
+    expect(res.ok).toBe(false);
+    if (res.ok) throw new Error('expected failure');
+    expect(res.reason).toBe('parse_error');
+  });
+
+  it('rejects answers with a duplicated id as parse_error', async () => {
+    const messages = vi.fn().mockResolvedValue(
+      fakeMessage(
+        JSON.stringify({
+          answers: [
+            { id: 'q1', verdict: 'pass', rationale: 'x', confidence: 1 },
+            { id: 'q1', verdict: 'fail', rationale: 'y', confidence: 1 },
+          ],
+        }),
+      ),
+    );
+    const res = await callJudge(REQUEST, { messages });
+    expect(res.ok).toBe(false);
+    if (res.ok) throw new Error('expected failure');
+    expect(res.reason).toBe('parse_error');
+  });
+
+  it('rejects answers that invent an unrequested id as parse_error', async () => {
+    const messages = vi.fn().mockResolvedValue(
+      fakeMessage(
+        JSON.stringify({
+          answers: [
+            { id: 'q1', verdict: 'pass', rationale: 'x', confidence: 1 },
+            { id: 'q-bogus', verdict: 'pass', rationale: 'y', confidence: 1 },
+          ],
+        }),
+      ),
+    );
     const res = await callJudge(REQUEST, { messages });
     expect(res.ok).toBe(false);
     if (res.ok) throw new Error('expected failure');

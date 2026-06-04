@@ -88,6 +88,33 @@ describe('POST /api/judge', () => {
     expect(mockCall).not.toHaveBeenCalled();
   });
 
+  it('returns 400 for an oversized context field and never calls the judge', async () => {
+    const huge = 'x'.repeat(9_000); // > MAX_CONTEXT_CHARS (8000)
+    const res = await POST(
+      makeRequest({
+        body: { questions: [{ id: 'q1', sectionId: 'headline', question: 'q?', context: huge }] },
+      }),
+    );
+    expect(res.status).toBe(400);
+    await expect(res.json()).resolves.toMatchObject({ ok: false, reason: 'invalid_request' });
+    expect(mockCall).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 for duplicate question ids', async () => {
+    const res = await POST(
+      makeRequest({
+        body: {
+          questions: [
+            { id: 'dup', sectionId: 'headline', question: 'a?', context: 'x' },
+            { id: 'dup', sectionId: 'about', question: 'b?', context: 'y' },
+          ],
+        },
+      }),
+    );
+    expect(res.status).toBe(400);
+    expect(mockCall).not.toHaveBeenCalled();
+  });
+
   it('returns 503 when ANTHROPIC_API_KEY is not configured', async () => {
     delete process.env.ANTHROPIC_API_KEY;
     const res = await POST(makeRequest());
