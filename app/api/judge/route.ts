@@ -117,21 +117,33 @@ export async function POST(request: Request) {
   }
   const judgeRequest = extracted.value;
 
-  // 3. Rate limit. Codex Round 3 P2: when IP_HASH_PEPPER is absent,
-  // hashIp() returns null. Falling back to a literal `unhashed` token
-  // would collapse EVERY caller into a single global bucket — one
-  // misconfigured deployment could exhaust the daily limit for all
-  // users. Fall back to the raw IP instead: it still partitions per
-  // caller (and lives only in the 25h KV bucket, never exposed). If
-  // no IP at all (rare — direct internal call), use a constant that
-  // shares one bucket among no-IP callers, which is correct because
-  // those callers cannot be distinguished from each other anyway.
+  // 3. Rate limit.
+  //
+  // Codex Round 3 P2: when IP_HASH_PEPPER is absent, hashIp() returns
+  // null. Falling back to a literal `unhashed` token collapses every
+  // caller into one global bucket; one misconfigured deployment, or
+  // any server-to-server caller without a forwarded IP, exhausts the
+  // documented per-IP daily limit for everyone. So we partition by
+  // the raw IP in that fallback case.
+  //
+  // Codex Round 4 P2: raw IPs must not be persisted, even briefly.
+  // `lib/audit/hashIp.ts` codifies this — it returns `null` rather
+  // than persist an un-peppered hash, because IPv4's keyspace makes
+  // such hashes weakly reversible. The audit pipeline applies the
+  // same rule to KV. So when the fallback engages, we route the
+  // counter through the in-memory map only (volatile process memory,
+  // not Redis). Per-instance scope is an acceptable degraded mode for
+  // a deployment that hasn't set the pepper — the right fix is for
+  // the operator to set IP_HASH_PEPPER.
   const ip = extractIp(request.headers);
   const hashed = ip ? hashIp(ip) : null;
   const ipKey = hashed ? `hash:${hashed}` : ip ? `raw:${ip}` : 'no-ip';
   const rateLimitKey = `judge:${ipKey}`;
+  const memoryOnly = hashed === null; // pepper-missing OR no IP at all
   const limit = numericEnv('JUDGE_RATE_LIMIT_PER_DAY', DEFAULT_RATE_LIMIT_PER_DAY);
-  const decision = await consumeJudgeRateLimit(rateLimitKey, limit);
+  const decision = await consumeJudgeRateLimit(rateLimitKey, limit, undefined, {
+    memoryOnly,
+  });
   if (!decision.allowed) {
     console.warn(
       `[api/judge] rate-limited key=${rateLimitKey} count=${decision.count} limit=${decision.limit} backend=${decision.backend}`,

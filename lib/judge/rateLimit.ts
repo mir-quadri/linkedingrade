@@ -77,6 +77,18 @@ export interface RateLimitDecision {
   backend: 'kv' | 'memory' | 'fail-open';
 }
 
+export interface ConsumeOptions {
+  /**
+   * Force the in-memory fallback even when KV is configured. The route
+   * passes this when the rate-limit key embeds a raw IP (because
+   * `IP_HASH_PEPPER` is unset): raw IPs are fine in volatile process
+   * memory but must not be written to persistent KV (Codex Round 4 P2;
+   * same contract as `lib/audit/hashIp.ts`, which returns `null` rather
+   * than persist an un-peppered hash of the tiny IPv4 keyspace).
+   */
+  memoryOnly?: boolean;
+}
+
 /**
  * Try to consume a request slot for `key`. Returns whether the call is
  * allowed and the post-increment count. The `nowYmd` arg is the date
@@ -86,11 +98,12 @@ export async function consumeJudgeRateLimit(
   key: string,
   limit: number,
   nowYmd?: string,
+  options: ConsumeOptions = {},
 ): Promise<RateLimitDecision> {
   if (limit <= 0) return { allowed: false, count: 0, limit, backend: 'fail-open' };
   const ymd = nowYmd ?? new Date().toISOString().slice(0, 10);
   const fullKey = `judge:rate:${key}:${ymd}`;
-  const kv = await getKv();
+  const kv = options.memoryOnly ? null : await getKv();
   if (kv) {
     try {
       const incrResult = await kv.incr(fullKey);
