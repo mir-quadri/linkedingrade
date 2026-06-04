@@ -1,6 +1,7 @@
 import type { ProfileData } from '@/lib/engine/types';
 import type { HeadlineJudgment } from '@/lib/engine/types/judge';
 import { startsWithCliche } from '../buzzwords';
+import { B_PLUS_CEILING } from '../letters';
 
 export interface HeadlineScore {
   rawScore: number;
@@ -11,6 +12,54 @@ export interface HeadlineScore {
 
 const MOBILE_TRUNCATION_CHARS = 70;
 const MAX_HEADLINE_CHARS = 220;
+
+/**
+ * Power words that signal seniority or a concrete specialty. Each distinct
+ * match adds +5 to the structural headline score, capped at +10 (two matches).
+ */
+const HEADLINE_POWER_WORDS: readonly string[] = [
+  'leader', 'executive', 'driving', 'building', 'head of', 'vp', 'svp', 'evp',
+  'founder', 'co-founder', 'cofounder', 'ceo', 'cto', 'cfo', 'coo', 'cmo', 'cpo',
+  'director', 'principal', 'chief', 'partner', 'transformation', 'strategy', 'growth',
+];
+
+function escapeRegex(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/**
+ * Length signal: char count → +0..+15, sweet spot 120–180 chars (a developed,
+ * scannable headline). Bare titles (< 40 chars) earn nothing.
+ */
+function headlineLengthSignal(len: number): number {
+  if (len >= 120 && len <= 180) return 15;
+  if (len >= 90 && len < 120) return 12;
+  if (len > 180 && len <= 220) return 10;
+  if (len >= 60 && len < 90) return 8;
+  if (len >= 40 && len < 60) return 4;
+  return 0;
+}
+
+/** Count distinct recognised power words present in the headline. */
+function countPowerWords(text: string): number {
+  const lower = text.toLowerCase();
+  let count = 0;
+  for (const w of HEADLINE_POWER_WORDS) {
+    const pattern = new RegExp(`(?:^|[^a-z0-9])${escapeRegex(w)}(?:$|[^a-z0-9])`, 'i');
+    if (pattern.test(lower)) count++;
+  }
+  return count;
+}
+
+/**
+ * Count runs of capitalised words ("Payments Technology", "Digital
+ * Transformation"). A keyword-dense headline carries several; a bare title
+ * carries two or three. Single-letter tokens ("I", "&") are ignored.
+ */
+function countCapitalizedPhrases(text: string): number {
+  const matches = text.match(/[A-Z][A-Za-z0-9&.\-]*(?:\s+[A-Z][A-Za-z0-9&.\-]*)*/g) ?? [];
+  return matches.filter((m) => m.replace(/[^A-Za-z]/g, '').length >= 2).length;
+}
 
 export function scoreHeadline(
   profile: ProfileData,
@@ -42,15 +91,52 @@ export function scoreHeadline(
 
   const trimmed = headline.trim();
   const len = trimmed.length;
-  let score = 70; // start from "C" baseline; signals push up or down
 
-  // Structural signal: length sanity
+  // Structural base: additive model (replaces the old flat "70" baseline that
+  // returned a floor-stuck raw 70 for every well-formed headline regardless of
+  // content). A bare title earns little; a developed, keyword-rich, pipe-
+  // delimited headline climbs toward the B+ structural ceiling.
+  //
+  //   base 50
+  //   + length signal       0..+15  (sweet spot 120–180 chars)
+  //   + 2+ pipe segments       +10  (scannable, keyword-rich structure)
+  //   + power words      +5 each, capped +10
+  //   + keyword-rich (>3 capitalised phrases)  +5
+  let score = 50;
+
+  const lengthSignal = headlineLengthSignal(len);
+  if (lengthSignal > 0) {
+    score += lengthSignal;
+    if (lengthSignal >= 12) reasons.push('Length is in the developed-headline sweet spot.');
+  } else {
+    reasons.push('Headline is very short — likely just a job title.');
+  }
+
+  const pipeCount = (trimmed.match(/\|/g) ?? []).length;
+  if (pipeCount >= 2) {
+    score += 10;
+    reasons.push('Pipe-delimited segments — scannable, keyword-rich structure.');
+  }
+
+  const powerHits = countPowerWords(trimmed);
+  if (powerHits > 0) {
+    score += Math.min(powerHits, 2) * 5;
+    reasons.push(
+      powerHits === 1
+        ? 'Uses a recognised power word (seniority / specialty signal).'
+        : 'Uses recognised power words (seniority / specialty signals).',
+    );
+  }
+
+  if (countCapitalizedPhrases(trimmed) > 3) {
+    score += 5;
+    reasons.push('Keyword-rich — several specific, capitalised phrases.');
+  }
+
+  // Structural signal: length sanity (over the hard limit)
   if (len > MAX_HEADLINE_CHARS) {
     score -= 5;
     reasons.push(`Headline exceeds the ${MAX_HEADLINE_CHARS}-char limit (${len} chars).`);
-  } else if (len < 30) {
-    score -= 8;
-    reasons.push('Headline is very short — likely just a job title.');
   }
 
   // Structural signal: cliché opener (deterministic)
@@ -67,6 +153,11 @@ export function scoreHeadline(
     score -= 4;
     reasons.push('First 70 characters lack a clear claim or separator (mobile truncation risk).');
   }
+
+  // Structural ceiling: signals alone cannot exceed the B+ band — structural
+  // cues can't tell A-grade originality from clever cliché-stuffing. The AI
+  // judge (below) may lift above this; structural-only headlines cannot.
+  score = Math.min(score, B_PLUS_CEILING);
 
   // Track how many of the AI boolean fields actually came back. The proxy
   // prompt allows fields to be omitted, so a partial object (e.g. notes-only)

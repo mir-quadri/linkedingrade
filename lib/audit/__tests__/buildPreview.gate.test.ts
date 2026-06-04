@@ -61,21 +61,22 @@ const audit: AuditResult = {
  * full sections / wins / fixes again, the gate is back to performative.
  */
 describe('buildPreview gate contract', () => {
-  it('preview exposes only the three above-the-fold sections, not all twelve', () => {
+  it('reveals all 4 graded sections (the grades are no longer gated)', () => {
     const preview = buildPreview(audit, 'Jane Doe');
     expect(preview.previewSections.map((s) => s.id)).toEqual([
       'headline',
       'about',
       'currentExperience',
+      'experienceHistory',
     ]);
-    // The set difference should be exactly the rest of the audit's
-    // sections — i.e. nine sections that the gate must keep hidden.
+    // The remaining 8 parsed sections are the extension's — shown as a
+    // callout, never graded in the PDF composite.
     const previewIds = new Set(preview.previewSections.map((s) => s.id));
-    const gated = audit.sections.filter((s) => !previewIds.has(s.id));
-    expect(gated).toHaveLength(9);
+    const nonGraded = audit.sections.filter((s) => !previewIds.has(s.id));
+    expect(nonGraded).toHaveLength(8);
   });
 
-  it('preview shape does not include wins or fixes', () => {
+  it('preview shape does not include the gated report (wins/fixes) or internals', () => {
     const preview = buildPreview(audit, 'Jane Doe');
     const keys = Object.keys(preview);
     expect(keys).not.toContain('wins');
@@ -85,9 +86,16 @@ describe('buildPreview gate contract', () => {
     expect(keys).not.toContain('warnings');
   });
 
-  it('preview serialised to JSON does not contain the gated fix recommendation', () => {
+  it('preview serialised to JSON does not contain the gated fix recommendation or win text', () => {
     const preview = buildPreview(audit, 'Jane Doe');
     expect(JSON.stringify(preview)).not.toContain('should not leak before the gate');
     expect(JSON.stringify(preview)).not.toContain('should not leak');
+  });
+
+  it('preview does not ship rendered-nowhere section fields (numeric scores / reasons)', () => {
+    const json = JSON.stringify(buildPreview(audit, 'Jane Doe'));
+    expect(json).not.toContain('rawScore');
+    expect(json).not.toContain('adjustedScore');
+    expect(json).not.toContain('reasons');
   });
 });

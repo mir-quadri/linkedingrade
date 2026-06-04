@@ -22,13 +22,12 @@ export default function AuditPage() {
               <span>WEB · PDF UPLOAD · NO INSTALL</span>
             </div>
             <h1>
-              Audit your LinkedIn profile, <em>without the extension.</em>
+              The focused content audit.
             </h1>
             <p className="deck">
-              Drop your LinkedIn &ldquo;Save to PDF&rdquo; export and get a graded audit:
-              composite score, section-by-section letter grades, top wins, and your three
-              highest-leverage fixes. Same rubric as the Chrome extension — narrower input,
-              honest about what it can&apos;t see.
+              Drop your LinkedIn &ldquo;Save to PDF&rdquo; export and get a graded audit of the 4
+              sections recruiters scan first: Headline, About, Current Role, and Career Arc. The
+              full 12-section audit lives in the Chrome extension.
             </p>
           </header>
           <AuditFlow />

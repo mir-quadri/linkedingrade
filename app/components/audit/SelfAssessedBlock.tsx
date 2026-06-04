@@ -1,8 +1,11 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
 
 import type { SelfReport } from '@/lib/storage/auditStore';
+
+import { EXTENSION_URL } from './ExtensionCallout';
 
 type Field = keyof Omit<SelfReport, 'submittedAt'>;
 type Status = 'idle' | 'submitting' | 'saved' | 'error';
@@ -120,16 +123,15 @@ export default function SelfAssessedBlock({ auditId, initial }: Props) {
           marginBottom: 8,
         }}
       >
-        Self-assessed · not verified
+        Quick self-check
       </div>
       <h3 style={{ margin: '0 0 6px', fontSize: 22, letterSpacing: '-0.015em', fontWeight: 500 }}>
-        Five questions the PDF can&apos;t see for you.
+        5 things this audit can&apos;t see.
       </h3>
       <p style={{ margin: '0 0 18px', color: 'var(--text-2)', fontSize: 14.5, lineHeight: 1.55 }}>
-        LinkedIn&apos;s PDF export drops photo composition, banner, activity, recommendations, and the
-        Featured section. Your answers here are recorded but{' '}
-        <b style={{ color: 'var(--text)', fontWeight: 500 }}>never folded into your composite score</b>
-        {' '}— the grade above stays an objective read of what we can verify.
+        Your answers aren&apos;t graded — but if you answer{' '}
+        <b style={{ color: 'var(--text)', fontWeight: 500 }}>&ldquo;No&rdquo;</b> to any, those are
+        signals to address before applying for senior roles.
       </p>
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
@@ -203,6 +205,12 @@ export default function SelfAssessedBlock({ auditId, initial }: Props) {
           ) : null}
         </div>
       </form>
+      <p style={{ margin: '16px 0 0', color: 'var(--text-2)', fontSize: 13.5, lineHeight: 1.55 }}>
+        Want these scored?{' '}
+        <Link href={EXTENSION_URL} style={{ color: 'var(--text)', borderBottom: '1px solid var(--border-2)' }}>
+          Install the Chrome extension. Install →
+        </Link>
+      </p>
     </section>
   );
 }

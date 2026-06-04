@@ -5,9 +5,8 @@ import { notFound } from 'next/navigation';
 import SiteFooter from '@/app/components/SiteFooter';
 import SiteNav from '@/app/components/SiteNav';
 import ScoreSummary from '@/app/components/audit/ScoreSummary';
-import SectionGradeList from '@/app/components/audit/SectionGradeList';
-import WinsAndFixes from '@/app/components/audit/WinsAndFixes';
-import SelfAssessedBlock from '@/app/components/audit/SelfAssessedBlock';
+import PdfAuditReport from '@/app/components/audit/PdfAuditReport';
+import { runPdfAudit } from '@/lib/engine/scoring';
 import { getAuditStore } from '@/lib/storage/auditStore';
 
 export const dynamic = 'force-dynamic';
@@ -35,7 +34,18 @@ export default async function AuditResultPage({ params }: PageProps) {
   // flagged. Treat ungated records as not-found so the id alone is never
   // sufficient to retrieve the full report.
   if (!record || !record.email) notFound();
-  const { profile, audit, selfReport, createdAt, email } = record;
+  const { selfReport, createdAt, email } = record;
+  // New records are stamped `auditMode: 'pdf'` and already carry the focused
+  // 4-section audit. Legacy records (saved before this renderer shipped) hold
+  // a full 12-section composite/wins/fixes that can't reconcile with the
+  // 4-section page — recompute the focused audit from their stored profile so
+  // the permanent link stays consistent. (No AI judge is involved yet, so the
+  // recompute is lossless.)
+  const { profile, audit } =
+    record.auditMode === 'pdf'
+      ? { profile: record.profile, audit: record.audit }
+      : runPdfAudit(record.profile);
+  const nameTrusted = profile.fullName && profile.nameConfidence !== 'low';
   return (
     <>
       <SiteNav />
@@ -48,23 +58,25 @@ export default async function AuditResultPage({ params }: PageProps) {
               <span>EMAILED TO {email}</span>
             </div>
             <h1>
-              {profile.fullName ? (
+              {nameTrusted ? (
                 <>Audit for <em>{profile.fullName}.</em></>
               ) : (
                 <>Your audit.</>
               )}
             </h1>
             <p className="deck">
-              Permanent link. The full grade breakdown, top wins, and highest-leverage fixes.
-              Self-assessed sections (photo, banner, activity, recommendations, featured) are
-              recorded separately and never folded into the composite.
+              Permanent link. A graded read of the 4 sections recruiters scan first —
+              Headline, About, Current Role, and Career Arc — plus your top wins and
+              highest-leverage fixes. The other 8 sections audit in the Chrome extension.
             </p>
           </header>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
-            <ScoreSummary composite={audit.composite} fullName={profile.fullName} />
-            <SectionGradeList sections={audit.sections} />
-            <WinsAndFixes wins={audit.wins} fixes={audit.fixes} />
-            <SelfAssessedBlock auditId={auditId} initial={selfReport} />
+            <ScoreSummary
+              composite={audit.composite}
+              fullName={profile.fullName}
+              nameConfidence={profile.nameConfidence}
+            />
+            <PdfAuditReport auditId={auditId} audit={audit} selfReport={selfReport} />
             <div
               style={{
                 padding: '16px 18px',

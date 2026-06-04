@@ -42,3 +42,40 @@ export function sectionMeta(id: SectionId): SectionMeta {
 export function totalWeight(): number {
   return SECTIONS.reduce((sum, s) => sum + s.weight, 0);
 }
+
+interface PdfAuditSection {
+  id: SectionId;
+  weight: number; // composite weight in the focused PDF audit (sums to 1.0)
+  /**
+   * Display label for the PDF "Sample Audit". The section ID is unchanged so
+   * storage, judge requests and the extension engine all keep using the
+   * canonical id; only the user-facing card label differs.
+   */
+  displayLabel: string;
+}
+
+/**
+ * The focused 4-section "Sample Audit" the PDF flow grades. These are the
+ * sections a recruiter scans first; each carries equal 25% weight in the PDF
+ * composite. The other 8 sections are still parsed and returned on the audit
+ * object (for reference / the future full report) but DO NOT contribute to
+ * the PDF composite — they are surfaced as a single "audit in the Chrome
+ * extension" callout instead.
+ *
+ * Display order matches the order recruiters scan: Headline → About →
+ * Current Role → Career Arc.
+ */
+export const PDF_AUDIT_SECTIONS: readonly PdfAuditSection[] = [
+  { id: 'headline', weight: 0.25, displayLabel: 'Headline' },
+  { id: 'about', weight: 0.25, displayLabel: 'About' },
+  { id: 'currentExperience', weight: 0.25, displayLabel: 'Current Experience' },
+  { id: 'experienceHistory', weight: 0.25, displayLabel: 'Career Arc' },
+];
+
+export const PDF_AUDIT_SECTION_IDS: readonly SectionId[] =
+  PDF_AUDIT_SECTIONS.map((s) => s.id);
+
+/** The 8 sections parsed but NOT graded in the PDF composite, in display order. */
+export const PDF_NON_GRADED_SECTION_IDS: readonly SectionId[] = SECTIONS
+  .map((s) => s.id)
+  .filter((id) => !PDF_AUDIT_SECTION_IDS.includes(id));

@@ -372,6 +372,33 @@ export function applySeniorityModifier(rawScore: number, modifier: number): numb
   return Math.max(0, Math.min(100, rawScore + modifier));
 }
 
+/**
+ * Asymmetric, banded tier modifier. Replaces the old uniform per-tier
+ * modifier (a flat -7 for every T3 section, etc.), which penalised excellent
+ * senior profiles for being senior and never rewarded strong early-career
+ * ones. The modifier now depends on BOTH the tier AND the section's raw
+ * score, so excellence is never penalised:
+ *
+ *   T3 (Senior/Leadership): raw ≥ 75 → 0,  raw 65–74 → -3, raw < 65 → -7
+ *   T2 (Mid-level):         raw ≥ 75 → 0,  raw 65–74 → -2, raw < 65 → -5
+ *   T1 (Early career):      raw ≥ 75 → +5, raw 65–74 → +3, raw < 65 → 0
+ *
+ * Returns the signed modifier to add to the raw score (apply + clamp via
+ * `applySeniorityModifier`).
+ */
+export function bandedTierModifier(tier: SeniorityTier, rawScore: number): number {
+  const high = rawScore >= 75;
+  const mid = rawScore >= 65 && rawScore < 75;
+  switch (tier) {
+    case 'T3':
+      return high ? 0 : mid ? -3 : -7;
+    case 'T2':
+      return high ? 0 : mid ? -2 : -5;
+    case 'T1':
+      return high ? 5 : mid ? 3 : 0;
+  }
+}
+
 export const TIER_LABEL: Record<SeniorityTier, string> = {
   T1: 'Early career',
   T2: 'Mid-level',
