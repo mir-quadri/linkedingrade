@@ -100,10 +100,27 @@ describe('POST /api/judge — authoriseCaller', () => {
     expect(body.status).toBe('ok');
   });
 
-  it('allows a request from an allow-listed origin (browser path)', async () => {
-    fetchSpy.mockResolvedValueOnce(makeAnthropicResponse(STRICT_OK_BODY));
+  it('rejects an allow-listed origin alone without the secret (Codex Round 3 P1)', async () => {
+    // Origin headers are trivially spoofable by non-browser clients
+    // (curl, scripts), so an Origin allowlist alone cannot be the auth
+    // gate — without the secret, the endpoint would degrade to an
+    // unauthenticated paid Anthropic proxy up to the per-IP rate
+    // limit. EVERY caller must present X-Judge-Auth; the Origin
+    // allowlist is CORS-only.
     const res = await POST(
       makeRequest(VALID_REQUEST, { origin: 'https://linkedingrade.com' }),
+    );
+    expect(res.status).toBe(403);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('allows a request from an allow-listed origin WHEN it also presents the secret', async () => {
+    fetchSpy.mockResolvedValueOnce(makeAnthropicResponse(STRICT_OK_BODY));
+    const res = await POST(
+      makeRequest(VALID_REQUEST, {
+        origin: 'https://linkedingrade.com',
+        'x-judge-auth': 'super-secret',
+      }),
     );
     expect(res.status).toBe(200);
   });
@@ -331,6 +348,70 @@ describe('POST /api/judge — one batched call per audit', () => {
   });
 });
 
+describe('POST /api/judge — rate-limit key partitioning (Codex Round 3 P2)', () => {
+  const fetchSpy = vi.spyOn(globalThis, 'fetch');
+  beforeEach(() => {
+    fetchSpy.mockReset();
+    delete process.env.KV_REST_API_URL;
+    delete process.env.KV_REST_API_TOKEN;
+    delete process.env.IP_HASH_PEPPER;
+    process.env.ANTHROPIC_API_KEY = 'sk-test';
+    process.env.JUDGE_PROXY_SECRET = 'super-secret';
+    process.env.JUDGE_RATE_LIMIT_PER_DAY = '1';
+    __resetJudgeRateLimitForTests();
+  });
+  afterEach(() => {
+    delete process.env.JUDGE_PROXY_SECRET;
+    delete process.env.JUDGE_RATE_LIMIT_PER_DAY;
+    delete process.env.ANTHROPIC_API_KEY;
+    delete process.env.IP_HASH_PEPPER;
+    __resetJudgeRateLimitForTests();
+  });
+
+  it('different IPs land in different buckets even when IP_HASH_PEPPER is unset', async () => {
+    // With pepper missing, hashIp() returns null. The earlier route
+    // collapsed every caller into a single literal `unhashed` bucket,
+    // so ONE deployment missing that env var or one server-to-server
+    // caller without an IP could exhaust the daily budget for ALL
+    // users. Fix: when no pepper, key by raw IP (still per-IP; never
+    // exposed beyond the 25h KV window).
+    // A Response body is single-read, so each fetch call needs its own
+    // Response instance — mockImplementation factory, not mockResolvedValue.
+    fetchSpy.mockImplementation(() => Promise.resolve(makeAnthropicResponse(STRICT_OK_BODY)));
+
+    // First IP — uses its one allowed call.
+    const r1 = await POST(
+      makeRequest(VALID_REQUEST, {
+        'x-judge-auth': 'super-secret',
+        'x-forwarded-for': '203.0.113.1',
+      }),
+    );
+    expect(r1.status).toBe(200);
+    expect(((await r1.json()) as { status: string }).status).toBe('ok');
+
+    // First IP — second call is rate-limited.
+    const r1b = await POST(
+      makeRequest(VALID_REQUEST, {
+        'x-judge-auth': 'super-secret',
+        'x-forwarded-for': '203.0.113.1',
+      }),
+    );
+    expect(((await r1b.json()) as { status: string; reason?: string }).reason).toBe(
+      'rate_limited',
+    );
+
+    // Second IP — independent bucket; gets its OWN first call.
+    const r2 = await POST(
+      makeRequest(VALID_REQUEST, {
+        'x-judge-auth': 'super-secret',
+        'x-forwarded-for': '203.0.113.2',
+      }),
+    );
+    expect(r2.status).toBe(200);
+    expect(((await r2.json()) as { status: string }).status).toBe('ok');
+  });
+});
+
 describe('OPTIONS /api/judge — CORS preflight (Codex P2)', () => {
   beforeEach(() => {
     process.env.JUDGE_ALLOWED_ORIGINS =
@@ -402,7 +483,10 @@ describe('POST /api/judge — CORS response headers (Codex P2)', () => {
   it('successful response carries Access-Control-Allow-Origin echoing the allow-listed origin', async () => {
     fetchSpy.mockResolvedValueOnce(makeAnthropicResponse(STRICT_OK_BODY));
     const res = await POST(
-      makeRequest(VALID_REQUEST, { origin: 'https://linkedingrade.com' }),
+      makeRequest(VALID_REQUEST, {
+        origin: 'https://linkedingrade.com',
+        'x-judge-auth': 'super-secret',
+      }),
     );
     expect(res.status).toBe(200);
     expect(res.headers.get('access-control-allow-origin')).toBe('https://linkedingrade.com');
@@ -412,7 +496,10 @@ describe('POST /api/judge — CORS response headers (Codex P2)', () => {
   it('judge_unavailable response from a browser caller still includes CORS headers', async () => {
     fetchSpy.mockResolvedValueOnce(makeAnthropicResponse('not JSON'));
     const res = await POST(
-      makeRequest(VALID_REQUEST, { origin: 'https://linkedingrade.com' }),
+      makeRequest(VALID_REQUEST, {
+        origin: 'https://linkedingrade.com',
+        'x-judge-auth': 'super-secret',
+      }),
     );
     expect(res.status).toBe(200);
     const body = (await res.json()) as { status: string };
@@ -421,6 +508,19 @@ describe('POST /api/judge — CORS response headers (Codex P2)', () => {
     // would surface a generic "CORS error" instead of the structured
     // `judge_unavailable` body — defeating the graceful-fallback
     // contract on the browser path.
+    expect(res.headers.get('access-control-allow-origin')).toBe('https://linkedingrade.com');
+  });
+
+  it('403 to an allow-listed origin without secret STILL carries CORS headers so the browser can read the reason', async () => {
+    // Codex Round 3 P1: secret-required policy. A browser caller from
+    // an allow-listed origin that forgets the X-Judge-Auth header
+    // should get a CORS-decorated 403 so the JS caller can surface
+    // the "Missing or invalid X-Judge-Auth header." reason instead of
+    // a generic "CORS error" in the devtools console.
+    const res = await POST(
+      makeRequest(VALID_REQUEST, { origin: 'https://linkedingrade.com' }),
+    );
+    expect(res.status).toBe(403);
     expect(res.headers.get('access-control-allow-origin')).toBe('https://linkedingrade.com');
   });
 

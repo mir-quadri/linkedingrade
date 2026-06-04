@@ -48,13 +48,19 @@ const MAX_ABOUT_CHARS = 5000;
  * `PROXY_URL` — never the Anthropic key.
  *
  * Auth model:
- *   - Same-server callers (the web audit pipeline running inside this
- *     Next.js process) send `X-Judge-Auth: <secret>` matching
- *     `JUDGE_PROXY_SECRET`. There's no browser Origin in this path.
- *   - Browser callers (future Chrome extension) must have an Origin
- *     header matching `JUDGE_ALLOWED_ORIGINS` (comma-separated env).
- *   - A request that satisfies EITHER check is allowed; one without
- *     either is 403.
+ *   - EVERY caller (server-to-server AND any future browser caller)
+ *     must present `X-Judge-Auth: <secret>` matching `JUDGE_PROXY_SECRET`.
+ *     Origin headers are trivially spoofable by non-browser clients
+ *     (curl, scripts), so an Origin allowlist alone cannot be a real
+ *     auth gate — without the secret, this endpoint would degrade to
+ *     a free unauthenticated Anthropic proxy up to the per-IP rate
+ *     limit. (Codex Round 3 P1.)
+ *   - `JUDGE_ALLOWED_ORIGINS` is CORS-only: it controls which browser
+ *     origins are allowed to READ the response (via the CORS preflight
+ *     + response headers), but it grants no privilege on its own.
+ *   - The future Chrome extension will need its own unspoofable browser
+ *     auth (server-mediated token exchange, signed installation
+ *     receipt, or similar) — deferred to the extension-wiring PR.
  *
  * Cost controls:
  *   - One batched call per audit (the caller sends a single request
@@ -111,11 +117,19 @@ export async function POST(request: Request) {
   }
   const judgeRequest = extracted.value;
 
-  // 3. Rate limit
-  const rateLimitKey =
-    auth.kind === 'origin'
-      ? `origin:${auth.origin}:${hashIp(extractIp(request.headers)) ?? 'unhashed'}`
-      : `server:${hashIp(extractIp(request.headers)) ?? 'unhashed'}`;
+  // 3. Rate limit. Codex Round 3 P2: when IP_HASH_PEPPER is absent,
+  // hashIp() returns null. Falling back to a literal `unhashed` token
+  // would collapse EVERY caller into a single global bucket — one
+  // misconfigured deployment could exhaust the daily limit for all
+  // users. Fall back to the raw IP instead: it still partitions per
+  // caller (and lives only in the 25h KV bucket, never exposed). If
+  // no IP at all (rare — direct internal call), use a constant that
+  // shares one bucket among no-IP callers, which is correct because
+  // those callers cannot be distinguished from each other anyway.
+  const ip = extractIp(request.headers);
+  const hashed = ip ? hashIp(ip) : null;
+  const ipKey = hashed ? `hash:${hashed}` : ip ? `raw:${ip}` : 'no-ip';
+  const rateLimitKey = `judge:${ipKey}`;
   const limit = numericEnv('JUDGE_RATE_LIMIT_PER_DAY', DEFAULT_RATE_LIMIT_PER_DAY);
   const decision = await consumeJudgeRateLimit(rateLimitKey, limit);
   if (!decision.allowed) {
@@ -247,31 +261,20 @@ function withCors(response: Response, request: Request): Response {
 
 type AuthDecision =
   | { ok: true; kind: 'secret' }
-  | { ok: true; kind: 'origin'; origin: string }
   | { ok: false; reason: string };
 
 function authoriseCaller(request: Request): AuthDecision {
+  // Codex Round 3 P1: secret is required on every call. Origin alone
+  // is not an auth gate (it's spoofable by non-browser callers).
   const secret = process.env.JUDGE_PROXY_SECRET;
-  if (secret) {
-    const provided = request.headers.get('x-judge-auth');
-    if (provided && provided === secret) {
-      return { ok: true, kind: 'secret' };
-    }
+  if (!secret) {
+    return { ok: false, reason: 'Judge proxy is not configured (JUDGE_PROXY_SECRET unset).' };
   }
-  const origin = request.headers.get('origin');
-  const allowed = (process.env.JUDGE_ALLOWED_ORIGINS ?? '')
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
-  if (origin && allowed.includes(origin)) {
-    return { ok: true, kind: 'origin', origin };
+  const provided = request.headers.get('x-judge-auth');
+  if (!provided || provided !== secret) {
+    return { ok: false, reason: 'Missing or invalid X-Judge-Auth header.' };
   }
-  return {
-    ok: false,
-    reason:
-      'Origin not allowed. Server-to-server callers must send a valid X-Judge-Auth header; ' +
-      'browser callers must come from JUDGE_ALLOWED_ORIGINS.',
-  };
+  return { ok: true, kind: 'secret' };
 }
 
 interface ParsedJudgeRequest {
