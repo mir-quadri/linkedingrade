@@ -13,6 +13,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.100.1",
     "@vercel/kv": "^3.0.0",
     "next": "15.5.18",
     "pdf-parse": "^2.4.5",
