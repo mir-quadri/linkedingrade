@@ -26,6 +26,20 @@ const DEFAULT_MAX_OUTPUT_TOKENS = 1500;
 const DEFAULT_RATE_LIMIT_PER_DAY = 50;
 
 /**
+ * Per-field input-text caps applied before building the prompt.
+ *
+ * LinkedIn's actual limits are 220 chars for the headline and 2600
+ * for About. The caps below sit well above those — generous enough
+ * for any plausible legitimate input but tight enough that a
+ * malformed extension payload (or a future allow-listed origin sent
+ * by a malicious caller) can't hand megabytes of text to Anthropic
+ * and burn the per-IP daily budget on a single call. Rate limit
+ * applies AFTER the upstream call, so this is the input-side guard.
+ */
+const MAX_HEADLINE_CHARS = 500;
+const MAX_ABOUT_CHARS = 5000;
+
+/**
  * AI-judge proxy.
  *
  * Holds the Anthropic key server-side and serves both the web audit
@@ -88,16 +102,14 @@ export async function POST(request: Request) {
       request,
     );
   }
-  const judgeRequest = extractJudgeRequest(payload);
-  if (!judgeRequest) {
+  const extracted = extractJudgeRequest(payload);
+  if (!extracted.ok) {
     return withCors(
-      NextResponse.json(
-        { error: 'Body must include `judgeRequest` with at least one section.' },
-        { status: 400 },
-      ),
+      NextResponse.json({ error: extracted.reason }, { status: 400 }),
       request,
     );
   }
+  const judgeRequest = extracted.value;
 
   // 3. Rate limit
   const rateLimitKey =
@@ -267,14 +279,44 @@ interface ParsedJudgeRequest {
   auditId: string | null;
 }
 
-function extractJudgeRequest(payload: unknown): ParsedJudgeRequest | null {
-  if (typeof payload !== 'object' || payload === null) return null;
+type ExtractResult =
+  | { ok: true; value: ParsedJudgeRequest }
+  | { ok: false; reason: string };
+
+function extractJudgeRequest(payload: unknown): ExtractResult {
+  if (typeof payload !== 'object' || payload === null) {
+    return { ok: false, reason: 'Body must include `judgeRequest` with at least one section.' };
+  }
   const body = payload as { judgeRequest?: unknown; auditId?: unknown };
-  if (typeof body.judgeRequest !== 'object' || body.judgeRequest === null) return null;
+  if (typeof body.judgeRequest !== 'object' || body.judgeRequest === null) {
+    return { ok: false, reason: 'Body must include `judgeRequest` with at least one section.' };
+  }
   const req = body.judgeRequest as Record<string, unknown>;
-  const headline = isTextField(req.headline) ? { text: req.headline.text } : undefined;
-  const about = isTextField(req.about) ? { text: req.about.text } : undefined;
-  if (!headline && !about) return null;
+  // Codex P2 — input-text caps. A browser-origin caller could otherwise
+  // hand megabytes of text to Anthropic in a single audit, blowing the
+  // per-IP daily budget before the rate limit kicks in (the limit
+  // counts calls, not tokens). Cap at well above LinkedIn's actual
+  // limits (220 chars / 2600 chars) and reject anything that pretends
+  // those slots are bigger.
+  const headlineRaw = isTextField(req.headline) ? req.headline.text : undefined;
+  if (headlineRaw !== undefined && headlineRaw.length > MAX_HEADLINE_CHARS) {
+    return {
+      ok: false,
+      reason: `judgeRequest.headline.text exceeds the ${MAX_HEADLINE_CHARS}-char cap.`,
+    };
+  }
+  const aboutRaw = isTextField(req.about) ? req.about.text : undefined;
+  if (aboutRaw !== undefined && aboutRaw.length > MAX_ABOUT_CHARS) {
+    return {
+      ok: false,
+      reason: `judgeRequest.about.text exceeds the ${MAX_ABOUT_CHARS}-char cap.`,
+    };
+  }
+  const headline = headlineRaw !== undefined ? { text: headlineRaw } : undefined;
+  const about = aboutRaw !== undefined ? { text: aboutRaw } : undefined;
+  if (!headline && !about) {
+    return { ok: false, reason: 'Body must include `judgeRequest` with at least one section.' };
+  }
   const rolesFamilyHint = typeof req.rolesFamilyHint === 'string' ? req.rolesFamilyHint : null;
   const targetsRaw = Array.isArray(req.rewriteTargets) ? req.rewriteTargets : [];
   const rewriteTargets = targetsRaw.filter(
@@ -288,7 +330,7 @@ function extractJudgeRequest(payload: unknown): ParsedJudgeRequest | null {
     rewriteTargets,
   };
   const auditId = typeof body.auditId === 'string' ? body.auditId : null;
-  return { request: judgeRequest, auditId };
+  return { ok: true, value: { request: judgeRequest, auditId } };
 }
 
 function isTextField(v: unknown): v is { text: string } {

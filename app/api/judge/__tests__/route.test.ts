@@ -157,6 +157,38 @@ describe('POST /api/judge — validation', () => {
     );
     expect(res.status).toBe(400);
   });
+
+  it('rejects a headline that exceeds the input-text cap (Codex P2) — no upstream Anthropic call', async () => {
+    // Without an input-text cap a malformed browser caller could hand
+    // megabytes of text to Anthropic in a single audit, blowing the
+    // per-IP daily budget before the rate limit (which counts calls,
+    // not tokens) could help. Generate a string well past 500 chars.
+    const huge = 'x'.repeat(10_000);
+    const res = await POST(
+      makeRequest(
+        { auditId: 'x', judgeRequest: { headline: { text: huge } } },
+        { 'x-judge-auth': 'super-secret' },
+      ),
+    );
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toMatch(/headline.*cap/);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('rejects an about that exceeds the input-text cap (Codex P2) — no upstream Anthropic call', async () => {
+    const huge = 'y'.repeat(100_000);
+    const res = await POST(
+      makeRequest(
+        { auditId: 'x', judgeRequest: { about: { text: huge } } },
+        { 'x-judge-auth': 'super-secret' },
+      ),
+    );
+    expect(res.status).toBe(400);
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toMatch(/about.*cap/);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
 });
 
 describe('POST /api/judge — graceful degradation', () => {
