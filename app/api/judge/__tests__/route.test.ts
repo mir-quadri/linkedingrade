@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { POST } from '../route';
+import { OPTIONS, POST } from '../route';
 import { __resetJudgeRateLimitForTests } from '@/lib/judge/rateLimit';
 
 const VALID_REQUEST = {
@@ -274,5 +274,130 @@ describe('POST /api/judge — one batched call per audit', () => {
     expect(body.usage.outputTokens).toBe(200);
     expect(body.usage.estimatedUsd).toBeGreaterThan(0);
     expect(body.auditId).toBe('aud_test');
+  });
+
+  it('falls back to a real Anthropic model id when JUDGE_MODEL is unset (Codex P1)', async () => {
+    // The first draft defaulted to `claude-sonnet-4-7` — an internal
+    // Claude Code name, not a public Anthropic API id. That would
+    // 404 on every live call, making the proxy look configured but
+    // silently degrade to judge_unavailable. The default must be a
+    // currently-supported public Sonnet 4.x model id.
+    delete process.env.JUDGE_MODEL;
+    fetchSpy.mockResolvedValueOnce(makeAnthropicResponse(STRICT_OK_BODY));
+    await POST(makeRequest(VALID_REQUEST, { 'x-judge-auth': 'super-secret' }));
+    const init = fetchSpy.mock.calls[0]![1] as RequestInit;
+    const sent = JSON.parse(init.body as string) as { model: string };
+    // The exact id is configurable, but it must NOT be the broken
+    // internal naming convention.
+    expect(sent.model).not.toBe('claude-sonnet-4-7');
+    // It should be a recognisably-Anthropic public id. Match the
+    // `claude-sonnet-4-<minor>` shape that Anthropic publishes
+    // (alias OR dated form). The test deliberately allows future
+    // version bumps; the regression we lock in is "no broken
+    // internal name."
+    expect(sent.model).toMatch(/^claude-sonnet-4-/);
+  });
+});
+
+describe('OPTIONS /api/judge — CORS preflight (Codex P2)', () => {
+  beforeEach(() => {
+    process.env.JUDGE_ALLOWED_ORIGINS =
+      'https://linkedingrade.com,chrome-extension://abc';
+  });
+  afterEach(() => {
+    delete process.env.JUDGE_ALLOWED_ORIGINS;
+  });
+
+  it('responds 204 with full CORS-allow headers for an allow-listed origin', async () => {
+    const res = await OPTIONS(
+      new Request('http://localhost/api/judge', {
+        method: 'OPTIONS',
+        headers: {
+          origin: 'https://linkedingrade.com',
+          'access-control-request-method': 'POST',
+          'access-control-request-headers': 'content-type,x-judge-auth',
+        },
+      }),
+    );
+    expect(res.status).toBe(204);
+    expect(res.headers.get('access-control-allow-origin')).toBe('https://linkedingrade.com');
+    expect(res.headers.get('access-control-allow-methods')).toBe('POST, OPTIONS');
+    const allowHeaders = res.headers.get('access-control-allow-headers') ?? '';
+    expect(allowHeaders).toContain('Content-Type');
+    expect(allowHeaders).toContain('X-Judge-Auth');
+    expect(res.headers.get('vary')).toBe('Origin');
+  });
+
+  it('responds 204 WITHOUT Access-Control-Allow-Origin for a non-allow-listed origin — browser blocks the request', async () => {
+    const res = await OPTIONS(
+      new Request('http://localhost/api/judge', {
+        method: 'OPTIONS',
+        headers: { origin: 'https://evil.example.com' },
+      }),
+    );
+    expect(res.status).toBe(204);
+    expect(res.headers.get('access-control-allow-origin')).toBeNull();
+  });
+
+  it('responds 204 with no origin header on a same-origin / server preflight', async () => {
+    const res = await OPTIONS(
+      new Request('http://localhost/api/judge', { method: 'OPTIONS' }),
+    );
+    expect(res.status).toBe(204);
+    expect(res.headers.get('access-control-allow-origin')).toBeNull();
+  });
+});
+
+describe('POST /api/judge — CORS response headers (Codex P2)', () => {
+  const fetchSpy = vi.spyOn(globalThis, 'fetch');
+  beforeEach(() => {
+    fetchSpy.mockReset();
+    process.env.ANTHROPIC_API_KEY = 'sk-test';
+    process.env.JUDGE_PROXY_SECRET = 'super-secret';
+    process.env.JUDGE_ALLOWED_ORIGINS =
+      'https://linkedingrade.com,chrome-extension://abc';
+    process.env.JUDGE_RATE_LIMIT_PER_DAY = '5';
+    __resetJudgeRateLimitForTests();
+  });
+  afterEach(() => {
+    delete process.env.JUDGE_PROXY_SECRET;
+    delete process.env.JUDGE_ALLOWED_ORIGINS;
+    delete process.env.JUDGE_RATE_LIMIT_PER_DAY;
+    delete process.env.ANTHROPIC_API_KEY;
+    __resetJudgeRateLimitForTests();
+  });
+
+  it('successful response carries Access-Control-Allow-Origin echoing the allow-listed origin', async () => {
+    fetchSpy.mockResolvedValueOnce(makeAnthropicResponse(STRICT_OK_BODY));
+    const res = await POST(
+      makeRequest(VALID_REQUEST, { origin: 'https://linkedingrade.com' }),
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get('access-control-allow-origin')).toBe('https://linkedingrade.com');
+    expect(res.headers.get('vary')).toBe('Origin');
+  });
+
+  it('judge_unavailable response from a browser caller still includes CORS headers', async () => {
+    fetchSpy.mockResolvedValueOnce(makeAnthropicResponse('not JSON'));
+    const res = await POST(
+      makeRequest(VALID_REQUEST, { origin: 'https://linkedingrade.com' }),
+    );
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { status: string };
+    expect(body.status).toBe('judge_unavailable');
+    // Without the CORS header on the degraded response, the browser
+    // would surface a generic "CORS error" instead of the structured
+    // `judge_unavailable` body — defeating the graceful-fallback
+    // contract on the browser path.
+    expect(res.headers.get('access-control-allow-origin')).toBe('https://linkedingrade.com');
+  });
+
+  it('server-to-server response (no Origin header) carries NO CORS headers — they would weaken the contract', async () => {
+    fetchSpy.mockResolvedValueOnce(makeAnthropicResponse(STRICT_OK_BODY));
+    const res = await POST(
+      makeRequest(VALID_REQUEST, { 'x-judge-auth': 'super-secret' }),
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get('access-control-allow-origin')).toBeNull();
   });
 });

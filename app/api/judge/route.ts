@@ -14,7 +14,14 @@ import type { JudgeRequest, JudgeResponse } from '@/lib/engine/types/judge';
 
 export const runtime = 'nodejs';
 
-const DEFAULT_MODEL = 'claude-sonnet-4-7';
+// Default to the latest publicly-released Sonnet 4.x model id. The
+// initial draft used `claude-sonnet-4-7`, which is an internal Claude
+// Code naming convention — NOT a public Anthropic API id. Live
+// requests against that id 404 with model-not-found, which the catch
+// degrades to `judge_unavailable`, so the proxy looked configured but
+// could never actually call. Operators can pin a specific dated id
+// (e.g. `claude-sonnet-4-5-20250929`) via JUDGE_MODEL.
+const DEFAULT_MODEL = 'claude-sonnet-4-5';
 const DEFAULT_MAX_OUTPUT_TOKENS = 1500;
 const DEFAULT_RATE_LIMIT_PER_DAY = 50;
 
@@ -58,7 +65,17 @@ export async function POST(request: Request) {
   // 1. Auth
   const auth = authoriseCaller(request);
   if (!auth.ok) {
-    return NextResponse.json({ error: auth.reason }, { status: 403 });
+    // Even on a 403 we attach the CORS-allow-origin header IF the
+    // caller's origin happens to be on the allowlist (it isn't, since
+    // auth failed) — otherwise the browser would not surface our 403
+    // body to the JS caller and the extension would see a generic
+    // "CORS error" instead of the clear "Origin not allowed" reason.
+    // For the no-origin / wrong-origin case, returning no CORS header
+    // is the right behaviour: same-origin servers don't need it.
+    return withCors(
+      NextResponse.json({ error: auth.reason }, { status: 403 }),
+      request,
+    );
   }
 
   // 2. Parse request
@@ -66,13 +83,19 @@ export async function POST(request: Request) {
   try {
     payload = await request.json();
   } catch {
-    return NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 });
+    return withCors(
+      NextResponse.json({ error: 'Invalid JSON body.' }, { status: 400 }),
+      request,
+    );
   }
   const judgeRequest = extractJudgeRequest(payload);
   if (!judgeRequest) {
-    return NextResponse.json(
-      { error: 'Body must include `judgeRequest` with at least one section.' },
-      { status: 400 },
+    return withCors(
+      NextResponse.json(
+        { error: 'Body must include `judgeRequest` with at least one section.' },
+        { status: 400 },
+      ),
+      request,
     );
   }
 
@@ -87,16 +110,20 @@ export async function POST(request: Request) {
     console.warn(
       `[api/judge] rate-limited key=${rateLimitKey} count=${decision.count} limit=${decision.limit} backend=${decision.backend}`,
     );
-    return judgeUnavailable('rate_limited', {
-      auditId: judgeRequest.auditId,
-    });
+    return withCors(
+      judgeUnavailable('rate_limited', { auditId: judgeRequest.auditId }),
+      request,
+    );
   }
 
   // 4. Build prompt + call Claude
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     console.warn('[api/judge] ANTHROPIC_API_KEY not set — degrading to judge_unavailable.');
-    return judgeUnavailable('not_configured', { auditId: judgeRequest.auditId });
+    return withCors(
+      judgeUnavailable('not_configured', { auditId: judgeRequest.auditId }),
+      request,
+    );
   }
   const model = process.env.JUDGE_MODEL?.trim() || DEFAULT_MODEL;
   const maxOutputTokens = numericEnv(
@@ -127,7 +154,10 @@ export async function POST(request: Request) {
     console.error(
       `[api/judge] judge call failed auditId=${judgeRequest.auditId ?? 'none'} model=${model}: ${reason}`,
     );
-    return judgeUnavailable(reason, { auditId: judgeRequest.auditId });
+    return withCors(
+      judgeUnavailable(reason, { auditId: judgeRequest.auditId }),
+      request,
+    );
   }
 
   // 5. Log cost-per-audit so we can correlate spend with audit volume.
@@ -137,15 +167,71 @@ export async function POST(request: Request) {
       `elapsedMs=${Date.now() - startedAt} rateBackend=${decision.backend} rateCount=${decision.count}/${decision.limit}`,
   );
 
-  return NextResponse.json({
-    status: 'ok',
-    judgeResponse,
-    usage: { inputTokens, outputTokens, estimatedUsd: costUsd },
-    auditId: judgeRequest.auditId,
-  });
+  return withCors(
+    NextResponse.json({
+      status: 'ok',
+      judgeResponse,
+      usage: { inputTokens, outputTokens, estimatedUsd: costUsd },
+      auditId: judgeRequest.auditId,
+    }),
+    request,
+  );
+}
+
+/**
+ * CORS preflight handler. Browser callers (the future Chrome extension)
+ * issue an OPTIONS request before the POST when the content-type is
+ * `application/json`; without this handler the browser blocks the
+ * actual request and the extension would see a generic "CORS error"
+ * even though server-side auth would have approved the call.
+ *
+ * Only origins on `JUDGE_ALLOWED_ORIGINS` get a permissive response —
+ * an unknown origin gets a 204 with NO `Access-Control-Allow-Origin`
+ * header, which the browser treats as a CORS failure and surfaces to
+ * the JS caller. (We can't differentiate "this is a probe" from "this
+ * is a malicious origin" at the OPTIONS stage; the response is
+ * uniform.)
+ */
+export async function OPTIONS(request: Request): Promise<Response> {
+  const origin = request.headers.get('origin');
+  const allowed = (process.env.JUDGE_ALLOWED_ORIGINS ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const isAllowed = origin !== null && allowed.includes(origin);
+  const headers: Record<string, string> = {
+    'Access-Control-Max-Age': '86400',
+    Vary: 'Origin',
+  };
+  if (isAllowed && origin) {
+    headers['Access-Control-Allow-Origin'] = origin;
+    headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS';
+    headers['Access-Control-Allow-Headers'] = 'Content-Type, X-Judge-Auth';
+  }
+  return new Response(null, { status: 204, headers });
 }
 
 // ---------- helpers ----------
+
+/**
+ * Attach CORS response headers when the request's `Origin` is on the
+ * allowlist. The browser otherwise blocks the response from reaching
+ * the JS caller. Server-to-server callers (no `Origin`) get no extra
+ * headers — they don't need them and adding `Access-Control-Allow-
+ * Origin: *` would weaken the contract.
+ */
+function withCors(response: Response, request: Request): Response {
+  const origin = request.headers.get('origin');
+  if (!origin) return response;
+  const allowed = (process.env.JUDGE_ALLOWED_ORIGINS ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (!allowed.includes(origin)) return response;
+  response.headers.set('Access-Control-Allow-Origin', origin);
+  response.headers.set('Vary', 'Origin');
+  return response;
+}
 
 type AuthDecision =
   | { ok: true; kind: 'secret' }
