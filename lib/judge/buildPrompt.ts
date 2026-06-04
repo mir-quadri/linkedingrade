@@ -31,12 +31,21 @@ export function buildJudgePrompt(req: JudgeRequest): {
    * call's `max_tokens`. */
   approximatePromptChars: number;
 } {
+  // Codex Round 8 P2: hard-delimit untrusted profile text with
+  // JSON.stringify so a value containing `"` plus newline plus
+  // instructions can't close the quoted block and become prompt
+  // directives. JSON.stringify escapes `"`, `\`, newlines, and control
+  // chars in one pass, producing a quoted string literal that's
+  // unambiguous to the model. The previous escapeForPrompt() only
+  // stripped control chars, leaving quotes/newlines intact — a
+  // self-scoring profile could have steered Claude into returning
+  // favourable JSON.
   const sections: string[] = [];
   if (req.headline?.text) {
-    sections.push(`HEADLINE: "${escapeForPrompt(req.headline.text)}"`);
+    sections.push(`HEADLINE: ${JSON.stringify(req.headline.text)}`);
   }
   if (req.about?.text) {
-    sections.push(`ABOUT: "${escapeForPrompt(req.about.text)}"`);
+    sections.push(`ABOUT: ${JSON.stringify(req.about.text)}`);
   }
 
   // The targets list is the engine's signal of which sections to rewrite.
@@ -113,10 +122,3 @@ notes under 25 words per section. Be honest, not encouraging.`;
   };
 }
 
-function escapeForPrompt(text: string): string {
-  // Strip control chars; keep newlines as literal \n inside the quoted block.
-  // We DO NOT JSON.stringify here — the model handles user-provided quotes
-  // fine inside a quoted block, and JSON-stringifying would double-escape
-  // already-escaped sequences.
-  return text.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, ' ');
-}
