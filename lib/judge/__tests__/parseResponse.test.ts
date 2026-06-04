@@ -44,6 +44,19 @@ describe('parseJudgeResponse', () => {
     expect(r.headline?.hasIdentity).toBe(true);
   });
 
+  it('tolerates a fenced response with leading whitespace/newline (Codex Round 9 P2)', () => {
+    // Anthropic occasionally returns "\n```json\n…\n```" with a
+    // leading newline. The fence regex is anchored, so without
+    // trimming the raw input first the regex misses, JSON.parse
+    // receives the backticks, the route reports judge_unavailable for
+    // an otherwise-valid upstream response, and the audit silently
+    // degrades. Trim BEFORE stripping.
+    const leadingWhitespace = '\n  \n```json\n' + STRICT_OK + '\n```\n  ';
+    const r = parseJudgeResponse(leadingWhitespace);
+    expect(r.headline?.hasIdentity).toBe(true);
+    expect(r.about?.buzzwordDensity).toBe('low');
+  });
+
   it('omits headline judgment when any flag is missing — never half-AI / half-fallback', () => {
     const partial = JSON.stringify({
       headline: { hasCliche: false, hasIdentity: true, hasDomain: true, hasCredibleSpecific: true /* missing mobileSafe */ },

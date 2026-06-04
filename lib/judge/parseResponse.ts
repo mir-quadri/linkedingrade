@@ -20,8 +20,11 @@ import type {
 export function parseJudgeResponse(raw: string): JudgeResponse {
   // Tolerate ``` code fences even though the system prompt says no
   // markdown. Claude occasionally leaks a fence around the JSON; cheap
-  // to strip and not worth a retry.
-  const cleaned = stripCodeFence(raw).trim();
+  // to strip and not worth a retry. Codex Round 9 P2: trim BEFORE
+  // stripping so a leading newline/space (e.g. "\n```json\n…\n```")
+  // doesn't dodge the anchored fence regex and leave the backticks
+  // for JSON.parse to choke on.
+  const cleaned = stripCodeFence(raw.trim()).trim();
   const parsed = JSON.parse(cleaned) as unknown;
   if (!isRecord(parsed)) {
     throw new Error('Judge response is not a JSON object.');
