@@ -66,13 +66,17 @@ describe('createServerJudge — env-driven judge selection', () => {
   });
 });
 
-describe('createServerJudge — client header forwarding (Codex Round 1 P1 + Round 4 P2)', () => {
+describe('createServerJudge — client header forwarding (Codex Round 1 P1 + Round 4 P2 + Round 6 F2)', () => {
   beforeEach(() => {
     process.env.JUDGE_PROXY_SECRET = 'shh';
+    // Pepper enables forwarding; tests assume production-like
+    // configuration unless they explicitly delete it.
+    process.env.IP_HASH_PEPPER = 'pepper';
     delete process.env.JUDGE_PROXY_URL;
   });
   afterEach(() => {
     delete process.env.JUDGE_PROXY_SECRET;
+    delete process.env.IP_HASH_PEPPER;
     delete process.env.JUDGE_PROXY_URL;
   });
 
@@ -169,5 +173,23 @@ describe('createServerJudge — client header forwarding (Codex Round 1 P1 + Rou
     );
     expect(headers['x-forwarded-for']).toBeUndefined();
     expect(headers['x-real-ip']).toBeUndefined();
+  });
+
+  it('IP_HASH_PEPPER unset → no IP headers forwarded (Round 6 F2: keep privacy bullet accurate when proxy would use raw IP)', async () => {
+    delete process.env.IP_HASH_PEPPER;
+    const headers = await captureOutboundHeaders(
+      new Headers({
+        'x-vercel-forwarded-for': '203.0.113.42',
+        'x-real-ip': '203.0.113.42',
+      }),
+    );
+    // Privacy bullet says "the audit pipeline forwards a one-way
+    // SHA-256 hash of your IP (peppered with the same server secret)".
+    // Without the pepper that hash doesn't exist, so the audit
+    // pipeline must NOT forward the raw IP — otherwise the proxy
+    // would key its rate limit by raw IP in memory, contradicting
+    // the disclosed contract.
+    expect(headers['x-real-ip']).toBeUndefined();
+    expect(headers['x-forwarded-for']).toBeUndefined();
   });
 });

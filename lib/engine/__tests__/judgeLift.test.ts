@@ -203,7 +203,25 @@ describe('B3 — needsReview clears ONLY when the judge actually returned for th
 });
 
 describe('B3 — judgeStatus is honest about PDF MVP scope', () => {
-  it("reports judgeStatus 'ok' when the proxy returns Headline + About + buzzwords (the full PDF MVP set)", () => {
+  it("reports judgeStatus 'ok' when the proxy returns Headline + About (the PDF MVP graded set)", () => {
+    const profile = makeProfile({
+      headline: { data: STRONG_HEADLINE_TEXT, confidence: 'high' },
+      about: { data: STRONG_ABOUT_TEXT, confidence: 'high' },
+    });
+    const judgeResponse: JudgeResponse = {
+      headline: STRONG_HEADLINE_JUDGMENT,
+      about: STRONG_ABOUT_JUDGMENT,
+    };
+    const audit = runScoring(profile, judgeResponse, 'pdf');
+    // PDF mode does NOT expect currentExperience/keywords/photo/banner/
+    // buzzwords judgments. currentExperience is structural-only in the
+    // 4-section MVP; buzzwords is consumed only by the non-graded
+    // keywordHealth section. judgeStatus must be `ok`, not `partial`.
+    expect(audit.judgeStatus).toBe('ok');
+    expect(audit.warnings).toEqual([]);
+  });
+
+  it("reports judgeStatus 'ok' even when the proxy also returns buzzwords — it doesn't change the graded user-facing output", () => {
     const profile = makeProfile({
       headline: { data: STRONG_HEADLINE_TEXT, confidence: 'high' },
       about: { data: STRONG_ABOUT_TEXT, confidence: 'high' },
@@ -214,11 +232,7 @@ describe('B3 — judgeStatus is honest about PDF MVP scope', () => {
       buzzwords: { density: 'low', examples: [], notes: 'Clean across both sections.' },
     };
     const audit = runScoring(profile, judgeResponse, 'pdf');
-    // PDF mode does NOT expect currentExperience/keywords/photo/banner
-    // judgments — the proxy doesn't return them in this MVP.
-    // judgeStatus must be `ok`, not `partial`.
     expect(audit.judgeStatus).toBe('ok');
-    expect(audit.warnings).toEqual([]);
   });
 
   it("reports judgeStatus 'unavailable' when the proxy returned nothing at all", () => {
@@ -230,15 +244,14 @@ describe('B3 — judgeStatus is honest about PDF MVP scope', () => {
     expect(audit.judgeStatus).toBe('unavailable');
   });
 
-  it("reports judgeStatus 'partial' when the proxy returned Headline + About but not buzzwords", () => {
+  it("reports judgeStatus 'partial' when the proxy returned Headline but not About (Round 6 F4: only graded sections drive the warning)", () => {
     const profile = makeProfile({
       headline: { data: STRONG_HEADLINE_TEXT, confidence: 'high' },
       about: { data: STRONG_ABOUT_TEXT, confidence: 'high' },
     });
     const judgeResponse: JudgeResponse = {
       headline: STRONG_HEADLINE_JUDGMENT,
-      about: STRONG_ABOUT_JUDGMENT,
-      // buzzwords absent — proxy dropped it
+      // about absent — a section the user CAN see
     };
     const audit = runScoring(profile, judgeResponse, 'pdf');
     expect(audit.judgeStatus).toBe('partial');

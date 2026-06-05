@@ -90,6 +90,19 @@ function extractClientForwardHeaders(
   inbound: Headers | undefined,
 ): Record<string, string> | undefined {
   if (!inbound) return undefined;
+  // Privacy contract (`app/privacy/page.tsx` — "AI judge service"
+  // bullet): the audit pipeline forwards a SHA-256 hash of the IP
+  // peppered with the server secret. That hash only exists when
+  // `IP_HASH_PEPPER` is set; without the pepper the proxy would use
+  // a raw IP in-memory key, which does not match the disclosed
+  // contract. Gate forwarding on the pepper so the audit pipeline's
+  // behaviour matches the policy in every config it can hit:
+  //
+  //   - Pepper SET (production):  forward x-real-ip → proxy hashes
+  //   - Pepper UNSET (dev/test):  forward nothing → proxy uses
+  //                              no-ip → no IP-derived data leaves
+  //                              this Vercel function
+  if (!process.env.IP_HASH_PEPPER) return undefined;
   let trustedIp: string | null = null;
   const vercelFwd = inbound.get('x-vercel-forwarded-for');
   if (vercelFwd) {
@@ -101,10 +114,9 @@ function extractClientForwardHeaders(
   }
   if (!trustedIp) return undefined;
   // Send via the proxy's fallback `x-real-ip` slot. We deliberately
-  // do NOT send `x-forwarded-for` — that header's chain[0] is the
-  // attacker-controlled value on Vercel, and the proxy's `extractIp`
-  // prefers `x-forwarded-for` over `x-real-ip`. By omitting it we
-  // force the proxy down the `x-real-ip` path where we've placed
-  // the Vercel-verified value.
+  // do NOT send `x-forwarded-for` — chain[0] of that header is
+  // attacker-controlled on Vercel, and even the proxy's `extractIp`
+  // (which we tightened in Round 6 to ignore `x-forwarded-for`)
+  // historically preferred it.
   return { 'x-real-ip': trustedIp };
 }

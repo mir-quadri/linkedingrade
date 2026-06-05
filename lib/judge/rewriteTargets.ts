@@ -16,8 +16,13 @@ import type { JudgeRequest } from '@/lib/engine/types/judge';
 export function pickGroundedRewriteTargets(
   request: JudgeRequest,
 ): Array<'headline' | 'about'> {
+  // Trim before checking. `buildJudgeRequest` already trims in-tree,
+  // but the helper is exported and may run on requests from less-
+  // tidy sources (a future extension caller, hand-built JSON, etc.).
+  // `{ text: '   ' }` and `{ text: null }` must both decline rewrite —
+  // there's no source text to ground a `before` excerpt in.
   const targets: Array<'headline' | 'about'> = [];
-  if (request.headline?.text) targets.push('headline');
-  if (request.about?.text) targets.push('about');
+  if (request.headline?.text?.trim()) targets.push('headline');
+  if (request.about?.text?.trim()) targets.push('about');
   return targets;
 }

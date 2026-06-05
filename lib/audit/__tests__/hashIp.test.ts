@@ -48,18 +48,40 @@ describe('hashIp', () => {
   });
 });
 
-describe('extractIp', () => {
-  it('prefers the first entry in x-forwarded-for', () => {
-    const headers = new Headers({ 'x-forwarded-for': '203.0.113.1, 10.0.0.1' });
+describe('extractIp — trust chain (Vercel-stamped headers only)', () => {
+  it('prefers x-vercel-forwarded-for chain[0] (Vercel-trusted)', () => {
+    const headers = new Headers({
+      'x-vercel-forwarded-for': '203.0.113.1, 10.0.0.1',
+    });
     expect(extractIp(headers)).toBe('203.0.113.1');
   });
 
-  it('falls back to x-real-ip when x-forwarded-for is absent', () => {
+  it('falls back to x-real-ip when x-vercel-forwarded-for is absent', () => {
     const headers = new Headers({ 'x-real-ip': '203.0.113.5' });
     expect(extractIp(headers)).toBe('203.0.113.5');
   });
 
-  it('returns null when neither header is present', () => {
+  it('returns null when neither Vercel-trusted header is present', () => {
     expect(extractIp(new Headers())).toBeNull();
+  });
+
+  it("does NOT read x-forwarded-for — chain[0] is client-controlled on Vercel and unreliable elsewhere", () => {
+    // An authenticated caller with the proxy secret (curl, the future
+    // browser extension, a misconfigured local proxy) can supply any
+    // value for x-forwarded-for. Trusting it would let them fan out
+    // across the per-IP rate-limit buckets and exhaust the documented
+    // per-IP cap arbitrarily.
+    const headers = new Headers({
+      'x-forwarded-for': '198.51.100.1, 203.0.113.1',
+    });
+    expect(extractIp(headers)).toBeNull();
+  });
+
+  it("Vercel-trusted x-vercel-forwarded-for wins over a tampered x-forwarded-for", () => {
+    const headers = new Headers({
+      'x-vercel-forwarded-for': '203.0.113.1',
+      'x-forwarded-for': '198.51.100.99',
+    });
+    expect(extractIp(headers)).toBe('203.0.113.1');
   });
 });

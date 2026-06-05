@@ -39,6 +39,22 @@ describe('pickGroundedRewriteTargets — only request rewrites for sections we a
     expect(pickGroundedRewriteTargets(req)).toEqual(['about']);
   });
 
+  it('treats a whitespace-only text field as not present — no ungrounded rewrite (Round 6 F3)', () => {
+    const req: JudgeRequest = {
+      headline: { text: '   \t\n  ' },
+      about: { text: 'Real about text.' },
+    };
+    expect(pickGroundedRewriteTargets(req)).toEqual(['about']);
+  });
+
+  it('treats text: null as not present (runtime defence against non-TS callers)', () => {
+    const req = {
+      headline: { text: null },
+      about: { text: 'Real about text.' },
+    } as unknown as JudgeRequest;
+    expect(pickGroundedRewriteTargets(req)).toEqual(['about']);
+  });
+
   it('never includes currentExperience even if the request has it — 4-section MVP scope is Headline + About only', () => {
     const req: JudgeRequest = {
       headline: { text: 'Senior Engineer @ Acme' },

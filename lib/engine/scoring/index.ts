@@ -156,12 +156,20 @@ function inferRoleFamilyHint(profile: ProfileData): string | null {
  */
 function expectedJudgeKeys(profile: ProfileData, mode: ScoringMode = 'full'): (keyof JudgeResponse)[] {
   if (mode === 'pdf') {
+    // In PDF mode the only graded sections that consume an AI
+    // judgment are Headline and About — Career Arc and Current
+    // Experience are structural-only in the 4-section MVP. We do
+    // NOT expect `buzzwords` here even though the proxy may emit it:
+    // it's consumed only by `scoreKeywordHealth`, which is not in
+    // `PDF_AUDIT_SECTIONS` and therefore not in the user's composite
+    // or letter-grade UI. Including buzzwords in `expectedJudgeKeys`
+    // would surface `judgeStatus: 'partial'` (and an opaque warning
+    // banner) on every audit where the model legitimately omitted
+    // the optional buzzwords block, despite both graded sections
+    // being fully judged. (Round 6 F4.)
     const expected: (keyof JudgeResponse)[] = [];
     if (profile.headline.data?.trim()) expected.push('headline');
     if (profile.about.data?.trim()) expected.push('about');
-    if (profile.headline.data?.trim() || profile.about.data?.trim()) {
-      expected.push('buzzwords');
-    }
     return expected;
   }
   return expectedJudgeKeysFull(profile);

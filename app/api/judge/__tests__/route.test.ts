@@ -380,14 +380,14 @@ describe('POST /api/judge — rate-limit key partitioning (Codex Round 3 P2)', (
       await POST(
         makeRequest(VALID_REQUEST, {
           'x-judge-auth': 'super-secret',
-          'x-forwarded-for': '203.0.113.42',
+          'x-vercel-forwarded-for': '203.0.113.42',
         }),
       );
       // Second call → over limit → warn fires.
       await POST(
         makeRequest(VALID_REQUEST, {
           'x-judge-auth': 'super-secret',
-          'x-forwarded-for': '203.0.113.42',
+          'x-vercel-forwarded-for': '203.0.113.42',
         }),
       );
       const logged = warnSpy.mock.calls.map((c) => String(c[0])).join('\n');
@@ -418,7 +418,7 @@ describe('POST /api/judge — rate-limit key partitioning (Codex Round 3 P2)', (
     const r1 = await POST(
       makeRequest(VALID_REQUEST, {
         'x-judge-auth': 'super-secret',
-        'x-forwarded-for': '203.0.113.1',
+        'x-vercel-forwarded-for': '203.0.113.1',
       }),
     );
     expect(r1.status).toBe(200);
@@ -428,7 +428,7 @@ describe('POST /api/judge — rate-limit key partitioning (Codex Round 3 P2)', (
     const r1b = await POST(
       makeRequest(VALID_REQUEST, {
         'x-judge-auth': 'super-secret',
-        'x-forwarded-for': '203.0.113.1',
+        'x-vercel-forwarded-for': '203.0.113.1',
       }),
     );
     expect(((await r1b.json()) as { status: string; reason?: string }).reason).toBe(
@@ -439,7 +439,7 @@ describe('POST /api/judge — rate-limit key partitioning (Codex Round 3 P2)', (
     const r2 = await POST(
       makeRequest(VALID_REQUEST, {
         'x-judge-auth': 'super-secret',
-        'x-forwarded-for': '203.0.113.2',
+        'x-vercel-forwarded-for': '203.0.113.2',
       }),
     );
     expect(r2.status).toBe(200);
