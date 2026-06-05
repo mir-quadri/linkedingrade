@@ -7,6 +7,14 @@ export interface AboutScore {
   reasons: string[];
   oneLineWhy: string;
   needsReview: boolean;
+  /**
+   * Codex Round 4 P2 — true when the AI judge ACTUALLY raised the score
+   * above the structural-only floor. See `HeadlineScore.judgeLifted`
+   * for the rationale: a complete-but-harsh judgment clears
+   * `needsReview` but does NOT confirm any above-B+ signal, and the
+   * cap in `runScoring` must continue to hold for it.
+   */
+  judgeLifted: boolean;
 }
 
 /** Cap on the cliché-opener penalty (raw points). See `scoreAbout`. */
@@ -36,6 +44,7 @@ export function scoreAbout(
         ? 'About could not be extracted — flagged for review.'
         : 'No About section — the strongest free-text slot is unused.',
       needsReview: extractionMissed,
+      judgeLifted: false,
     };
   }
 
@@ -129,9 +138,12 @@ export function scoreAbout(
   // Lift-only invariant: never below the structural floor when judgment
   // is present. Without judgment, the structural score IS the score —
   // no max() needed (structural == floor by definition).
+  const judgeAdjusted = clamp(score);
   const rawScore = judgment
-    ? Math.max(structuralFloor, clamp(score))
-    : clamp(score);
+    ? Math.max(structuralFloor, judgeAdjusted)
+    : judgeAdjusted;
+  // Codex Round 4 P2 — see HeadlineScore.judgeLifted for rationale.
+  const judgeLifted = !!judgment && judgeAdjusted > structuralFloor;
   return {
     rawScore,
     reasons,
@@ -142,6 +154,7 @@ export function scoreAbout(
     oneLineWhy: oneLine(rawScore, !!judgment, judgment),
     // No judgment, or most of the AI booleans missing → flag degraded coverage.
     needsReview: !judgment || unknownFields >= 3,
+    judgeLifted,
   };
 }
 

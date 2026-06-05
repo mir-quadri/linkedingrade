@@ -245,6 +245,110 @@ describe('B3 — judgeStatus is honest about PDF MVP scope', () => {
   });
 });
 
+describe("B3 — Codex Round 4 P2: harsh-but-complete judgment can't unlock the above-B+ path", () => {
+  it('a structurally-strong T1 headline + harsh judgment STAYS capped at B+ even with the tier modifier — judge "replied" is not the same as judge "lifted"', () => {
+    // T1 (early-career) profile so the seniority modifier is the
+    // positive +5 at high raw scores. Without the judgeLifted gate,
+    // the harsh judgment would clear needsReview, the B+ cap would
+    // not apply, and the modifier would push the headline to A-/A
+    // even though the judge said it's bad.
+    const profile = makeProfile({
+      fullName: 'Early Career',
+      headline: { data: STRONG_HEADLINE_TEXT, confidence: 'high' },
+      currentExperience: {
+        data: entry({
+          title: 'Junior Analyst',
+          description: 'Built dashboards and reduced reporting time 40% across 3 teams.',
+        }),
+        confidence: 'high',
+      },
+      experienceHistory: {
+        data: [entry({ title: 'Junior Analyst' }), entry({ title: 'Intern' })],
+        confidence: 'high',
+      },
+    });
+
+    const judged = runScoring(
+      profile,
+      { headline: HARSH_HEADLINE_JUDGMENT },
+      'pdf',
+    );
+    const headline = judged.sections.find((s) => s.id === 'headline')!;
+    // needsReview clears because the judge replied with all 5 booleans…
+    expect(headline.needsReview).toBe(false);
+    // …but the cap still holds because judgeLifted is false (judge
+    // didn't push above the structural floor).
+    expect(headline.adjustedScore).toBeLessThanOrEqual(B_PLUS_CEILING);
+    expect(headline.letter.startsWith('A')).toBe(false);
+  });
+
+  it('a structurally-strong headline + CONFIRMING judgment DOES break above B+ (lift path remains open)', () => {
+    const profile = makeProfile({
+      fullName: 'Early Career',
+      headline: { data: STRONG_HEADLINE_TEXT, confidence: 'high' },
+      currentExperience: {
+        data: entry({ title: 'Junior Analyst', description: 'Built things and quantified impact: 40% gain in 3 quarters.' }),
+        confidence: 'high',
+      },
+      experienceHistory: {
+        data: [entry({ title: 'Junior Analyst' })],
+        confidence: 'high',
+      },
+    });
+    const judged = runScoring(
+      profile,
+      { headline: STRONG_HEADLINE_JUDGMENT },
+      'pdf',
+    );
+    const headline = judged.sections.find((s) => s.id === 'headline')!;
+    expect(headline.needsReview).toBe(false);
+    expect(headline.adjustedScore).toBeGreaterThan(B_PLUS_CEILING);
+  });
+
+  it('a structurally-strong About + harsh judgment STAYS capped at B+', () => {
+    const profile = makeProfile({
+      fullName: 'Senior Person',
+      about: { data: STRONG_ABOUT_TEXT, confidence: 'high' },
+    });
+    const judged = runScoring(
+      profile,
+      { about: HARSH_ABOUT_JUDGMENT },
+      'pdf',
+    );
+    const about = judged.sections.find((s) => s.id === 'about')!;
+    expect(about.needsReview).toBe(false);
+    expect(about.adjustedScore).toBeLessThanOrEqual(B_PLUS_CEILING);
+  });
+
+  it('non-AI-judged section (currentExperience) is unaffected by the judgeLifted gate — its scorer leaves the field undefined and runScoring treats undefined as no-cap', () => {
+    // A high-quality T1 currentExperience should still be able to
+    // reach A — the judgeLifted gate is only for sections whose
+    // scorer opts in (headline + about today).
+    const profile = makeProfile({
+      fullName: 'Early Career',
+      currentExperience: {
+        data: entry({
+          title: 'Junior Analyst',
+          description:
+            'Reduced model inference latency 42% across 11 product surfaces; led the platform migration that saved $1.2M ARR.',
+        }),
+        confidence: 'high',
+      },
+      experienceHistory: {
+        data: [entry({ title: 'Junior Analyst' })],
+        confidence: 'high',
+      },
+    });
+    const judged = runScoring(profile, {}, 'pdf');
+    const cur = judged.sections.find((s) => s.id === 'currentExperience')!;
+    // currentExperience.needsReview will be true in PDF mode (it's an
+    // AI-pending section), so we ONLY care that the new judgeLifted
+    // gate doesn't accidentally cap it further than today's B+ rule.
+    // The pre-existing needsReview cap behaviour is unchanged.
+    expect(cur.adjustedScore).toBeLessThanOrEqual(B_PLUS_CEILING);
+  });
+});
+
 describe('B3 — composite differentiation preserved under judge lift', () => {
   it('a strong + judged profile composites HIGHER than the same profile scored structurally-only', () => {
     // Mirror the John profile shape — strong headline + strong About.

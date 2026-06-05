@@ -61,18 +61,50 @@ export function createServerJudge(opts: {
 }
 
 /**
- * Pull only the headers the proxy's `extractIp` cares about. We
- * deliberately don't blanket-forward the inbound headers — that would
- * leak cookies, auth, etc. into a server-to-server call.
+ * Derive the END-USER's client IP from the inbound `/api/audit`
+ * headers and pass it to the proxy via a SINGLE `x-real-ip` header.
+ *
+ * Codex Round 4 P2: do NOT forward the raw `x-forwarded-for` chain.
+ * On Vercel, the edge APPENDS the real client IP to whatever the
+ * client supplied — chain[0] is then the attacker-supplied value, and
+ * since `/api/audit` is unauthenticated a scripted caller could vary
+ * that header on every upload and fan out across the proxy's per-IP
+ * daily rate-limit buckets. (X-Judge-Auth still gates the proxy, but
+ * the fan-out lets one IP exhaust the documented per-IP budget
+ * arbitrarily.) Two headers are Vercel-trusted: `x-vercel-forwarded-
+ * for` and `x-real-ip` — both are stamped exclusively by the edge,
+ * and Vercel strips any client-supplied values before forwarding.
+ *
+ * Selection order:
+ *   1. `x-vercel-forwarded-for` first value (Vercel's verified chain)
+ *   2. `x-real-ip` (Vercel's verified single value)
+ *   3. nothing → no header forwarded → proxy's rate limit falls back
+ *      to its `no-ip` partition (per-instance memory only when no
+ *      pepper, per `lib/judge/rateLimit.ts`).
+ *
+ * Sensitive headers (cookies, authorization, user-agent) are NEVER
+ * forwarded — the inner call is server-to-server and must not leak
+ * end-user auth into a request whose audit log we control.
  */
 function extractClientForwardHeaders(
   inbound: Headers | undefined,
 ): Record<string, string> | undefined {
   if (!inbound) return undefined;
-  const out: Record<string, string> = {};
-  const xff = inbound.get('x-forwarded-for');
-  if (xff) out['x-forwarded-for'] = xff;
-  const xri = inbound.get('x-real-ip');
-  if (xri) out['x-real-ip'] = xri;
-  return Object.keys(out).length > 0 ? out : undefined;
+  let trustedIp: string | null = null;
+  const vercelFwd = inbound.get('x-vercel-forwarded-for');
+  if (vercelFwd) {
+    const first = vercelFwd.split(',')[0]?.trim();
+    if (first) trustedIp = first;
+  }
+  if (!trustedIp) {
+    trustedIp = inbound.get('x-real-ip');
+  }
+  if (!trustedIp) return undefined;
+  // Send via the proxy's fallback `x-real-ip` slot. We deliberately
+  // do NOT send `x-forwarded-for` — that header's chain[0] is the
+  // attacker-controlled value on Vercel, and the proxy's `extractIp`
+  // prefers `x-forwarded-for` over `x-real-ip`. By omitting it we
+  // force the proxy down the `x-real-ip` path where we've placed
+  // the Vercel-verified value.
+  return { 'x-real-ip': trustedIp };
 }

@@ -223,7 +223,20 @@ export function runScoring(
     warnings.push(`Seniority assumed: ${seniority.rationale}`);
   }
 
-  type RawResult = { rawScore: number; reasons: string[]; oneLineWhy: string; needsReview: boolean };
+  type RawResult = {
+    rawScore: number;
+    reasons: string[];
+    oneLineWhy: string;
+    needsReview: boolean;
+    /**
+     * OPTIONAL signal: `true` iff the AI judge ACTUALLY raised the
+     * section's score above its structural-only floor. Today only
+     * `scoreHeadline` and `scoreAbout` set it — every other scorer
+     * leaves it undefined, which means "not applicable; trust
+     * `needsReview` alone for cap decisions". (Codex Round 4 P2.)
+     */
+    judgeLifted?: boolean;
+  };
   const rawByID: Partial<Record<SectionId, RawResult>> = {
     headline: scoreHeadline(profile, judgeResponse.headline),
     photo: scorePhoto(profile, judgeResponse.photo),
@@ -250,7 +263,23 @@ export function runScoring(
     // band — structural cues can't distinguish A-grade originality from clever
     // cliché-stuffing. The AI judge lifts B+ → A later; it never drops a
     // structural grade. See `lib/engine/README.md`.
-    if (raw.needsReview) adjusted = Math.min(adjusted, B_PLUS_CEILING);
+    //
+    // Codex Round 4 P2: the cap also applies when the judge REPLIED
+    // but didn't actually lift the section above its structural
+    // floor. Without this, a complete-but-harsh judgment (which
+    // clears `needsReview`) would let the seniority modifier turn a
+    // "judge said this is bad" headline into an A grade. For scorers
+    // that don't compute `judgeLifted` (every non-headline/about
+    // section today), the field is undefined → falsy on the
+    // strict-check below → BUT we only apply the additional gate to
+    // scorers that opt in via setting the field. Photo/banner/etc.
+    // leave `judgeLifted` undefined and stay uncapped here when
+    // `needsReview` is false (their existing behaviour).
+    if (raw.needsReview) {
+      adjusted = Math.min(adjusted, B_PLUS_CEILING);
+    } else if (raw.judgeLifted === false) {
+      adjusted = Math.min(adjusted, B_PLUS_CEILING);
+    }
     return {
       id: meta.id,
       label: meta.label,
