@@ -159,6 +159,15 @@ export function scoreHeadline(
   // judge (below) may lift above this; structural-only headlines cannot.
   score = Math.min(score, B_PLUS_CEILING);
 
+  // Lift-only invariant (B3 Unit 2): the structural score IS the floor.
+  // The AI judge may RAISE a section above its structural value (and above
+  // the B+ cap, toward A) but must NEVER drop it below this floor — a
+  // judge that returns harsh booleans for a structurally-decent headline
+  // shouldn't be able to turn a B into a D. Snapshot the structural score
+  // before applying judgment adjustments, then take `max(floor, adjusted)`
+  // at the end.
+  const structuralFloor = clamp(score);
+
   // Track how many of the AI boolean fields actually came back. The proxy
   // prompt allows fields to be omitted, so a partial object (e.g. notes-only)
   // shouldn't be treated as a confident "all false" judgment — that misclassifies
@@ -211,8 +220,14 @@ export function scoreHeadline(
   }
 
   const oneLineWhy = oneLine(score, !!judgment, judgment);
+  // Lift-only invariant: never below the structural floor when judgment
+  // is present. Without judgment, the structural score IS the score —
+  // no max() needed (structural == floor by definition).
+  const rawScore = judgment
+    ? Math.max(structuralFloor, clamp(score))
+    : clamp(score);
   return {
-    rawScore: clamp(score),
+    rawScore,
     reasons,
     oneLineWhy,
     // No judgment, or most boolean fields missing → degraded coverage.

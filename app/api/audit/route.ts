@@ -13,9 +13,10 @@ import { NextResponse } from 'next/server';
 import { randomUUID } from 'node:crypto';
 
 import { parseLinkedInPdf } from '@/lib/pdf/parseLinkedInPdf';
-import { runPdfAudit } from '@/lib/engine/scoring';
+import { runPdfAudit, buildJudgeRequest } from '@/lib/engine/scoring';
 import { getAuditStore } from '@/lib/storage/auditStore';
 import { buildPreview } from '@/lib/audit/buildPreview';
+import { createServerJudge } from '@/lib/judge/createServerJudge';
 
 // Force the Node runtime: pdf-parse / pdfjs-dist depend on Node APIs and
 // cannot run on Vercel's Edge runtime.
@@ -68,15 +69,52 @@ export async function POST(request: Request) {
 
   try {
     const parsed = await parseLinkedInPdf(buffer);
+
+    // Generate the auditId up front so it can be stamped on the judge
+    // request — proxy logs correlate audit → judge call by this id, and
+    // the rate-limiter / cost-per-audit accounting downstream needs it
+    // even when the judge is the NullJudge fallback.
+    const auditId = randomUUID();
+
+    // Call the AI judge BEFORE runPdfAudit so the section scorers see
+    // real judgments and the engine can apply the lift-only invariant
+    // (Headline + About may lift above the B+ structural ceiling toward
+    // A; harsh judgments can never drop a section below its structural
+    // floor — see `lib/engine/scoring/sections/headline.ts` / `about.ts`).
+    // Failure mode is graceful: HttpJudge resolves to `{}` on any error,
+    // and the audit then degrades to today's structural-only output with
+    // `needsReview: true`. NEVER throws — the audit must complete even
+    // when the proxy is down.
+    const judgeRequest = buildJudgeRequest(parsed);
+    // 4-section PDF MVP scope: only Headline + About get rewrites. The
+    // proxy prompt builder already filters to these, but setting it
+    // here documents the web audit's contract and keeps the request
+    // tight.
+    judgeRequest.rewriteTargets = ['headline', 'about'];
+    const judge = createServerJudge({
+      origin: new URL(request.url).origin,
+      auditId,
+      onResult: (outcome) => {
+        const usage = outcome.usage
+          ? ` inputTokens=${outcome.usage.inputTokens} outputTokens=${outcome.usage.outputTokens} usd=${outcome.usage.estimatedUsd}`
+          : '';
+        const reason = outcome.reason ? ` reason=${outcome.reason}` : '';
+        console.log(
+          `[api/audit] judge auditId=${auditId} status=${outcome.status} elapsedMs=${outcome.elapsedMs}${usage}${reason}`,
+        );
+      },
+    });
+    const judgeResponse = await judge.evaluate(judgeRequest);
+
     // Focused 4-section PDF audit. `runPdfAudit` also applies the name-
     // suspicion guard, returning a normalised profile (name corrected to a
     // neutral placeholder when the parse looks misparsed) — persist THAT
-    // profile so storage and the preview share the same fullName. Scores
-    // with an empty JudgeResponse: the AI judge ships in PR B3, so AI-pending
-    // sections surface their structural grade with `needsReview: true`.
-    const { profile, audit } = runPdfAudit(parsed);
+    // profile so storage and the preview share the same fullName. The
+    // judge response (`{}` when the proxy is unavailable) flows in here
+    // so AI-pending sections lift above their B+ floor when judgments
+    // landed, and stay at structural with `needsReview: true` when not.
+    const { profile, audit } = runPdfAudit(parsed, judgeResponse);
 
-    const auditId = randomUUID();
     const store = await getAuditStore();
     // userAgent / ipHash are intentionally NOT captured here. The
     // privacy policy ties their collection to the email-submit step

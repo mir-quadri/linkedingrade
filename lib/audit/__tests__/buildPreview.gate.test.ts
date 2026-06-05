@@ -46,6 +46,13 @@ const audit: AuditResult = {
       pointsGain: 5,
       effort: 'low',
       recommendation: 'should not leak before the gate',
+      // B3 Unit 2: rewrites ride with the post-gate fix payload. They
+      // must NOT appear in the preview — they're the most identifying
+      // piece of judge output a pre-gate leak could expose.
+      rewrite: {
+        before: 'I am a passionate, results-driven',
+        after: 'Built X (40% gain) on Y; opening at Z',
+      },
     },
   ],
   heatMap: [],
@@ -97,5 +104,16 @@ describe('buildPreview gate contract', () => {
     expect(json).not.toContain('rawScore');
     expect(json).not.toContain('adjustedScore');
     expect(json).not.toContain('reasons');
+  });
+
+  it('preview does not leak the AI judge rewrites (Headline/About before/after) — gated alongside fixes (B3 Unit 2)', () => {
+    const preview = buildPreview(audit, 'Jane Doe');
+    const json = JSON.stringify(preview);
+    // Both the literal `rewrite` key and the actual before/after text
+    // must be absent. A pre-gate leak of `after` is the worst case —
+    // that's the actionable rewrite the user paid the email for.
+    expect(json).not.toContain('rewrite');
+    expect(json).not.toContain('Built X (40% gain) on Y');
+    expect(json).not.toContain('I am a passionate');
   });
 });

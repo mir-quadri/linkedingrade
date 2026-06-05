@@ -146,8 +146,28 @@ function inferRoleFamilyHint(profile: ProfileData): string | null {
  * a missing banner judgment isn't a sign of AI degradation.
  *
  * `rewrites` is metadata, not a scoring judgment, so it's not included.
+ *
+ * Mode-aware (B3 Unit 2): the PDF MVP proxy only judges Headline + About
+ * + cross-cutting buzzwords (`lib/judge/buildPrompt.ts`). currentExperience,
+ * photo, banner, featured and keywords are NOT requested in PDF mode, so
+ * their absence from `judgeResponse` mustn't be counted as degradation —
+ * otherwise a clean proxy response would always report `partial`. Full
+ * mode (extension audit) keeps the broader expectation set.
  */
-function expectedJudgeKeys(profile: ProfileData): (keyof JudgeResponse)[] {
+function expectedJudgeKeys(profile: ProfileData, mode: ScoringMode = 'full'): (keyof JudgeResponse)[] {
+  if (mode === 'pdf') {
+    const expected: (keyof JudgeResponse)[] = [];
+    if (profile.headline.data?.trim()) expected.push('headline');
+    if (profile.about.data?.trim()) expected.push('about');
+    if (profile.headline.data?.trim() || profile.about.data?.trim()) {
+      expected.push('buzzwords');
+    }
+    return expected;
+  }
+  return expectedJudgeKeysFull(profile);
+}
+
+function expectedJudgeKeysFull(profile: ProfileData): (keyof JudgeResponse)[] {
   const expected: (keyof JudgeResponse)[] = [];
   if (profile.headline.data?.trim()) expected.push('headline');
   if (profile.about.data?.trim()) expected.push('about');
@@ -289,7 +309,7 @@ export function runScoring(
   // have asked the judge for (based on profile content) against what
   // came back; report 'partial'/'unavailable' only when the AI itself
   // didn't cover what it was asked.
-  const expectedAI = expectedJudgeKeys(profile);
+  const expectedAI = expectedJudgeKeys(profile, mode);
   const presentAI = expectedAI.filter((k) => judgeResponse[k] != null);
   const missingAI = expectedAI.length - presentAI.length;
   let judgeStatus: AuditResult['judgeStatus'] = 'ok';

@@ -71,6 +71,15 @@ export function scoreAbout(
     reasons.push('Some buzzword phrasing — recruiters notice.');
   }
 
+  // Lift-only invariant (B3 Unit 2): the structural score IS the floor.
+  // The AI judge may RAISE a section above its structural value (and above
+  // the B+ cap, toward A) but must NEVER drop it below this floor — a
+  // judge that returns harsh booleans for a structurally-decent About
+  // shouldn't be able to turn a B into a D. Snapshot the structural score
+  // before applying judgment adjustments, then take `max(floor, adjusted)`
+  // at the end.
+  const structuralFloor = clamp(score);
+
   // AI judgment is the heart of this section. Track which booleans actually
   // landed — the proxy prompt allows fields to be omitted, so missing fields
   // must NOT be scored as confident false.
@@ -117,8 +126,14 @@ export function scoreAbout(
     reasons.push('Hook/range/CTA assessment pending AI review.');
   }
 
+  // Lift-only invariant: never below the structural floor when judgment
+  // is present. Without judgment, the structural score IS the score —
+  // no max() needed (structural == floor by definition).
+  const rawScore = judgment
+    ? Math.max(structuralFloor, clamp(score))
+    : clamp(score);
   return {
-    rawScore: clamp(score),
+    rawScore,
     reasons,
     oneLineWhy: oneLine(score, !!judgment, judgment),
     // No judgment, or most of the AI booleans missing → flag degraded coverage.
