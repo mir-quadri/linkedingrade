@@ -190,13 +190,14 @@ function SampleAudit() {
                 maxWidth: "46ch",
               }}
             >
-              The 6-page PDF includes line-by-line rewrites for the About and
-              top three Experience entries, the exact phrasing flagged as
-              cliché, and the three highest-leverage fixes ranked by
-              minutes-to-implement.
+              The full 6-page PDF — line-by-line rewrites for the About and top
+              three Experience entries, the exact phrasing flagged as cliché, and
+              the highest-leverage fixes ranked by minutes-to-implement — ships
+              with the Chrome extension. The live audit grades the 4 sections
+              recruiters scan first, free today.
             </p>
             <div style={{ display: "flex", gap: 10, marginTop: 8, flexWrap: "wrap" }}>
-              <Link href="#cta" className="btn btn-primary">
+              <Link href="/audit" className="btn btn-primary">
                 Run yours
               </Link>
               <Link href="#pricing" className="btn btn-ghost">
