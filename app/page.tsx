@@ -680,11 +680,11 @@ function BuiltFor() {
 
 function Pricing() {
   const free: Feature[] = [
-    { label: (<><b>1</b> audit · ever</>) },
-    { label: "6-page PDF · watermark" },
-    { label: "Grade + heat map" },
-    { label: "No before/after rewrites", excluded: true },
-    { label: "No history, no exports", excluded: true },
+    { label: "Composite grade + score" },
+    { label: (<><b>4</b> graded sections</>) },
+    { label: "Top wins + highest-leverage fixes" },
+    { label: "Emailed report + permanent link" },
+    { label: "8 more sections in the extension", excluded: true },
   ];
   const pro: Feature[] = [
     { label: (<><b>25</b> audits / month</>) },
@@ -727,12 +727,13 @@ function Pricing() {
         <div className="price-grid">
           <PricingTier
             tier="Tier 00 · Free"
-            name="Single audit"
+            name="PDF audit"
             price="$0"
-            per="/ one-time"
-            blurb="One audit on any profile, full PDF, watermarked. For the curious."
+            per="/ no card"
+            blurb="Drop your LinkedIn PDF and grade the 4 sections recruiters scan first — composite, section grades, top wins, and your highest-leverage fixes."
             features={free}
-            ctaLabel={WAITLIST_CTA}
+            ctaLabel={AUDIT_CTA}
+            ctaHref="/audit"
           />
           <PricingTier
             featured
