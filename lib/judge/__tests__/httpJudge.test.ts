@@ -178,6 +178,60 @@ describe('HttpJudge — graceful degradation (NEVER throws, always returns {})',
   });
 });
 
+describe('HttpJudge — forwarded client headers (Codex Round 1 P1)', () => {
+  it('forwards `x-forwarded-for` and `x-real-ip` so the proxy rate-limits per END-USER, not per Vercel-to-Vercel inner request', async () => {
+    const fetchImpl = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(
+        jsonResponse({ status: 'ok', judgeResponse: SAMPLE_JUDGE_RESPONSE }),
+      );
+    const judge = new HttpJudge({
+      proxyUrl: PROXY_URL,
+      proxySecret: PROXY_SECRET,
+      auditId: 'aud_fwd',
+      fetchImpl,
+      forwardHeaders: {
+        'x-forwarded-for': '203.0.113.99',
+        'x-real-ip': '203.0.113.99',
+      },
+    });
+    await judge.evaluate(SAMPLE_REQUEST);
+    const init = fetchImpl.mock.calls[0]![1] as RequestInit;
+    const headers = init.headers as Record<string, string>;
+    expect(headers['x-forwarded-for']).toBe('203.0.113.99');
+    expect(headers['x-real-ip']).toBe('203.0.113.99');
+    // Auth + content-type still set by HttpJudge, not overridden by caller.
+    expect(headers['X-Judge-Auth']).toBe(PROXY_SECRET);
+    expect(headers['Content-Type']).toBe('application/json');
+  });
+
+  it('a caller-supplied forwardHeaders entry CANNOT override X-Judge-Auth or Content-Type', async () => {
+    const fetchImpl = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(
+        jsonResponse({ status: 'ok', judgeResponse: SAMPLE_JUDGE_RESPONSE }),
+      );
+    const judge = new HttpJudge({
+      proxyUrl: PROXY_URL,
+      proxySecret: PROXY_SECRET,
+      auditId: 'aud_safety',
+      fetchImpl,
+      forwardHeaders: {
+        // Hostile config — must NOT win.
+        'X-Judge-Auth': 'attacker-secret',
+        'Content-Type': 'text/plain',
+        'x-forwarded-for': '203.0.113.1',
+      },
+    });
+    await judge.evaluate(SAMPLE_REQUEST);
+    const init = fetchImpl.mock.calls[0]![1] as RequestInit;
+    const headers = init.headers as Record<string, string>;
+    expect(headers['X-Judge-Auth']).toBe(PROXY_SECRET);
+    expect(headers['Content-Type']).toBe('application/json');
+    expect(headers['x-forwarded-for']).toBe('203.0.113.1');
+  });
+});
+
 describe('HttpJudge — one call per audit (cost invariant)', () => {
   it('issues exactly ONE fetch per evaluate() — the proxy contract is "one batched call per audit"', async () => {
     const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(

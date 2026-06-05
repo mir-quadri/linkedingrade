@@ -11,6 +11,20 @@ export interface HttpJudgeOptions {
    * is the request-level cap that covers DNS, TLS, and the wait for the
    * proxy response together. */
   timeoutMs?: number;
+  /**
+   * Forwarded headers identifying the originating end-user — typically
+   * `x-forwarded-for` and `x-real-ip` from the inbound `/api/audit`
+   * request. The proxy's per-IP daily rate limit reads these to
+   * partition audits by real caller; without forwarding, every web
+   * audit collapses into the Vercel-to-Vercel `no-ip` bucket and
+   * shares one `JUDGE_RATE_LIMIT_PER_DAY` quota for all users.
+   * (Codex Round 1 P1.)
+   *
+   * Keys are case-normalised by `fetch`; supply them however you like.
+   * `X-Judge-Auth` and `Content-Type` cannot be overridden — the
+   * client always sets those itself.
+   */
+  forwardHeaders?: Record<string, string>;
   /** Test seam — overridable so unit tests can drive the client without
    * touching the real network. */
   fetchImpl?: typeof fetch;
@@ -54,12 +68,17 @@ export class HttpJudge implements Judge {
     const auditId = this.opts.auditId ?? null;
     const fetchImpl = this.opts.fetchImpl ?? fetch;
     try {
+      const headers: Record<string, string> = {
+        // Forwarded client-identifying headers go FIRST so our own
+        // auth + content-type can't be silently overridden by a
+        // caller-supplied entry.
+        ...(this.opts.forwardHeaders ?? {}),
+        'Content-Type': 'application/json',
+        'X-Judge-Auth': this.opts.proxySecret,
+      };
       const res = await fetchImpl(this.opts.proxyUrl, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Judge-Auth': this.opts.proxySecret,
-        },
+        headers,
         body: JSON.stringify({ auditId, judgeRequest: req }),
         signal: ac.signal,
       });

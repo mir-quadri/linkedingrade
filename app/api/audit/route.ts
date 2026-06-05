@@ -94,6 +94,13 @@ export async function POST(request: Request) {
     const judge = createServerJudge({
       origin: new URL(request.url).origin,
       auditId,
+      // Forward x-forwarded-for / x-real-ip so the proxy's per-IP
+      // daily rate limit partitions by the END-USER's IP, not the
+      // Vercel-to-Vercel inner request. Without this, every web audit
+      // would share a single bucket and the documented per-IP cap
+      // would silently degrade the judge for everyone after ~50 audits
+      // (Codex Round 1 P1 on PR #19).
+      inboundHeaders: request.headers,
       onResult: (outcome) => {
         const usage = outcome.usage
           ? ` inputTokens=${outcome.usage.inputTokens} outputTokens=${outcome.usage.outputTokens} usd=${outcome.usage.estimatedUsd}`

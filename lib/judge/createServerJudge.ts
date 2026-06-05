@@ -23,6 +23,15 @@ import { HttpJudge, type HttpJudgeOutcome } from './httpJudge';
 export function createServerJudge(opts: {
   origin: string;
   auditId: string;
+  /**
+   * The inbound request's headers — used to forward the client-
+   * identifying values (`x-forwarded-for`, `x-real-ip`) so the proxy's
+   * per-IP daily rate limit partitions by REAL caller. Without this,
+   * the Vercel-to-Vercel inner fetch presents no client IP and the
+   * proxy collapses every web audit into one shared bucket. (Codex
+   * Round 1 P1 on PR #19.)
+   */
+  inboundHeaders?: Headers;
   onResult?: (outcome: HttpJudgeOutcome) => void;
 }): Judge {
   const secret = process.env.JUDGE_PROXY_SECRET;
@@ -41,5 +50,23 @@ export function createServerJudge(opts: {
     proxySecret: secret,
     auditId: opts.auditId,
     onResult: opts.onResult,
+    forwardHeaders: extractClientForwardHeaders(opts.inboundHeaders),
   });
+}
+
+/**
+ * Pull only the headers the proxy's `extractIp` cares about. We
+ * deliberately don't blanket-forward the inbound headers — that would
+ * leak cookies, auth, etc. into a server-to-server call.
+ */
+function extractClientForwardHeaders(
+  inbound: Headers | undefined,
+): Record<string, string> | undefined {
+  if (!inbound) return undefined;
+  const out: Record<string, string> = {};
+  const xff = inbound.get('x-forwarded-for');
+  if (xff) out['x-forwarded-for'] = xff;
+  const xri = inbound.get('x-real-ip');
+  if (xri) out['x-real-ip'] = xri;
+  return Object.keys(out).length > 0 ? out : undefined;
 }
