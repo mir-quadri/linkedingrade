@@ -35,6 +35,15 @@ const MAX_PDF_BYTES = 4 * 1024 * 1024; // 4 MB
 const GENERIC_ERROR = "We couldn't read that PDF. Make sure it's the LinkedIn 'Save to PDF' export and try again.";
 
 export async function POST(request: Request) {
+  // DIAGNOSTIC — first line of the handler, before ANY work. If this
+  // doesn't appear in Vercel runtime logs for a successful upload,
+  // the deployed route handler isn't this file: stale build, wrong
+  // branch, route-segment override, or middleware short-circuit.
+  // The token includes the route path and a build marker so it's
+  // grep-friendly. Remove once the wiring is live-verified.
+  console.log(
+    `[api/audit] ENTRY POST /api/audit secretPresent=${!!process.env.JUDGE_PROXY_SECRET} buildMarker=8a919fd`,
+  );
   let formData: FormData;
   try {
     formData = await request.formData();
@@ -70,6 +79,7 @@ export async function POST(request: Request) {
 
   try {
     const parsed = await parseLinkedInPdf(buffer);
+    console.log(`[api/audit] TRACE post-parse — parseLinkedInPdf returned, continuing`);
 
     // Generate the auditId up front so it can be stamped on the judge
     // request — proxy logs correlate audit → judge call by this id, and
@@ -87,6 +97,9 @@ export async function POST(request: Request) {
     // `needsReview: true`. NEVER throws — the audit must complete even
     // when the proxy is down.
     const judgeRequest = buildJudgeRequest(parsed);
+    console.log(
+      `[api/audit] TRACE post-buildJudgeRequest — auditId=${auditId} hasHeadline=${!!judgeRequest.headline} hasAbout=${!!judgeRequest.about}`,
+    );
     // 4-section PDF MVP scope: only Headline + About get rewrites,
     // AND only the sections we actually sent source text for. Codex
     // Round 3 P2: asking for a rewrite of a section the request has
@@ -161,6 +174,9 @@ export async function POST(request: Request) {
     // user inspect DevTools (or call the endpoint directly) and bypass
     // the email gate entirely. The full record is persisted in the audit
     // store; /api/audit/email looks it up and returns it on success.
+    console.log(
+      `[api/audit] TRACE success-return — auditId=${auditId} composite=${audit.composite.score} judgeStatus=${audit.judgeStatus}`,
+    );
     return NextResponse.json({
       auditId,
       preview: buildPreview(audit, profile.fullName, profile.nameConfidence),
