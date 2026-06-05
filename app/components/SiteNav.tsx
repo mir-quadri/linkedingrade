@@ -17,6 +17,7 @@ export default function SiteNav() {
           <Link href="/#how">How it works</Link>
           <Link href="/#audiences">Built for</Link>
           <Link href="/#pricing">Pricing</Link>
+          <Link href="/audit">Audit</Link>
         </div>
         <div className="nav-cta">
           <ThemeToggle />

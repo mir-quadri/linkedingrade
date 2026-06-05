@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { WAITLIST_CTA, EXTENSION_COMING_SOON } from "@/lib/copy";
+import { WAITLIST_CTA, EXTENSION_COMING_SOON, AUDIT_CTA } from "@/lib/copy";
 
 import AuditPreviewCard from "./components/AuditPreviewCard";
 import AuditReportCard from "./components/AuditReportCard";
@@ -59,6 +59,25 @@ function Hero() {
                 "SOC 2 in progress",
               ]}
             />
+
+            <p
+              style={{
+                margin: "10px 0 0",
+                fontSize: 13.5,
+                color: "var(--text-2)",
+              }}
+            >
+              Want a grade today?{" "}
+              <Link
+                href="/audit"
+                style={{
+                  color: "var(--text)",
+                  borderBottom: "1px solid var(--border-2)",
+                }}
+              >
+                {AUDIT_CTA}
+              </Link>
+            </p>
 
             <div className="proof-strip">
               <div className="proof-cell">
@@ -764,7 +783,10 @@ function FinalCTA() {
           <p>
             {EXTENSION_COMING_SOON} Join the waitlist and we&apos;ll email you
             the moment it ships. Want a grade today? Drop your profile PDF for an
-            honest read on the 4 sections recruiters scan first.
+            honest read on the 4 sections recruiters scan first —{" "}
+            <Link href="/audit" style={{ color: "inherit", borderBottom: "1px solid currentColor" }}>
+              {AUDIT_CTA}
+            </Link>
           </p>
         </div>
         <WaitlistForm
