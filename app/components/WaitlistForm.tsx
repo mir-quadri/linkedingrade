@@ -2,6 +2,8 @@
 
 import { useId, useState, type FormEvent } from "react";
 
+import { WAITLIST_CTA } from "@/lib/copy";
+
 type Status = "idle" | "submitting" | "success" | "error";
 
 type Props = {
@@ -11,7 +13,7 @@ type Props = {
 };
 
 export default function WaitlistForm({
-  buttonLabel = "Audit my profile →",
+  buttonLabel = WAITLIST_CTA,
   fineprint,
   placeholder = "you@work.com",
 }: Props) {

@@ -1,9 +1,11 @@
 import Link from 'next/link';
 
+import { WAITLIST_CTA } from '@/lib/copy';
+
 /**
- * Where the "Install the extension" CTA points. The Chrome Web Store listing
- * isn't live yet (pre-launch), so this routes to the homepage where the
- * waitlist lives. Swap to the store URL once the extension ships.
+ * Where the waitlist CTA points. The Chrome Web Store listing isn't live yet
+ * (pre-launch), so this routes to the homepage where the waitlist lives. Swap
+ * to the store URL once the extension ships.
  */
 export const EXTENSION_URL = '/';
 
@@ -40,10 +42,11 @@ export default function ExtensionCallout() {
       </h3>
       <p style={{ margin: '0 0 14px', color: 'var(--text-2)', fontSize: 14.5, lineHeight: 1.55 }}>
         Photo, Banner, Featured, Activity, Recommendations, Skills, Education,
-        Keyword Health — all audited at full depth in the extension.
+        Keyword Health — all audited at full depth in the Chrome extension,
+        coming soon.
       </p>
       <Link href={EXTENSION_URL} className="btn btn-primary">
-        Install the extension →
+        {WAITLIST_CTA}
       </Link>
     </section>
   );

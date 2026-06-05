@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { WAITLIST_CTA, EXTENSION_COMING_SOON } from "@/lib/copy";
+
 import AuditPreviewCard from "./components/AuditPreviewCard";
 import AuditReportCard from "./components/AuditReportCard";
 import PricingTier, { type Feature } from "./components/PricingTier";
@@ -41,17 +43,18 @@ function Hero() {
               gets a grade<em>.</em>
             </h1>
             <p className="lede">
-              A 30-second Chrome extension audits any profile and returns a{" "}
-              <b>6-page report</b> — letter grade A through F, recruiter heat
-              map, before/after rewrites, and a priority action plan.{" "}
-              <b>No hedging, no horoscopes.</b> Brutal where it matters,
-              specific everywhere.
+              A 30-second Chrome extension — <b>coming soon</b> — will audit any
+              profile and return a 6-page report: letter grade A through F,
+              recruiter heat map, before/after rewrites, and a priority action
+              plan. Today, drop your profile PDF for an honest grade on the{" "}
+              <b>4 sections recruiters scan first.</b> No hedging, no horoscopes.
+              Brutal where it matters, specific everywhere.
             </p>
 
             <WaitlistForm
-              buttonLabel="Audit my profile →"
+              buttonLabel={WAITLIST_CTA}
               fineprint={[
-                "Free for 1 audit · no card",
+                "We email you at launch",
                 "Chrome & Edge",
                 "SOC 2 in progress",
               ]}
@@ -62,7 +65,7 @@ function Hero() {
                 <span className="num">
                   31<span style={{ color: "var(--accent)" }}>s</span>
                 </span>
-                <span className="lbl">Median audit</span>
+                <span className="lbl">Target median</span>
               </div>
               <div className="proof-cell">
                 <span className="num">6</span>
@@ -396,10 +399,10 @@ function WhyExtension() {
                 maxWidth: "38ch",
               }}
             >
-              Pin the extension, hit any profile, click once. A 6-page PDF lands
-              in your downloads before you&apos;d have finished typing the
-              system prompt. Built for the cadence of an actual job search or an
-              actual sourcing day.
+              Once it ships, you&apos;ll pin the extension, hit any profile, and
+              click once — a 6-page PDF in your downloads before you&apos;d have
+              finished typing the system prompt. Built for the cadence of an
+              actual job search or an actual sourcing day.
             </p>
             <div
               className="font-mono"
@@ -710,7 +713,7 @@ function Pricing() {
             per="/ one-time"
             blurb="One audit on any profile, full PDF, watermarked. For the curious."
             features={free}
-            ctaLabel="Install free"
+            ctaLabel={WAITLIST_CTA}
           />
           <PricingTier
             featured
@@ -753,19 +756,20 @@ function FinalCTA() {
         <div>
           <div className="meta-line">
             <span>§ 05 — ACTION</span>
-            <span>30 SECONDS · CHROME / EDGE · FREE</span>
+            <span>CHROME EXTENSION · COMING SOON</span>
           </div>
           <h2>
             Find out what your profile is <em>actually</em> worth.
           </h2>
           <p>
-            Free for your first audit. No card. No tab-switching. The PDF lands
-            in your downloads before your coffee.
+            {EXTENSION_COMING_SOON} Join the waitlist and we&apos;ll email you
+            the moment it ships. Want a grade today? Drop your profile PDF for an
+            honest read on the 4 sections recruiters scan first.
           </p>
         </div>
         <WaitlistForm
-          buttonLabel="Install & audit →"
-          fineprint={["Chrome & Edge", "No card required", "2-click uninstall"]}
+          buttonLabel={WAITLIST_CTA}
+          fineprint={["Chrome & Edge", "No card required", "We email you at launch"]}
         />
       </div>
     </section>

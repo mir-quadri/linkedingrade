@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 
 import type { SelfReport } from '@/lib/storage/auditStore';
+import { WAITLIST_CTA } from '@/lib/copy';
 
 import { EXTENSION_URL } from './ExtensionCallout';
 
@@ -206,9 +207,9 @@ export default function SelfAssessedBlock({ auditId, initial }: Props) {
         </div>
       </form>
       <p style={{ margin: '16px 0 0', color: 'var(--text-2)', fontSize: 13.5, lineHeight: 1.55 }}>
-        Want these scored?{' '}
+        Want these scored in the full 12-section Chrome extension?{' '}
         <Link href={EXTENSION_URL} style={{ color: 'var(--text)', borderBottom: '1px solid var(--border-2)' }}>
-          Install the Chrome extension. Install →
+          {WAITLIST_CTA}
         </Link>
       </p>
     </section>

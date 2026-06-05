@@ -18,7 +18,7 @@ const geistMono = Geist_Mono({
 
 const title = "LinkedInGrade — the honest LinkedIn audit";
 const description =
-  "A 30-second Chrome extension audits any LinkedIn profile and returns a 6-page report. Letter grade, recruiter heat map, before/after rewrites, priority action plan.";
+  "Drop your LinkedIn profile PDF and get a real letter grade on the 4 sections recruiters scan first. The full 12-section Chrome extension — 6-page report, recruiter heat map, before/after rewrites — is coming soon.";
 
 export const metadata: Metadata = {
   title,
