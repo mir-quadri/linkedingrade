@@ -10,6 +10,13 @@
 export const WAITLIST_CTA = 'Join the extension waitlist →';
 
 /**
+ * Compact waitlist label for tight spaces (e.g. the nav bar). The full
+ * WAITLIST_CTA overflows the non-wrapping mobile header on narrow screens, so
+ * the nav uses this shorter form while the full copy stays everywhere else.
+ */
+export const WAITLIST_CTA_SHORT = 'Join waitlist';
+
+/**
  * One-line status for the unshipped full extension, reused across the site.
  */
 export const EXTENSION_COMING_SOON =
