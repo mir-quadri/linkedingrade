@@ -35,6 +35,12 @@ export function createServerJudge(opts: {
   onResult?: (outcome: HttpJudgeOutcome) => void;
 }): Judge {
   const secret = process.env.JUDGE_PROXY_SECRET;
+  // One-shot diagnostic — pairs with the `[api/audit] judge wiring:`
+  // line in the route so we can confirm both code paths see the same
+  // env state. Remove once verified live on Vercel.
+  console.log(
+    `[createServerJudge] auditId=${opts.auditId} kind=${secret ? 'HttpJudge' : 'NullJudge'}`,
+  );
   if (!secret) {
     // Intentional fall-back, not an error: the audit must keep running.
     // Logged once per upload so an operator can see why grades are

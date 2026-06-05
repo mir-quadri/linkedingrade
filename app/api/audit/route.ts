@@ -91,6 +91,15 @@ export async function POST(request: Request) {
     // here documents the web audit's contract and keeps the request
     // tight.
     judgeRequest.rewriteTargets = ['headline', 'about'];
+    // One-shot diagnostic — logged BEFORE the judge is constructed so
+    // we see what the route sees on Vercel even if `createServerJudge`
+    // itself can't run. The factory emits its own `[createServerJudge]
+    // kind=…` line; correlating the two by auditId tells us whether
+    // the env var is unreadable here or the factory is mis-wiring.
+    // Remove once verified live.
+    console.log(
+      `[api/audit] judge wiring: auditId=${auditId} secretPresent=${!!process.env.JUDGE_PROXY_SECRET} proxyUrl=${process.env.JUDGE_PROXY_URL ?? '<default-origin>'}`,
+    );
     const judge = createServerJudge({
       origin: new URL(request.url).origin,
       auditId,
