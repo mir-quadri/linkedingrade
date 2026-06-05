@@ -17,6 +17,7 @@ import { runPdfAudit, buildJudgeRequest } from '@/lib/engine/scoring';
 import { getAuditStore } from '@/lib/storage/auditStore';
 import { buildPreview } from '@/lib/audit/buildPreview';
 import { createServerJudge } from '@/lib/judge/createServerJudge';
+import { pickGroundedRewriteTargets } from '@/lib/judge/rewriteTargets';
 
 // Force the Node runtime: pdf-parse / pdfjs-dist depend on Node APIs and
 // cannot run on Vercel's Edge runtime.
@@ -86,11 +87,13 @@ export async function POST(request: Request) {
     // `needsReview: true`. NEVER throws — the audit must complete even
     // when the proxy is down.
     const judgeRequest = buildJudgeRequest(parsed);
-    // 4-section PDF MVP scope: only Headline + About get rewrites. The
-    // proxy prompt builder already filters to these, but setting it
-    // here documents the web audit's contract and keeps the request
-    // tight.
-    judgeRequest.rewriteTargets = ['headline', 'about'];
+    // 4-section PDF MVP scope: only Headline + About get rewrites,
+    // AND only the sections we actually sent source text for. Codex
+    // Round 3 P2: asking for a rewrite of a section the request has
+    // no source text for (e.g. PDF parsed About but not Headline)
+    // lets the model fabricate one, which `pickFixes` would attach as
+    // an ungrounded before/after in the gated report.
+    judgeRequest.rewriteTargets = pickGroundedRewriteTargets(judgeRequest);
     // One-shot diagnostic — logged BEFORE the judge is constructed so
     // we see what the route sees on Vercel even if `createServerJudge`
     // itself can't run. The factory emits its own `[createServerJudge]
