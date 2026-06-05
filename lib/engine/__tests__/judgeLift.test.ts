@@ -132,6 +132,38 @@ describe('B3 — structural FLOOR holds (judge never drops a section below struc
   });
 });
 
+describe('B3 — oneLineWhy reflects the displayed rawScore, not the floored-away pre-floor value (Codex Round 2 P2)', () => {
+  it('headline: harsh judgment on a structurally-strong headline produces a one-liner consistent with the FLOORED (high) score', () => {
+    const profile = makeProfile({
+      headline: { data: STRONG_HEADLINE_TEXT, confidence: 'high' },
+    });
+    const harshed = scoreHeadline(profile, HARSH_HEADLINE_JUDGMENT);
+    // rawScore is at the structural floor (top of B+ band).
+    expect(harshed.rawScore).toBeGreaterThanOrEqual(80);
+    // The narrative for sub-70 scores ("Headline does little work —
+    // most of the slot is wasted." / "Reads as a job title and little
+    // else.") must NOT appear: the user sees a B+/A and would be
+    // confused by a "does little work" sentence.
+    expect(harshed.oneLineWhy).not.toMatch(/does little work/);
+    expect(harshed.oneLineWhy).not.toMatch(/job title and little else/);
+  });
+
+  it('about: harsh judgment on a structurally-decent About produces a one-liner consistent with the FLOORED score', () => {
+    const profile = makeProfile({
+      about: { data: STRONG_ABOUT_TEXT, confidence: 'high' },
+    });
+    const structural = scoreAbout(profile, undefined);
+    const harshed = scoreAbout(profile, HARSH_ABOUT_JUDGMENT);
+    // The score holds at the structural floor; the one-liner must
+    // describe the floored grade, not the dropped-then-restored low.
+    expect(harshed.rawScore).toBe(structural.rawScore);
+    // Same narrative as the structural-only case at that score band
+    // (we don't pin exact text — just that the floored grade and its
+    // explanation agree, by computing both from the same number).
+    expect(harshed.oneLineWhy.length).toBeGreaterThan(0);
+  });
+});
+
 describe('B3 — needsReview clears ONLY when the judge actually returned for that section', () => {
   it('headline keeps needsReview when no judge response is supplied', () => {
     const profile = makeProfile({

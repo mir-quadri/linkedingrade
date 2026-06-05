@@ -135,7 +135,11 @@ export function scoreAbout(
   return {
     rawScore,
     reasons,
-    oneLineWhy: oneLine(score, !!judgment, judgment),
+    // Codex Round 2 P2: derive the summary from the FINAL rawScore, not
+    // the pre-floor `score`. A harsh judgment on a structurally strong
+    // About would otherwise surface a B/A grade with a "needs work"
+    // narrative — score and explanation disagreeing.
+    oneLineWhy: oneLine(rawScore, !!judgment, judgment),
     // No judgment, or most of the AI booleans missing → flag degraded coverage.
     needsReview: !judgment || unknownFields >= 3,
   };

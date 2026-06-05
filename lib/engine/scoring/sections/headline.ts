@@ -219,13 +219,18 @@ export function scoreHeadline(
     if (judgment.notes) reasons.push(judgment.notes);
   }
 
-  const oneLineWhy = oneLine(score, !!judgment, judgment);
   // Lift-only invariant: never below the structural floor when judgment
   // is present. Without judgment, the structural score IS the score —
   // no max() needed (structural == floor by definition).
   const rawScore = judgment
     ? Math.max(structuralFloor, clamp(score))
     : clamp(score);
+  // Codex Round 2 P2: derive the summary from the FINAL rawScore, not
+  // the pre-floor `score`. Otherwise a harsh judgment on a structurally
+  // strong headline could surface a high grade with a "does little
+  // work" narrative — the score the user sees and the sentence
+  // explaining it would disagree.
+  const oneLineWhy = oneLine(rawScore, !!judgment, judgment);
   return {
     rawScore,
     reasons,
