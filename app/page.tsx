@@ -717,10 +717,10 @@ function Pricing() {
             Four prices. <em>One product.</em> Cancel in two clicks.
           </h2>
           <p className="deck">
-            No trial, no card on file for the free audit. The paid plans differ
-            on volume and exports, not on the quality of the audit. Whichever
-            tier you&apos;re on, you get the same rubric and the same 6-page
-            report.
+            No trial, no card for the free audit — it grades the 4 sections
+            recruiters scan first, today. The paid plans add the full
+            12-section report, volume, and exports when the Chrome extension
+            ships.
           </p>
         </div>
 
