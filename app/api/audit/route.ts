@@ -148,12 +148,15 @@ export async function POST(request: Request) {
     const { profile, audit } = runPdfAudit(parsed, judgeResponse);
 
     const store = await getAuditStore();
-    // userAgent / ipHash are intentionally NOT captured here. The
-    // privacy policy ties their collection to the email-submit step
-    // (the moment the user gives explicit consent). An upload-only
-    // visitor who never clears the gate must not have UA / IP hash
-    // retained. The /api/audit/email route captures them from its own
-    // request headers and passes them to attachEmail.
+    // userAgent / ipHash are intentionally NOT captured on the AUDIT
+    // RECORD here. The privacy policy ties audit-record retention of
+    // the IP hash to the email-submit consent moment. The /api/audit/
+    // email route captures both from its own request headers and
+    // passes them to attachEmail.
+    //
+    // (Separately, the AI judge proxy DOES receive a SHA-256-hashed
+    // IP as its per-IP rate-limit key — that's a 25-hour counter,
+    // not an audit-record field, and is disclosed in /privacy.)
     await store.save({
       auditId,
       createdAt: new Date().toISOString(),
