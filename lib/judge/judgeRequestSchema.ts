@@ -24,6 +24,16 @@ import type { JudgeRequest } from '@/lib/engine/types/judge';
  */
 export const MAX_HEADLINE_CHARS = 500;
 export const MAX_ABOUT_CHARS = 5000;
+/**
+ * `rolesFamilyHint` is interpolated into the Anthropic prompt by
+ * `buildJudgePrompt`, so it must be capped too — otherwise a spoofed-
+ * origin request to the secretless relay could send a tiny headline plus
+ * a multi-megabyte hint and bypass the per-field token-cost caps (Codex
+ * P2). A real role family is a few words ("engineering", "product"); 100
+ * chars is generous. Over-cap hints are DROPPED (not rejected) since the
+ * hint is optional metadata — the audit proceeds without it.
+ */
+export const MAX_ROLES_HINT_CHARS = 100;
 
 export interface ParsedJudgeRequest {
   request: JudgeRequest;
@@ -75,7 +85,11 @@ export function parseJudgeRequestBody(payload: unknown): ParseJudgeRequestResult
     return { ok: false, reason: 'Body must include `judgeRequest` with at least one section.' };
   }
 
-  const rolesFamilyHint = typeof req.rolesFamilyHint === 'string' ? req.rolesFamilyHint : null;
+  // Drop an over-cap hint rather than fail the request — see
+  // MAX_ROLES_HINT_CHARS. This bounds what reaches the prompt.
+  const rolesHintRaw = typeof req.rolesFamilyHint === 'string' ? req.rolesFamilyHint : null;
+  const rolesFamilyHint =
+    rolesHintRaw !== null && rolesHintRaw.length <= MAX_ROLES_HINT_CHARS ? rolesHintRaw : null;
   const targetsRaw = Array.isArray(req.rewriteTargets) ? req.rewriteTargets : [];
   const rewriteTargets = targetsRaw.filter(
     (t): t is 'headline' | 'about' | 'currentExperience' =>

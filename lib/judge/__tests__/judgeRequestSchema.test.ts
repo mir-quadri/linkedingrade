@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   MAX_ABOUT_CHARS,
   MAX_HEADLINE_CHARS,
+  MAX_ROLES_HINT_CHARS,
   parseJudgeRequestBody,
 } from '../judgeRequestSchema';
 
@@ -49,6 +50,21 @@ describe('parseJudgeRequestBody', () => {
       judgeRequest: { about: { text: 'x'.repeat(MAX_ABOUT_CHARS + 1) } },
     });
     expect(tooBig.ok).toBe(false);
+  });
+
+  it('keeps a normal rolesFamilyHint but drops an over-cap one (token-cost cap)', () => {
+    const ok = parseJudgeRequestBody({
+      judgeRequest: { about: { text: 'hi' }, rolesFamilyHint: 'engineering' },
+    });
+    expect(ok.ok).toBe(true);
+    if (ok.ok) expect(ok.value.request.rolesFamilyHint).toBe('engineering');
+
+    const dropped = parseJudgeRequestBody({
+      judgeRequest: { about: { text: 'hi' }, rolesFamilyHint: 'x'.repeat(MAX_ROLES_HINT_CHARS + 1) },
+    });
+    expect(dropped.ok).toBe(true);
+    // Request still succeeds; the overlong hint is dropped to null.
+    if (dropped.ok) expect(dropped.value.request.rolesFamilyHint).toBeNull();
   });
 
   it('filters rewriteTargets to the allow-list and defaults auditId to null', () => {
