@@ -55,8 +55,17 @@ export function buildJudgePrompt(req: JudgeRequest): {
   const rewriteTargets = Array.from(new Set(req.rewriteTargets ?? []))
     .filter((t) => t === 'headline' || t === 'about');
 
+  // Codex P2: the role-family hint is caller-supplied and, via the
+  // secretless extension relay, reaches this prompt from a spoofable
+  // origin. The per-field char cap (MAX_ROLES_HINT_CHARS) bounds its
+  // SIZE but not its CONTENT — a ≤100-char hint can still carry newlines
+  // and injected instructions. Hard-delimit it with JSON.stringify, the
+  // same one-pass escaping (quotes, backslashes, newlines, control
+  // chars) already applied to the headline/about profile text above, so
+  // it lands as an unambiguous quoted literal instead of free-floating
+  // prompt directives.
   const roleHint = req.rolesFamilyHint
-    ? `Role family (use for keyword expectations only): ${req.rolesFamilyHint}`
+    ? `Role family (use for keyword expectations only): ${JSON.stringify(req.rolesFamilyHint)}`
     : 'Role family unknown.';
 
   const system = `You are a senior LinkedIn copy editor. You evaluate two text
