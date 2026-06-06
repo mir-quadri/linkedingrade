@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 
-import { extractIp, hashIp } from '@/lib/audit/hashIp';
 import {
   callAnthropic,
   estimateUsd,
@@ -8,9 +7,16 @@ import {
   type PriceTable,
 } from '@/lib/judge/anthropicClient';
 import { buildJudgePrompt } from '@/lib/judge/buildPrompt';
+import {
+  buildPreflightResponse,
+  parseAllowedOrigins,
+  withCorsHeaders,
+} from '@/lib/judge/cors';
+import { deriveJudgeRateKey } from '@/lib/judge/ipRateKey';
+import { parseJudgeRequestBody } from '@/lib/judge/judgeRequestSchema';
 import { parseJudgeResponse } from '@/lib/judge/parseResponse';
 import { consumeJudgeRateLimit } from '@/lib/judge/rateLimit';
-import type { JudgeRequest, JudgeResponse } from '@/lib/engine/types/judge';
+import type { JudgeResponse } from '@/lib/engine/types/judge';
 
 export const runtime = 'nodejs';
 // Vercel function timeout. Must sit ABOVE the upstream Anthropic
@@ -32,20 +38,6 @@ export const maxDuration = 60;
 const DEFAULT_MODEL = 'claude-sonnet-4-6';
 const DEFAULT_MAX_OUTPUT_TOKENS = 1500;
 const DEFAULT_RATE_LIMIT_PER_DAY = 50;
-
-/**
- * Per-field input-text caps applied before building the prompt.
- *
- * LinkedIn's actual limits are 220 chars for the headline and 2600
- * for About. The caps below sit well above those — generous enough
- * for any plausible legitimate input but tight enough that a
- * malformed extension payload (or a future allow-listed origin sent
- * by a malicious caller) can't hand megabytes of text to Anthropic
- * and burn the per-IP daily budget on a single call. Rate limit
- * applies AFTER the upstream call, so this is the input-side guard.
- */
-const MAX_HEADLINE_CHARS = 500;
-const MAX_ABOUT_CHARS = 5000;
 
 /**
  * AI-judge proxy.
@@ -118,7 +110,7 @@ export async function POST(request: Request) {
       request,
     );
   }
-  const extracted = extractJudgeRequest(payload);
+  const extracted = parseJudgeRequestBody(payload);
   if (!extracted.ok) {
     return withCors(
       NextResponse.json({ error: extracted.reason }, { status: 400 }),
@@ -145,17 +137,14 @@ export async function POST(request: Request) {
   // not Redis). Per-instance scope is an acceptable degraded mode for
   // a deployment that hasn't set the pepper — the right fix is for
   // the operator to set IP_HASH_PEPPER.
-  const ip = extractIp(request.headers);
-  const hashed = ip ? hashIp(ip) : null;
-  const ipKey = hashed ? `hash:${hashed}` : ip ? `raw:${ip}` : 'no-ip';
-  const rateLimitKey = `judge:${ipKey}`;
-  const memoryOnly = hashed === null; // pepper-missing OR no IP at all
+  //
   // Codex Round 5 P2: never log the rate-limit key directly — when
   // pepper is unset it embeds the raw IP, and Vercel/runtime logs are
   // persistent (same contract `lib/audit/hashIp.ts` enforces for KV).
-  // Emit the key SHAPE only; that's enough to diagnose abuse (which
-  // partition is over-limit) without persisting the identifier.
-  const keyShape = hashed ? 'hash' : ip ? 'raw' : 'no-ip';
+  // `deriveJudgeRateKey` returns the key SHAPE only for logging; that's
+  // enough to diagnose abuse (which partition is over-limit) without
+  // persisting the identifier.
+  const { rateLimitKey, memoryOnly, keyShape } = deriveJudgeRateKey(request.headers, 'judge');
   const limit = numericEnv('JUDGE_RATE_LIMIT_PER_DAY', DEFAULT_RATE_LIMIT_PER_DAY);
   const decision = await consumeJudgeRateLimit(rateLimitKey, limit, undefined, {
     memoryOnly,
@@ -248,43 +237,21 @@ export async function POST(request: Request) {
  */
 export async function OPTIONS(request: Request): Promise<Response> {
   const origin = request.headers.get('origin');
-  const allowed = (process.env.JUDGE_ALLOWED_ORIGINS ?? '')
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
-  const isAllowed = origin !== null && allowed.includes(origin);
-  const headers: Record<string, string> = {
-    'Access-Control-Max-Age': '86400',
-    Vary: 'Origin',
-  };
-  if (isAllowed && origin) {
-    headers['Access-Control-Allow-Origin'] = origin;
-    headers['Access-Control-Allow-Methods'] = 'POST, OPTIONS';
-    headers['Access-Control-Allow-Headers'] = 'Content-Type, X-Judge-Auth';
-  }
-  return new Response(null, { status: 204, headers });
+  const allowed = parseAllowedOrigins(process.env.JUDGE_ALLOWED_ORIGINS);
+  return buildPreflightResponse(origin, allowed, 'Content-Type, X-Judge-Auth');
 }
 
 // ---------- helpers ----------
 
 /**
  * Attach CORS response headers when the request's `Origin` is on the
- * allowlist. The browser otherwise blocks the response from reaching
- * the JS caller. Server-to-server callers (no `Origin`) get no extra
- * headers — they don't need them and adding `Access-Control-Allow-
- * Origin: *` would weaken the contract.
+ * `JUDGE_ALLOWED_ORIGINS` allowlist. Server-to-server callers (no
+ * `Origin`) get no extra headers — see `lib/judge/cors.ts`.
  */
 function withCors(response: Response, request: Request): Response {
   const origin = request.headers.get('origin');
-  if (!origin) return response;
-  const allowed = (process.env.JUDGE_ALLOWED_ORIGINS ?? '')
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
-  if (!allowed.includes(origin)) return response;
-  response.headers.set('Access-Control-Allow-Origin', origin);
-  response.headers.set('Vary', 'Origin');
-  return response;
+  const allowed = parseAllowedOrigins(process.env.JUDGE_ALLOWED_ORIGINS);
+  return withCorsHeaders(response, origin, allowed);
 }
 
 type AuthDecision =
@@ -303,69 +270,6 @@ function authoriseCaller(request: Request): AuthDecision {
     return { ok: false, reason: 'Missing or invalid X-Judge-Auth header.' };
   }
   return { ok: true, kind: 'secret' };
-}
-
-interface ParsedJudgeRequest {
-  request: JudgeRequest;
-  auditId: string | null;
-}
-
-type ExtractResult =
-  | { ok: true; value: ParsedJudgeRequest }
-  | { ok: false; reason: string };
-
-function extractJudgeRequest(payload: unknown): ExtractResult {
-  if (typeof payload !== 'object' || payload === null) {
-    return { ok: false, reason: 'Body must include `judgeRequest` with at least one section.' };
-  }
-  const body = payload as { judgeRequest?: unknown; auditId?: unknown };
-  if (typeof body.judgeRequest !== 'object' || body.judgeRequest === null) {
-    return { ok: false, reason: 'Body must include `judgeRequest` with at least one section.' };
-  }
-  const req = body.judgeRequest as Record<string, unknown>;
-  // Codex P2 — input-text caps. A browser-origin caller could otherwise
-  // hand megabytes of text to Anthropic in a single audit, blowing the
-  // per-IP daily budget before the rate limit kicks in (the limit
-  // counts calls, not tokens). Cap at well above LinkedIn's actual
-  // limits (220 chars / 2600 chars) and reject anything that pretends
-  // those slots are bigger.
-  const headlineRaw = isTextField(req.headline) ? req.headline.text : undefined;
-  if (headlineRaw !== undefined && headlineRaw.length > MAX_HEADLINE_CHARS) {
-    return {
-      ok: false,
-      reason: `judgeRequest.headline.text exceeds the ${MAX_HEADLINE_CHARS}-char cap.`,
-    };
-  }
-  const aboutRaw = isTextField(req.about) ? req.about.text : undefined;
-  if (aboutRaw !== undefined && aboutRaw.length > MAX_ABOUT_CHARS) {
-    return {
-      ok: false,
-      reason: `judgeRequest.about.text exceeds the ${MAX_ABOUT_CHARS}-char cap.`,
-    };
-  }
-  const headline = headlineRaw !== undefined ? { text: headlineRaw } : undefined;
-  const about = aboutRaw !== undefined ? { text: aboutRaw } : undefined;
-  if (!headline && !about) {
-    return { ok: false, reason: 'Body must include `judgeRequest` with at least one section.' };
-  }
-  const rolesFamilyHint = typeof req.rolesFamilyHint === 'string' ? req.rolesFamilyHint : null;
-  const targetsRaw = Array.isArray(req.rewriteTargets) ? req.rewriteTargets : [];
-  const rewriteTargets = targetsRaw.filter(
-    (t): t is 'headline' | 'about' | 'currentExperience' =>
-      t === 'headline' || t === 'about' || t === 'currentExperience',
-  );
-  const judgeRequest: JudgeRequest = {
-    headline,
-    about,
-    rolesFamilyHint,
-    rewriteTargets,
-  };
-  const auditId = typeof body.auditId === 'string' ? body.auditId : null;
-  return { ok: true, value: { request: judgeRequest, auditId } };
-}
-
-function isTextField(v: unknown): v is { text: string } {
-  return typeof v === 'object' && v !== null && typeof (v as { text?: unknown }).text === 'string';
 }
 
 function judgeUnavailable(reason: string, ctx: { auditId: string | null }) {
