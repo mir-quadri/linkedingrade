@@ -23,9 +23,15 @@ const SECTION_HEADERS = [
   'Publication',
   'Patents',
   'Patent',
+  // LinkedIn's documented variants for the Honors-Awards section use
+  // BOTH Title-Case and lowercase `awards`. The header match is
+  // exact-string `===`, so each variant the export can emit must be
+  // listed explicitly. (Codex R2 P2 on PR #22.)
   'Honors-Awards',
   'Honors and Awards',
+  'Honors and awards',
   'Honors & Awards',
+  'Honors & awards',
   'Awards',
   'Summary',
   'Experience',
@@ -49,7 +55,9 @@ const SIDEBAR_HEADERS: ReadonlySet<SectionHeader> = new Set([
   'Patent',
   'Honors-Awards',
   'Honors and Awards',
+  'Honors and awards',
   'Honors & Awards',
+  'Honors & awards',
   'Awards',
 ]);
 

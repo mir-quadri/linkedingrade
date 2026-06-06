@@ -158,6 +158,39 @@ BBA, Marketing
     );
   });
 
+  it('lowercase `Honors & awards` variant is recognised — Codex R2 P2 (LinkedIn emits both Title-Case and lowercase `awards`)', () => {
+    const HONORS_LOWERCASE_VARIANT = `Contact
+555-0109 (Mobile)
+example9@example.com
+Top Skills
+Product Strategy
+Languages
+English
+Certifications
+Certified Scrum Product Owner
+Honors & awards
+Industry Leadership Award
+2023
+Award Recipient Citation
+2022
+Anna Schmidt
+Director of Product
+Berlin, Germany
+Summary
+Product leader summary.
+Experience
+SomeCorp
+Director of Product
+January 2023 - Present (1 year 11 months)
+Berlin, Germany
+Education
+Technical University of Munich
+M.S., Computer Science
+`;
+    const profile = parseLinkedInText(HONORS_LOWERCASE_VARIANT);
+    expect(profile.fullName).toBe('Anna Schmidt');
+  });
+
   it('Honors-Awards block in the sidebar does not garble the fullName', () => {
     const profile = parseLinkedInText(HONORS_PROFILE);
     expect(profile.fullName).toBe('Maria Garcia');
