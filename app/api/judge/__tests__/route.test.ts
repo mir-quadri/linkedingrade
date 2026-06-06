@@ -568,3 +568,57 @@ describe('POST /api/judge — CORS response headers (Codex P2)', () => {
     expect(res.headers.get('access-control-allow-origin')).toBeNull();
   });
 });
+
+describe('POST /api/judge — trusted-relay rate-limit skip', () => {
+  const fetchSpy = vi.spyOn(globalThis, 'fetch');
+  beforeEach(() => {
+    fetchSpy.mockReset();
+    delete process.env.KV_REST_API_URL;
+    delete process.env.KV_REST_API_TOKEN;
+    process.env.ANTHROPIC_API_KEY = 'sk-test';
+    process.env.JUDGE_PROXY_SECRET = 'super-secret';
+    process.env.JUDGE_RATE_LIMIT_PER_DAY = '1';
+    __resetJudgeRateLimitForTests();
+  });
+  afterEach(() => {
+    delete process.env.JUDGE_PROXY_SECRET;
+    delete process.env.JUDGE_RATE_LIMIT_PER_DAY;
+    delete process.env.ANTHROPIC_API_KEY;
+    __resetJudgeRateLimitForTests();
+  });
+
+  it('bypasses the per-IP limit when a secret-authenticated caller sends X-Judge-Skip-Rate-Limit', async () => {
+    // Fresh Response per call — a body can only be read once.
+    fetchSpy.mockImplementation(async () => makeAnthropicResponse(STRICT_OK_BODY));
+    // Limit is 1/day, but two skip-flagged calls both succeed — the
+    // proxy never consumes the judge bucket for trusted relayed traffic.
+    for (let i = 0; i < 2; i++) {
+      const res = await POST(
+        makeRequest(VALID_REQUEST, {
+          'x-judge-auth': 'super-secret',
+          'x-judge-skip-rate-limit': '1',
+        }),
+      );
+      expect(res.status).toBe(200);
+      expect(((await res.json()) as { status: string }).status).toBe('ok');
+    }
+  });
+
+  it('does NOT let the skip header bypass auth — no secret still 403s', async () => {
+    const res = await POST(
+      makeRequest(VALID_REQUEST, { 'x-judge-skip-rate-limit': '1' }),
+    );
+    expect(res.status).toBe(403);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it('still limits normal (non-skip) callers — the skip is opt-in', async () => {
+    fetchSpy.mockResolvedValue(makeAnthropicResponse(STRICT_OK_BODY));
+    const first = await POST(makeRequest(VALID_REQUEST, { 'x-judge-auth': 'super-secret' }));
+    expect(first.status).toBe(200);
+    const second = await POST(makeRequest(VALID_REQUEST, { 'x-judge-auth': 'super-secret' }));
+    expect(second.status).toBe(200);
+    // Limit is 1; the second non-skip call degrades to judge_unavailable.
+    expect(((await second.json()) as { status: string }).status).toBe('judge_unavailable');
+  });
+});
