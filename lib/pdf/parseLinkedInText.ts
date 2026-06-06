@@ -11,6 +11,22 @@ const SECTION_HEADERS = [
   'Top Skills',
   'Languages',
   'Certifications',
+  // Publications / Patents / Honors-Awards / Awards render in the SAME
+  // left sidebar column as Contact / Top Skills / Languages /
+  // Certifications. Without recognising them as headers the parser
+  // treats their multi-line content as part of the identity slice
+  // (between the last recognised sidebar header and `Summary`), which
+  // produced the "Erum Quadri" misparse where author lists and
+  // publication titles polluted the name-finder window. LinkedIn ships
+  // a handful of label variants; we list each.
+  'Publications',
+  'Publication',
+  'Patents',
+  'Patent',
+  'Honors-Awards',
+  'Honors and Awards',
+  'Honors & Awards',
+  'Awards',
   'Summary',
   'Experience',
   'Education',
@@ -19,12 +35,22 @@ type SectionHeader = (typeof SECTION_HEADERS)[number];
 
 // Sidebar sections sit above the identity block in a LinkedIn PDF. Any of
 // them can be the last one before the name appears (Certifications is the
-// canonical trailing header, but the Certifications section is optional).
+// canonical trailing header, but the Certifications section is optional —
+// and Publications / Patents / Honors / Awards can run BELOW it when a
+// profile uses them).
 const SIDEBAR_HEADERS: ReadonlySet<SectionHeader> = new Set([
   'Contact',
   'Top Skills',
   'Languages',
   'Certifications',
+  'Publications',
+  'Publication',
+  'Patents',
+  'Patent',
+  'Honors-Awards',
+  'Honors and Awards',
+  'Honors & Awards',
+  'Awards',
 ]);
 
 interface HeaderIndex {
@@ -341,20 +367,33 @@ function extractIdentity(
   }
 
   // Legacy fallback for slices where no line passes the name heuristic.
+  // Validate the candidate against `looksLikeName` before emitting it:
+  // if the fallback would produce a not-a-name (e.g. a headline
+  // fragment or publication title from a column-interleaved export),
+  // return `name: null` so the engine's name-suspicion guard sees an
+  // honest "couldn't extract" rather than a garbled string. This is
+  // safer than the old behaviour, which blindly returned
+  // `slice[length-3]` even when it was clearly a headline fragment
+  // with pipes / commas / disqualifier words.
+  const candidate =
+    slice.length === 1 ? slice[0]!
+    : slice.length === 2 ? slice[0]!
+    : slice[slice.length - 3]!;
+  const honestCandidate = looksLikeName(candidate) ? candidate : null;
   if (slice.length === 1) {
     return {
-      name: slice[0]!, headline: null, location: null,
+      name: honestCandidate, headline: null, location: null,
       trailingSidebarItems: [], trailingHeader,
     };
   }
   if (slice.length === 2) {
     return {
-      name: slice[0]!, headline: null, location: slice[1]!,
+      name: honestCandidate, headline: null, location: slice[1]!,
       trailingSidebarItems: [], trailingHeader,
     };
   }
   return {
-    name: slice[slice.length - 3]!,
+    name: honestCandidate,
     headline: slice[slice.length - 2]!,
     location: slice[slice.length - 1]!,
     trailingSidebarItems: slice.slice(0, slice.length - 3),
