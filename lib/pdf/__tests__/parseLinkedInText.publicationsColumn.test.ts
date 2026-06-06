@@ -309,6 +309,42 @@ B.A., Business Administration
     expect(profile.fullName).toBe('Juan Carlos de la Cruz');
   });
 
+  it('legacy fallback preserves a suffixed name with trailing `.` (Codex R5 P2 — `John Smith Jr.` / `Jane Doe Sr.`)', () => {
+    // `looksLikeName` rejects any line ending in `.?!:` (sentence /
+    // bullet markers). Common dotted suffixes ("Jr.", "Sr.", "M.D.")
+    // make the identity line end in `.` — which the strict heuristic
+    // declines, sending the parse through the fallback. My R0
+    // `obviouslyNotAName` check ALSO had a trailing-`.` rejection,
+    // so it would have re-killed the candidate. Narrowed to `?!:`
+    // only — periods are name-permissible at the end (Jr./Sr./M.D./
+    // Ph.D.). Codex R5 P2.
+    const SUFFIXED_NAME = `Contact
+555-0112 (Mobile)
+example12@example.com
+Top Skills
+Engineering Leadership
+Distributed Systems
+Site Reliability
+Certifications
+AWS Certified Solutions Architect
+John Smith Jr.
+Engineering Manager | Distributed Systems
+Seattle, Washington, United States
+Summary
+Engineering manager summary.
+Experience
+TechCo
+Engineering Manager
+January 2020 - Present (4 years 11 months)
+Seattle, Washington, United States
+Education
+University of Washington
+B.S., Computer Science
+`;
+    const profile = parseLinkedInText(SUFFIXED_NAME);
+    expect(profile.fullName).toBe('John Smith Jr.');
+  });
+
   it('headline-fragment fallback returns null name — does not emit a garbled fullName', () => {
     // Degenerate slice that the old legacy fallback would have
     // emitted as a name. The slice between Certifications and Summary

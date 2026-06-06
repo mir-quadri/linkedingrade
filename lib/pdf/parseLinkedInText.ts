@@ -333,7 +333,7 @@ function obviouslyNotAName(line: string): boolean {
   if (!t) return true;
   if (/[|@&/•·]/.test(t)) return true;
   if (/\sat\s/i.test(t)) return true;
-  if (/[.?!:]$/.test(t)) return true;
+  if (/[?!:]$/.test(t)) return true;
   if (t.split(/\s+/).length > 5) return true;
   return false;
 }
