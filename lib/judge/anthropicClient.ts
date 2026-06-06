@@ -88,12 +88,12 @@ export async function callAnthropic(params: AnthropicCallParams): Promise<Anthro
       signal: controller.signal,
     });
     if (!resp.ok) {
-      const body = await resp.text().catch(() => '');
+      const body = await readTextWithAbort(resp, controller.signal).catch(() => '');
       throw new Error(
         `anthropic ${resp.status}: ${body.slice(0, 200)}`,
       );
     }
-    const json = (await resp.json()) as AnthropicResponseBody;
+    const json = (await readJsonWithAbort(resp, controller.signal)) as AnthropicResponseBody;
     const text = (json.content ?? [])
       .filter((b) => b.type === 'text' && typeof b.text === 'string')
       .map((b) => b.text!)
@@ -132,4 +132,50 @@ export function estimateUsd(usage: AnthropicUsage, prices: PriceTable = DEFAULT_
   const input = (usage.inputTokens / 1_000_000) * prices.inputUsdPerMillion;
   const output = (usage.outputTokens / 1_000_000) * prices.outputUsdPerMillion;
   return Math.round((input + output) * 10_000) / 10_000; // round to 4dp
+}
+
+/**
+ * Read a `Response` body as JSON, racing against an `AbortSignal`.
+ * See the matching helper in `httpJudge.ts` for the production
+ * dead-zone bug this guards against (body stream not honouring the
+ * fetch-level abort, causing `await resp.json()` to hang past
+ * `maxDuration` and skip `catch`/`finally`).
+ */
+async function readJsonWithAbort(res: Response, signal: AbortSignal): Promise<unknown> {
+  if (signal.aborted) {
+    await res.body?.cancel().catch(() => undefined);
+    const err = new Error('aborted');
+    err.name = 'AbortError';
+    throw err;
+  }
+  const abortPromise = new Promise<never>((_, reject) => {
+    const onAbort = () => {
+      res.body?.cancel().catch(() => undefined);
+      const err = new Error('aborted');
+      err.name = 'AbortError';
+      reject(err);
+    };
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
+  return Promise.race([res.json(), abortPromise]);
+}
+
+/** Same shape as `readJsonWithAbort` but for the error-path text body. */
+async function readTextWithAbort(res: Response, signal: AbortSignal): Promise<string> {
+  if (signal.aborted) {
+    await res.body?.cancel().catch(() => undefined);
+    const err = new Error('aborted');
+    err.name = 'AbortError';
+    throw err;
+  }
+  const abortPromise = new Promise<never>((_, reject) => {
+    const onAbort = () => {
+      res.body?.cancel().catch(() => undefined);
+      const err = new Error('aborted');
+      err.name = 'AbortError';
+      reject(err);
+    };
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
+  return Promise.race([res.text(), abortPromise]);
 }

@@ -36,4 +36,40 @@ describe('judge timeout invariants', () => {
     expect(ANTHROPIC_DEFAULT_TIMEOUT_MS).toBeLessThanOrEqual(45_000);
     expect(HTTP_JUDGE_DEFAULT_TIMEOUT_MS).toBeLessThanOrEqual(50_000);
   });
+
+  it('caller timeout + cold-start + parse + storage budget fits under the route maxDuration (60s)', async () => {
+    // Production guard: the route's `export const maxDuration = 60`
+    // is a hard wall — anything that exceeds it gets killed mid-
+    // flight with no `catch`/`finally` running, which is exactly the
+    // failure mode that motivated this PR. The audit route's worst-
+    // case path is:
+    //   cold-start (~2s)
+    //   + parseLinkedInPdf (~3s on a heavy PDF)
+    //   + HttpJudge timeout (≤ HTTP_JUDGE_DEFAULT_TIMEOUT_MS)
+    //   + runPdfAudit (ms)
+    //   + KV store.save (p99 ~3s on Upstash)
+    // ≈ 8 + caller_timeout. The caller-side cap must therefore stay
+    // at least 8s below maxDuration so legitimate slow paths land
+    // inside the budget.
+    const MAX_DURATION_MS = 60_000;
+    const NON_JUDGE_BUDGET_MS = 8_000;
+    expect(HTTP_JUDGE_DEFAULT_TIMEOUT_MS).toBeLessThanOrEqual(
+      MAX_DURATION_MS - NON_JUDGE_BUDGET_MS,
+    );
+
+    // Also assert both route files actually set maxDuration = 60.
+    // If a future edit drops the export, this test catches it before
+    // the production function reverts to the plan default.
+    const fs = await import('node:fs/promises');
+    const auditRoute = await fs.readFile(
+      new URL('../../../app/api/audit/route.ts', import.meta.url),
+      'utf8',
+    );
+    const judgeRoute = await fs.readFile(
+      new URL('../../../app/api/judge/route.ts', import.meta.url),
+      'utf8',
+    );
+    expect(auditRoute).toMatch(/export\s+const\s+maxDuration\s*=\s*60\b/);
+    expect(judgeRoute).toMatch(/export\s+const\s+maxDuration\s*=\s*60\b/);
+  });
 });

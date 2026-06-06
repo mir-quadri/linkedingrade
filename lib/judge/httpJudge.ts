@@ -110,7 +110,7 @@ export class HttpJudge implements Judge {
         return {};
       }
       console.log(`[HttpJudge] TRACE pre-json auditId=${auditId}`);
-      const body = (await res.json()) as {
+      const body = (await readJsonWithAbort(res, ac.signal)) as {
         status?: 'ok' | 'judge_unavailable';
         judgeResponse?: JudgeResponse;
         reason?: string;
@@ -167,4 +167,43 @@ export class HttpJudge implements Judge {
       // Observability hooks must never break the audit.
     }
   }
+}
+
+/**
+ * Read a `Response` body as JSON, racing against an `AbortSignal`.
+ *
+ * Why this exists: the AbortController passed to `fetch()` only
+ * propagates to the body reader in some runtimes — notably, if the
+ * upstream returns headers but stalls during body streaming, Node's
+ * `undici`-backed `fetch` may not abort `await res.json()` on
+ * `controller.abort()`. The `await` then hangs forever, the
+ * `try`/`catch`/`finally` never runs, `onResult` never fires, and
+ * Vercel kills the function at `maxDuration`. This is the
+ * production dead-zone bug.
+ *
+ * The fix: explicitly race the body read against the abort signal.
+ * If the signal fires while `res.json()` is in-flight, we cancel
+ * the body stream (releasing the socket) and reject so the outer
+ * `catch` handles it normally and `onResult` fires with
+ * `reason='timeout'`.
+ */
+async function readJsonWithAbort(res: Response, signal: AbortSignal): Promise<unknown> {
+  if (signal.aborted) {
+    await res.body?.cancel().catch(() => undefined);
+    const err = new Error('aborted');
+    err.name = 'AbortError';
+    throw err;
+  }
+  const abortPromise = new Promise<never>((_, reject) => {
+    const onAbort = () => {
+      // Release the underlying socket so the connection doesn't sit
+      // open until the upstream eventually closes it.
+      res.body?.cancel().catch(() => undefined);
+      const err = new Error('aborted');
+      err.name = 'AbortError';
+      reject(err);
+    };
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
+  return Promise.race([res.json(), abortPromise]);
 }
