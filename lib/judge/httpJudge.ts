@@ -1,5 +1,13 @@
 import type { Judge, JudgeRequest, JudgeResponse } from '@/lib/engine/types/judge';
 
+/**
+ * Default caller-side timeout for HttpJudge. Exported so tests and
+ * route code share the constant. MUST sit above
+ * `ANTHROPIC_DEFAULT_TIMEOUT_MS` from `anthropicClient.ts` — see
+ * `__tests__/timeoutInvariants.test.ts`.
+ */
+export const HTTP_JUDGE_DEFAULT_TIMEOUT_MS = 35_000;
+
 export interface HttpJudgeOptions {
   /** Absolute URL of the `/api/judge` proxy. */
   proxyUrl: string;
@@ -7,9 +15,11 @@ export interface HttpJudgeOptions {
   proxySecret: string;
   /** Stamped on outgoing requests so proxy logs correlate audit ↔ judge call. */
   auditId?: string | null;
-  /** Caller-side timeout. Proxy enforces its own ~12s upstream timeout — this
-   * is the request-level cap that covers DNS, TLS, and the wait for the
-   * proxy response together. */
+  /** Caller-side timeout. Sits ABOVE the proxy's upstream Anthropic
+   * timeout (30s as of the timeout raise) so the upstream times out
+   * first and returns a structured `judge_unavailable`; the caller
+   * timeout is the belt-and-suspenders cap that also covers DNS,
+   * TLS, and the wait for the proxy response. Defaults to 35_000ms. */
   timeoutMs?: number;
   /**
    * Forwarded headers identifying the originating end-user — typically
@@ -62,11 +72,14 @@ export class HttpJudge implements Judge {
 
   async evaluate(req: JudgeRequest): Promise<JudgeResponse> {
     const startedAt = Date.now();
-    const timeoutMs = this.opts.timeoutMs ?? 15_000;
+    const timeoutMs = this.opts.timeoutMs ?? HTTP_JUDGE_DEFAULT_TIMEOUT_MS;
     const ac = new AbortController();
     const timer = setTimeout(() => ac.abort(), timeoutMs);
     const auditId = this.opts.auditId ?? null;
     const fetchImpl = this.opts.fetchImpl ?? fetch;
+    console.log(
+      `[HttpJudge] TRACE evaluate-start auditId=${auditId} proxyUrl=${this.opts.proxyUrl} timeoutMs=${timeoutMs}`,
+    );
     try {
       const headers: Record<string, string> = {
         // Forwarded client-identifying headers go FIRST so our own
@@ -76,12 +89,16 @@ export class HttpJudge implements Judge {
         'Content-Type': 'application/json',
         'X-Judge-Auth': this.opts.proxySecret,
       };
+      console.log(`[HttpJudge] TRACE pre-fetch auditId=${auditId}`);
       const res = await fetchImpl(this.opts.proxyUrl, {
         method: 'POST',
         headers,
         body: JSON.stringify({ auditId, judgeRequest: req }),
         signal: ac.signal,
       });
+      console.log(
+        `[HttpJudge] TRACE post-fetch auditId=${auditId} httpStatus=${res.status} ok=${res.ok} elapsedMs=${Date.now() - startedAt}`,
+      );
       if (!res.ok) {
         this.report({
           status: 'judge_unavailable',
@@ -92,13 +109,17 @@ export class HttpJudge implements Judge {
         });
         return {};
       }
-      const body = (await res.json()) as {
+      console.log(`[HttpJudge] TRACE pre-json auditId=${auditId}`);
+      const body = (await readJsonWithAbort(res, ac.signal)) as {
         status?: 'ok' | 'judge_unavailable';
         judgeResponse?: JudgeResponse;
         reason?: string;
         usage?: { inputTokens: number; outputTokens: number; estimatedUsd: number };
         auditId?: string | null;
       };
+      console.log(
+        `[HttpJudge] TRACE post-json auditId=${auditId} bodyStatus=${body.status ?? 'undefined'} hasJudgeResponse=${!!body.judgeResponse}`,
+      );
       if (body.status === 'ok' && body.judgeResponse) {
         this.report({
           status: 'ok',
@@ -124,6 +145,9 @@ export class HttpJudge implements Judge {
             ? 'timeout'
             : err.message
           : String(err);
+      console.log(
+        `[HttpJudge] TRACE catch auditId=${auditId} errName=${err instanceof Error ? err.name : 'non-Error'} reason=${reason} elapsedMs=${Date.now() - startedAt}`,
+      );
       this.report({
         status: 'judge_unavailable',
         reason,
@@ -143,4 +167,43 @@ export class HttpJudge implements Judge {
       // Observability hooks must never break the audit.
     }
   }
+}
+
+/**
+ * Read a `Response` body as JSON, racing against an `AbortSignal`.
+ *
+ * Why this exists: the AbortController passed to `fetch()` only
+ * propagates to the body reader in some runtimes — notably, if the
+ * upstream returns headers but stalls during body streaming, Node's
+ * `undici`-backed `fetch` may not abort `await res.json()` on
+ * `controller.abort()`. The `await` then hangs forever, the
+ * `try`/`catch`/`finally` never runs, `onResult` never fires, and
+ * Vercel kills the function at `maxDuration`. This is the
+ * production dead-zone bug.
+ *
+ * The fix: explicitly race the body read against the abort signal.
+ * If the signal fires while `res.json()` is in-flight, we cancel
+ * the body stream (releasing the socket) and reject so the outer
+ * `catch` handles it normally and `onResult` fires with
+ * `reason='timeout'`.
+ */
+async function readJsonWithAbort(res: Response, signal: AbortSignal): Promise<unknown> {
+  if (signal.aborted) {
+    await res.body?.cancel().catch(() => undefined);
+    const err = new Error('aborted');
+    err.name = 'AbortError';
+    throw err;
+  }
+  const abortPromise = new Promise<never>((_, reject) => {
+    const onAbort = () => {
+      // Release the underlying socket so the connection doesn't sit
+      // open until the upstream eventually closes it.
+      res.body?.cancel().catch(() => undefined);
+      const err = new Error('aborted');
+      err.name = 'AbortError';
+      reject(err);
+    };
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
+  return Promise.race([res.json(), abortPromise]);
 }

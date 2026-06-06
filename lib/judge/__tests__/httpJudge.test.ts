@@ -140,6 +140,43 @@ describe('HttpJudge — graceful degradation (NEVER throws, always returns {})',
     expect(outcomes[0]!.reason).toMatch(/ENOTFOUND/);
   });
 
+  it('returns `{}` and reports reason=timeout when `res.json()` hangs after fetch resolves (production dead-zone fix)', async () => {
+    // The production bug: Anthropic returns headers (`fetch` resolves
+    // with `ok=true`) but stalls during body streaming, and Node's
+    // undici-backed fetch may not propagate the abort signal to the
+    // body reader. Without the explicit race in `readJsonWithAbort`,
+    // `await res.json()` hangs forever past timeoutMs and the whole
+    // `try`/`catch`/`finally` block never runs.
+    //
+    // Simulate by handing HttpJudge a Response whose body is a
+    // never-resolving ReadableStream — JSON parsing would hang
+    // forever in the legacy code path, but the abort race must rescue
+    // it within `timeoutMs`.
+    const stalledBody = new ReadableStream<Uint8Array>({
+      start() {
+        /* never emits, never closes */
+      },
+    });
+    const fetchImpl = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response(stalledBody, {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    const outcomes: HttpJudgeOutcome[] = [];
+    const startedAt = Date.now();
+    const judge = makeJudge({ fetchImpl, onResult: (o) => outcomes.push(o), timeoutMs: 50 });
+    const response = await judge.evaluate(SAMPLE_REQUEST);
+    const elapsed = Date.now() - startedAt;
+    expect(response).toEqual({});
+    expect(outcomes[0]!.status).toBe('judge_unavailable');
+    expect(outcomes[0]!.reason).toBe('timeout');
+    // Must resolve within a small multiple of timeoutMs — generous
+    // enough for CI scheduling jitter but tight enough that a hung
+    // body read would never finish in this window.
+    expect(elapsed).toBeLessThan(2000);
+  });
+
   it('returns `{}` and reports reason=timeout when the request aborts', async () => {
     // Simulate a request that never resolves — the AbortController fires
     // and `fetch` rejects with an AbortError.

@@ -22,6 +22,13 @@ import { pickGroundedRewriteTargets } from '@/lib/judge/rewriteTargets';
 // Force the Node runtime: pdf-parse / pdfjs-dist depend on Node APIs and
 // cannot run on Vercel's Edge runtime.
 export const runtime = 'nodejs';
+// Vercel function timeout. The audit handler does parseLinkedInPdf
+// (heavy) + the AI judge call (up to ~35s caller cap) + scoring +
+// storage. 60s gives headroom over the longest-realistic-judge path
+// without changing the cost-per-audit story. Pro plan default is
+// 60s but we set it explicitly so the cap is part of the route
+// contract, not the plan.
+export const maxDuration = 60;
 
 // Vercel Functions cap request bodies at 4.5 MB and reject anything
 // larger before the route handler runs (returns a non-JSON 413
@@ -116,6 +123,7 @@ export async function POST(request: Request) {
     console.log(
       `[api/audit] judge wiring: auditId=${auditId} secretPresent=${!!process.env.JUDGE_PROXY_SECRET} proxyUrl=${process.env.JUDGE_PROXY_URL ?? '<default-origin>'}`,
     );
+    console.log(`[api/audit] TRACE pre-createServerJudge auditId=${auditId}`);
     const judge = createServerJudge({
       origin: new URL(request.url).origin,
       auditId,
@@ -136,7 +144,15 @@ export async function POST(request: Request) {
         );
       },
     });
+    console.log(
+      `[api/audit] TRACE post-createServerJudge auditId=${auditId} judgeKind=${judge.constructor.name}`,
+    );
+    console.log(`[api/audit] TRACE pre-evaluate auditId=${auditId}`);
+    const evaluateStartedAt = Date.now();
     const judgeResponse = await judge.evaluate(judgeRequest);
+    console.log(
+      `[api/audit] TRACE post-evaluate auditId=${auditId} elapsedMs=${Date.now() - evaluateStartedAt} keys=${Object.keys(judgeResponse).join(',') || 'none'}`,
+    );
 
     // Focused 4-section PDF audit. `runPdfAudit` also applies the name-
     // suspicion guard, returning a normalised profile (name corrected to a
@@ -145,7 +161,11 @@ export async function POST(request: Request) {
     // judge response (`{}` when the proxy is unavailable) flows in here
     // so AI-pending sections lift above their B+ floor when judgments
     // landed, and stay at structural with `needsReview: true` when not.
+    console.log(`[api/audit] TRACE pre-runPdfAudit auditId=${auditId}`);
     const { profile, audit } = runPdfAudit(parsed, judgeResponse);
+    console.log(
+      `[api/audit] TRACE post-runPdfAudit auditId=${auditId} composite=${audit.composite.score} judgeStatus=${audit.judgeStatus} headlineNeedsReview=${audit.sections.find((s) => s.id === 'headline')?.needsReview} aboutNeedsReview=${audit.sections.find((s) => s.id === 'about')?.needsReview}`,
+    );
 
     const store = await getAuditStore();
     // userAgent / ipHash are intentionally NOT captured on the AUDIT

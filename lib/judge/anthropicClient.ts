@@ -5,8 +5,11 @@
  * Cost controls are baked in:
  *   - `maxOutputTokens` hard cap on every call (default 1500, ~$0.012
  *     per call at sonnet pricing).
- *   - 12 s request timeout via AbortController; on timeout the caller
+ *   - 30 s request timeout via AbortController; on timeout the caller
  *     sees a thrown error and falls through to "judge unavailable".
+ *     (Production raised from the original 12 s after real audits with
+ *     judgments + 2 rewrites hit the wall — see the merged "fix judge
+ *     timeout" change in `app/api/judge`.)
  *   - Returns `usage` so the route can log cost-per-audit.
  */
 
@@ -21,7 +24,9 @@ export interface AnthropicCallParams {
   system: string;
   messages: AnthropicMessage[];
   maxOutputTokens: number;
-  /** Hard request timeout — defaults to 12_000ms. Resend's pattern. */
+  /** Hard request timeout — defaults to 30_000ms. Raised from 12s
+   * after real-profile audits with rewrites consistently hit the
+   * original wall. */
   timeoutMs?: number;
 }
 
@@ -37,7 +42,14 @@ export interface AnthropicResult {
   stopReason: string | null;
 }
 
-const DEFAULT_TIMEOUT_MS = 12_000;
+/**
+ * Default Anthropic upstream timeout. Exported so route + test code
+ * can refer to the same number rather than duplicating the magic
+ * value. Caller-side timeouts (see `httpJudge.ts`) MUST sit above
+ * this — see `__tests__/timeoutInvariants.test.ts`.
+ */
+export const ANTHROPIC_DEFAULT_TIMEOUT_MS = 30_000;
+const DEFAULT_TIMEOUT_MS = ANTHROPIC_DEFAULT_TIMEOUT_MS;
 
 interface AnthropicContentBlock {
   type: string;
@@ -76,12 +88,12 @@ export async function callAnthropic(params: AnthropicCallParams): Promise<Anthro
       signal: controller.signal,
     });
     if (!resp.ok) {
-      const body = await resp.text().catch(() => '');
+      const body = await readTextWithAbort(resp, controller.signal).catch(() => '');
       throw new Error(
         `anthropic ${resp.status}: ${body.slice(0, 200)}`,
       );
     }
-    const json = (await resp.json()) as AnthropicResponseBody;
+    const json = (await readJsonWithAbort(resp, controller.signal)) as AnthropicResponseBody;
     const text = (json.content ?? [])
       .filter((b) => b.type === 'text' && typeof b.text === 'string')
       .map((b) => b.text!)
@@ -120,4 +132,50 @@ export function estimateUsd(usage: AnthropicUsage, prices: PriceTable = DEFAULT_
   const input = (usage.inputTokens / 1_000_000) * prices.inputUsdPerMillion;
   const output = (usage.outputTokens / 1_000_000) * prices.outputUsdPerMillion;
   return Math.round((input + output) * 10_000) / 10_000; // round to 4dp
+}
+
+/**
+ * Read a `Response` body as JSON, racing against an `AbortSignal`.
+ * See the matching helper in `httpJudge.ts` for the production
+ * dead-zone bug this guards against (body stream not honouring the
+ * fetch-level abort, causing `await resp.json()` to hang past
+ * `maxDuration` and skip `catch`/`finally`).
+ */
+async function readJsonWithAbort(res: Response, signal: AbortSignal): Promise<unknown> {
+  if (signal.aborted) {
+    await res.body?.cancel().catch(() => undefined);
+    const err = new Error('aborted');
+    err.name = 'AbortError';
+    throw err;
+  }
+  const abortPromise = new Promise<never>((_, reject) => {
+    const onAbort = () => {
+      res.body?.cancel().catch(() => undefined);
+      const err = new Error('aborted');
+      err.name = 'AbortError';
+      reject(err);
+    };
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
+  return Promise.race([res.json(), abortPromise]);
+}
+
+/** Same shape as `readJsonWithAbort` but for the error-path text body. */
+async function readTextWithAbort(res: Response, signal: AbortSignal): Promise<string> {
+  if (signal.aborted) {
+    await res.body?.cancel().catch(() => undefined);
+    const err = new Error('aborted');
+    err.name = 'AbortError';
+    throw err;
+  }
+  const abortPromise = new Promise<never>((_, reject) => {
+    const onAbort = () => {
+      res.body?.cancel().catch(() => undefined);
+      const err = new Error('aborted');
+      err.name = 'AbortError';
+      reject(err);
+    };
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
+  return Promise.race([res.text(), abortPromise]);
 }
