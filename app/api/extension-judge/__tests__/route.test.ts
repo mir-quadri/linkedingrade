@@ -153,6 +153,10 @@ describe('POST /api/extension-judge — relay', () => {
     const [, init] = fetchSpy.mock.calls[0] as [string, RequestInit];
     const headers = new Headers(init.headers);
     expect(headers.get('x-judge-auth')).toBe('super-secret');
+    // The relay already rate-limited (ext-judge bucket), so it tells the
+    // proxy to skip its own limit — extension traffic must not also burn
+    // the web judge bucket.
+    expect(headers.get('x-judge-skip-rate-limit')).toBe('1');
   });
 
   it('degrades to judge_unavailable (200) when the proxy reports unavailable', async () => {

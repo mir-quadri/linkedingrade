@@ -33,6 +33,17 @@ export function createServerJudge(opts: {
    */
   inboundHeaders?: Headers;
   onResult?: (outcome: HttpJudgeOutcome) => void;
+  /**
+   * When true, instruct the proxy to SKIP its own per-IP rate limit via
+   * `X-Judge-Skip-Rate-Limit` (honoured only because this call also sends
+   * the secret). The `/api/extension-judge` relay sets this: it already
+   * enforced a per-IP limit in its own `ext-judge:` bucket, so letting the
+   * proxy limit again would double-count extension traffic against the web
+   * `judge:` bucket. When skipping we also stop forwarding the client IP —
+   * the proxy no longer needs it. The web-audit path leaves this false so
+   * the proxy keeps limiting web traffic.
+   */
+  skipProxyRateLimit?: boolean;
 }): Judge {
   const secret = process.env.JUDGE_PROXY_SECRET;
   // One-shot diagnostic — pairs with the `[api/audit] judge wiring:`
@@ -51,12 +62,19 @@ export function createServerJudge(opts: {
     return new NullJudge();
   }
   const url = process.env.JUDGE_PROXY_URL?.trim() || `${opts.origin}/api/judge`;
+  // When the caller already rate-limited (the extension relay), tell the
+  // proxy to skip its own limit and don't forward the IP it no longer
+  // needs. Otherwise forward the trusted client IP so the proxy partitions
+  // its per-IP limit by the real end-user.
+  const forwardHeaders = opts.skipProxyRateLimit
+    ? { 'x-judge-skip-rate-limit': '1' }
+    : extractClientForwardHeaders(opts.inboundHeaders);
   return new HttpJudge({
     proxyUrl: url,
     proxySecret: secret,
     auditId: opts.auditId,
     onResult: opts.onResult,
-    forwardHeaders: extractClientForwardHeaders(opts.inboundHeaders),
+    forwardHeaders,
   });
 }
 

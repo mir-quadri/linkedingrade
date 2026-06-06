@@ -132,7 +132,12 @@ export async function POST(request: Request): Promise<Response> {
   const judge = createServerJudge({
     origin: new URL(request.url).origin,
     auditId: auditId ?? 'extension',
-    inboundHeaders: request.headers,
+    // This relay already enforced its own per-IP limit (the ext-judge
+    // bucket above), so tell the proxy to skip its limit — otherwise
+    // extension calls would also burn the same IP's web `judge:` quota
+    // and the extension cap wouldn't be independent. The skip is honoured
+    // only because createServerJudge also sends the secret.
+    skipProxyRateLimit: true,
     onResult: (o) => {
       outcome = o;
     },

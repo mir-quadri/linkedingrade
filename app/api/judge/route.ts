@@ -144,19 +144,35 @@ export async function POST(request: Request) {
   // `deriveJudgeRateKey` returns the key SHAPE only for logging; that's
   // enough to diagnose abuse (which partition is over-limit) without
   // persisting the identifier.
-  const { rateLimitKey, memoryOnly, keyShape } = deriveJudgeRateKey(request.headers, 'judge');
-  const limit = numericEnv('JUDGE_RATE_LIMIT_PER_DAY', DEFAULT_RATE_LIMIT_PER_DAY);
-  const decision = await consumeJudgeRateLimit(rateLimitKey, limit, undefined, {
-    memoryOnly,
-  });
-  if (!decision.allowed) {
-    console.warn(
-      `[api/judge] rate-limited keyShape=${keyShape} count=${decision.count} limit=${decision.limit} backend=${decision.backend}`,
-    );
-    return withCors(
-      judgeUnavailable('rate_limited', { auditId: judgeRequest.auditId }),
-      request,
-    );
+  // Trusted-relay skip: a caller that already passed `authoriseCaller`
+  // (i.e. presented the valid X-Judge-Auth secret) may opt OUT of this
+  // per-IP limit with `X-Judge-Skip-Rate-Limit: 1`. Only the
+  // `/api/extension-judge` relay sends it — and only after enforcing its
+  // OWN per-IP limit in a separate `ext-judge:` bucket — so extension
+  // traffic is limited exactly once and never consumes this web `judge:`
+  // bucket (the extension quota must be truly independent). The header is
+  // unreachable without the secret (auth ran above), so a public/browser
+  // caller cannot use it to bypass the limit. The web-audit path does NOT
+  // send the header, so web traffic is still limited here.
+  let rateBackend = 'skipped';
+  let rateCount = 'skipped';
+  if (request.headers.get('x-judge-skip-rate-limit') !== '1') {
+    const { rateLimitKey, memoryOnly, keyShape } = deriveJudgeRateKey(request.headers, 'judge');
+    const limit = numericEnv('JUDGE_RATE_LIMIT_PER_DAY', DEFAULT_RATE_LIMIT_PER_DAY);
+    const decision = await consumeJudgeRateLimit(rateLimitKey, limit, undefined, {
+      memoryOnly,
+    });
+    if (!decision.allowed) {
+      console.warn(
+        `[api/judge] rate-limited keyShape=${keyShape} count=${decision.count} limit=${decision.limit} backend=${decision.backend}`,
+      );
+      return withCors(
+        judgeUnavailable('rate_limited', { auditId: judgeRequest.auditId }),
+        request,
+      );
+    }
+    rateBackend = decision.backend;
+    rateCount = `${decision.count}/${decision.limit}`;
   }
 
   // 4. Build prompt + call Claude
@@ -207,7 +223,7 @@ export async function POST(request: Request) {
   console.log(
     `[api/judge] ok auditId=${judgeRequest.auditId ?? 'none'} model=${model} ` +
       `inputTokens=${inputTokens} outputTokens=${outputTokens} usd=${costUsd} ` +
-      `elapsedMs=${Date.now() - startedAt} rateBackend=${decision.backend} rateCount=${decision.count}/${decision.limit}`,
+      `elapsedMs=${Date.now() - startedAt} rateBackend=${rateBackend} rateCount=${rateCount}`,
   );
 
   return withCors(
