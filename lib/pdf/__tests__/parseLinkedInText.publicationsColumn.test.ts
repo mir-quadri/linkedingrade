@@ -243,6 +243,40 @@ J.D.
     expect(profile.fullName).toBe('John M. Smith');
   });
 
+  it('legacy fallback preserves a connector-particle name (Codex R1 P2 — `Juan Carlos de la Cruz` has "de" / "la" connector words)', () => {
+    // `looksLikeName` rejects connector words like "de" / "la" / "of"
+    // (CONNECTOR_WORDS). For a Spanish/Portuguese name where the
+    // particle is intrinsic to the name, the walk-backwards finds no
+    // match. The softer `obviouslyNotAName` fallback gate must let
+    // this through — connector words are name-internal here, not the
+    // pipes / "at" / "&" tokens that indicate a headline.
+    const CONNECTOR_NAME = `Contact
+555-0108 (Mobile)
+example8@example.com
+Top Skills
+Customer Success
+Account Management
+Sales Operations
+Certifications
+Certified Customer Success Manager
+Juan Carlos de la Cruz
+Customer Success Leader | Scaling B2B SaaS at LatAm Markets
+Mexico City, Mexico
+Summary
+Customer success leader summary.
+Experience
+SaaS Co
+VP Customer Success
+January 2023 - Present (1 year 11 months)
+Mexico City, Mexico
+Education
+Universidad Iberoamericana
+B.A., Business Administration
+`;
+    const profile = parseLinkedInText(CONNECTOR_NAME);
+    expect(profile.fullName).toBe('Juan Carlos de la Cruz');
+  });
+
   it('headline-fragment fallback returns null name — does not emit a garbled fullName', () => {
     // Degenerate slice that the old legacy fallback would have
     // emitted as a name. The slice between Certifications and Summary
