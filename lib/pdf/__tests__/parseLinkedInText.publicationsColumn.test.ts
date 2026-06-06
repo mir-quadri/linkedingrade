@@ -348,6 +348,47 @@ M.S., Computer Science
     expect(profile.fullName).toBeNull();
   });
 
+  it('a Top Skill literally named "Awards" does NOT get promoted to a header (Codex R3 P2 — standalone `Awards` is too broad)', () => {
+    // Codex's R3 P2 finding: in lenient mode (real exports with no
+    // blank lines between sections) `findHeaders` skips the boundary
+    // check. The standalone `Awards` label as a section header would
+    // then collide with any sidebar item whose text is exactly
+    // "Awards" — a Top Skill, a certification, etc. — and slice the
+    // parent section short. Removing the standalone label means a
+    // skill called "Awards" stays a skill.
+    const TOP_SKILL_NAMED_AWARDS = `Contact
+555-0110 (Mobile)
+example10@example.com
+Top Skills
+Brand Strategy
+Awards
+Marketing Operations
+Certifications
+Certified Digital Marketing Professional
+Sandra Chen
+Marketing Strategist
+Toronto, Canada
+Summary
+Marketing summary.
+Experience
+Acme
+Marketing Strategist
+January 2023 - Present (1 year 11 months)
+Toronto, Canada
+Education
+University of Toronto
+B.A., Communications
+`;
+    const profile = parseLinkedInText(TOP_SKILL_NAMED_AWARDS);
+    // The "Awards" skill must NOT be promoted to a header — it should
+    // appear as a regular skill in Top Skills, and the name parse
+    // should be unaffected.
+    expect(profile.fullName).toBe('Sandra Chen');
+    expect(profile.skills.data?.topThree).toContain('Awards');
+    expect(profile.skills.data?.topThree).toContain('Brand Strategy');
+    expect(profile.skills.data?.topThree).toContain('Marketing Operations');
+  });
+
   it('a clean profile (no Publications/Patents/Honors) still parses correctly — regression guard', () => {
     const CLEAN_PROFILE = `Contact
 555-0104 (Mobile)

@@ -27,12 +27,20 @@ const SECTION_HEADERS = [
   // BOTH Title-Case and lowercase `awards`. The header match is
   // exact-string `===`, so each variant the export can emit must be
   // listed explicitly. (Codex R2 P2 on PR #22.)
+  // Each Honors-Awards variant must be the FULL labelled form. A
+  // standalone `Awards` was originally listed too, but Codex R3 P2
+  // flagged that as too broad — in lenient mode (real exports with no
+  // blank lines between sections) the boundary check is skipped, and
+  // a sidebar item literally named "Awards" (a Top Skill, a
+  // certification, etc.) would be promoted to a section header and
+  // truncate its parent block. The narrower compound variants
+  // ("Honors-Awards", "Honors & Awards", lowercase variants) are
+  // unambiguous and cover LinkedIn's documented labels.
   'Honors-Awards',
   'Honors and Awards',
   'Honors and awards',
   'Honors & Awards',
   'Honors & awards',
-  'Awards',
   'Summary',
   'Experience',
   'Education',
@@ -58,7 +66,6 @@ const SIDEBAR_HEADERS: ReadonlySet<SectionHeader> = new Set([
   'Honors and awards',
   'Honors & Awards',
   'Honors & awards',
-  'Awards',
 ]);
 
 interface HeaderIndex {
