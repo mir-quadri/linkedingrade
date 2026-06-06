@@ -181,6 +181,68 @@ BBA, Marketing
     ]);
   });
 
+  it('legacy fallback preserves a 4-word name (Codex R1 P2 — `looksLikeName` rejects 4 tokens but the slice IS a valid name)', () => {
+    // `looksLikeName` caps at 3 tokens, so this would have been
+    // re-rejected by the Round-0 strict-fallback guard. The softer
+    // `obviouslyNotAName` check accepts it.
+    const FOUR_WORD_NAME = `Contact
+555-0106 (Mobile)
+example6@example.com
+Top Skills
+Brand Strategy
+Marketing Operations
+Engineering Leadership
+Certifications
+Certified Digital Marketing Professional
+Mary Anne Sue Jones
+Marketing Strategist
+Toronto, Canada
+Summary
+Some summary.
+Experience
+Acme
+Marketing Strategist
+January 2023 - Present (1 year 11 months)
+Toronto, Canada
+Education
+University of Toronto
+B.A., Communications
+`;
+    const profile = parseLinkedInText(FOUR_WORD_NAME);
+    expect(profile.fullName).toBe('Mary Anne Sue Jones');
+  });
+
+  it('legacy fallback preserves a middle-initial name (Codex R1 P2 — `John M. Smith` fails the regex but IS a valid name)', () => {
+    // The period after "M" makes `^[A-Z][\p{L}'\-]*$` fail on "M.",
+    // so `looksLikeName` rejects this line. Fallback must still
+    // emit it as the name.
+    const MIDDLE_INITIAL = `Contact
+555-0107 (Mobile)
+example7@example.com
+Top Skills
+Securities Litigation
+Corporate Governance
+Regulatory Compliance
+Certifications
+Bar Admission, Massachusetts
+John M. Smith
+Senior Counsel
+Boston, Massachusetts, United States
+Summary
+Counsel summary.
+Experience
+LawFirm LLP
+Senior Counsel
+January 2023 - Present (1 year 11 months)
+Boston, Massachusetts, United States
+Education
+Harvard Law School
+J.D.
+`;
+    const profile = parseLinkedInText(MIDDLE_INITIAL);
+    expect(profile.fullName).toBe('John M. Smith');
+  });
+
   it('headline-fragment fallback returns null name — does not emit a garbled fullName', () => {
     // Degenerate slice that the old legacy fallback would have
     // emitted as a name. The slice between Certifications and Summary

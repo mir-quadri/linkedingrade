@@ -294,6 +294,41 @@ function looksLikeName(line: string): boolean {
 }
 
 /**
+ * Permissive negative-of-`looksLikeName` for the legacy fallback.
+ *
+ * `looksLikeName` is conservative: it rejects 4+ word names, names with
+ * middle-initial punctuation ("John M. Smith"), single-token mononyms,
+ * and anything outside the strict 2-3 Title-Case word window. Those
+ * rejections are fine when there's a CLEAN candidate elsewhere in the
+ * slice, but the fallback is the path for slices where no line passed
+ * — including legitimate identity lines whose shape happens to fall
+ * outside the conservative window. So the fallback needs a SOFTER
+ * gate: reject only candidates that are unambiguously NOT names.
+ *
+ * Things a real name never contains:
+ *   - `|` (LinkedIn's canonical headline separator)
+ *   - `@`, `&`, `/`, `•`, `·` (headline punctuation / emoji bullets)
+ *   - ` at ` (case-insensitive — "Director at Acme")
+ *   - sentence-ending `.?!:` (period after a single capital letter
+ *     IS allowed — "John M. Smith" — but the LINE shouldn't end with
+ *     `.?!:` because real names don't)
+ *   - more than 5 whitespace-separated tokens (real full names cap
+ *     out around 4-5; longer is a headline / publication title)
+ *
+ * Matches the engine-side `isSuspiciousName` rules so the parser and
+ * the engine agree on what a not-a-name looks like.
+ */
+function obviouslyNotAName(line: string): boolean {
+  const t = line.trim();
+  if (!t) return true;
+  if (/[|@&/•·]/.test(t)) return true;
+  if (/\sat\s/i.test(t)) return true;
+  if (/[.?!:]$/.test(t)) return true;
+  if (t.split(/\s+/).length > 5) return true;
+  return false;
+}
+
+/**
  * Identity (NAME / HEADLINE / LOCATION) sits between the last sidebar
  * section and the first main section. Three shapes have to be handled:
  *
@@ -367,19 +402,20 @@ function extractIdentity(
   }
 
   // Legacy fallback for slices where no line passes the name heuristic.
-  // Validate the candidate against `looksLikeName` before emitting it:
-  // if the fallback would produce a not-a-name (e.g. a headline
-  // fragment or publication title from a column-interleaved export),
-  // return `name: null` so the engine's name-suspicion guard sees an
-  // honest "couldn't extract" rather than a garbled string. This is
-  // safer than the old behaviour, which blindly returned
-  // `slice[length-3]` even when it was clearly a headline fragment
-  // with pipes / commas / disqualifier words.
+  // Validate the candidate against a SOFTER check (`obviouslyNotAName`)
+  // before emitting it: reject only clearly-wrong candidates (pipes,
+  // ampersands, sentence punctuation, " at "), so legitimate names
+  // that `looksLikeName` itself rejects — 4+ word names, names with
+  // middle-initial punctuation like "John M. Smith", single-token
+  // mononyms — still come through the fallback. (Codex R1 P2 on PR
+  // #22 — without this softening, my Round-0 strict-fallback guard
+  // would have regressed clean profiles whose identity line happens
+  // to fail the conservative `looksLikeName` heuristic.)
   const candidate =
     slice.length === 1 ? slice[0]!
     : slice.length === 2 ? slice[0]!
     : slice[slice.length - 3]!;
-  const honestCandidate = looksLikeName(candidate) ? candidate : null;
+  const honestCandidate = obviouslyNotAName(candidate) ? null : candidate;
   if (slice.length === 1) {
     return {
       name: honestCandidate, headline: null, location: null,
