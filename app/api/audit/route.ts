@@ -22,6 +22,13 @@ import { pickGroundedRewriteTargets } from '@/lib/judge/rewriteTargets';
 // Force the Node runtime: pdf-parse / pdfjs-dist depend on Node APIs and
 // cannot run on Vercel's Edge runtime.
 export const runtime = 'nodejs';
+// Vercel function timeout. The audit handler does parseLinkedInPdf
+// (heavy) + the AI judge call (up to ~35s caller cap) + scoring +
+// storage. 60s gives headroom over the longest-realistic-judge path
+// without changing the cost-per-audit story. Pro plan default is
+// 60s but we set it explicitly so the cap is part of the route
+// contract, not the plan.
+export const maxDuration = 60;
 
 // Vercel Functions cap request bodies at 4.5 MB and reject anything
 // larger before the route handler runs (returns a non-JSON 413

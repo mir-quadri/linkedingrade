@@ -13,6 +13,13 @@ import { consumeJudgeRateLimit } from '@/lib/judge/rateLimit';
 import type { JudgeRequest, JudgeResponse } from '@/lib/engine/types/judge';
 
 export const runtime = 'nodejs';
+// Vercel function timeout. Must sit ABOVE the upstream Anthropic
+// timeout (30s in `lib/judge/anthropicClient.ts`) so the upstream
+// AbortController fires first and we return a structured
+// `judge_unavailable` instead of Vercel killing the function with a
+// 504. Pro plan default is 60s, but we set it explicitly so the cap
+// is part of the contract, not the plan.
+export const maxDuration = 60;
 
 // Default to the latest publicly-released Sonnet 4.x model id. The
 // initial draft used `claude-sonnet-4-7`, which is an internal Claude
@@ -68,7 +75,9 @@ const MAX_ABOUT_CHARS = 5000;
  *     covering Headline + About + the rewrites).
  *   - Hard `max_tokens` cap (DEFAULT_MAX_OUTPUT_TOKENS, configurable
  *     via `JUDGE_MAX_OUTPUT_TOKENS`).
- *   - 12s request timeout (Anthropic client default).
+ *   - 30s upstream Anthropic timeout (client default). HttpJudge
+ *     callers sit at 35s so the upstream times out first and the
+ *     caller sees a structured `judge_unavailable`.
  *   - Per-IP-hash daily rate limit, KV-backed (DEFAULT_RATE_LIMIT_PER_DAY
  *     configurable via `JUDGE_RATE_LIMIT_PER_DAY`).
  *   - Cost-per-audit logged on every success.

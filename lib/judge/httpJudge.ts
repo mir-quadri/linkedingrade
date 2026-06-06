@@ -1,5 +1,13 @@
 import type { Judge, JudgeRequest, JudgeResponse } from '@/lib/engine/types/judge';
 
+/**
+ * Default caller-side timeout for HttpJudge. Exported so tests and
+ * route code share the constant. MUST sit above
+ * `ANTHROPIC_DEFAULT_TIMEOUT_MS` from `anthropicClient.ts` — see
+ * `__tests__/timeoutInvariants.test.ts`.
+ */
+export const HTTP_JUDGE_DEFAULT_TIMEOUT_MS = 35_000;
+
 export interface HttpJudgeOptions {
   /** Absolute URL of the `/api/judge` proxy. */
   proxyUrl: string;
@@ -7,9 +15,11 @@ export interface HttpJudgeOptions {
   proxySecret: string;
   /** Stamped on outgoing requests so proxy logs correlate audit ↔ judge call. */
   auditId?: string | null;
-  /** Caller-side timeout. Proxy enforces its own ~12s upstream timeout — this
-   * is the request-level cap that covers DNS, TLS, and the wait for the
-   * proxy response together. */
+  /** Caller-side timeout. Sits ABOVE the proxy's upstream Anthropic
+   * timeout (30s as of the timeout raise) so the upstream times out
+   * first and returns a structured `judge_unavailable`; the caller
+   * timeout is the belt-and-suspenders cap that also covers DNS,
+   * TLS, and the wait for the proxy response. Defaults to 35_000ms. */
   timeoutMs?: number;
   /**
    * Forwarded headers identifying the originating end-user — typically
@@ -62,7 +72,7 @@ export class HttpJudge implements Judge {
 
   async evaluate(req: JudgeRequest): Promise<JudgeResponse> {
     const startedAt = Date.now();
-    const timeoutMs = this.opts.timeoutMs ?? 15_000;
+    const timeoutMs = this.opts.timeoutMs ?? HTTP_JUDGE_DEFAULT_TIMEOUT_MS;
     const ac = new AbortController();
     const timer = setTimeout(() => ac.abort(), timeoutMs);
     const auditId = this.opts.auditId ?? null;

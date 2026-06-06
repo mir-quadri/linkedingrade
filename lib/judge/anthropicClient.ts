@@ -5,8 +5,11 @@
  * Cost controls are baked in:
  *   - `maxOutputTokens` hard cap on every call (default 1500, ~$0.012
  *     per call at sonnet pricing).
- *   - 12 s request timeout via AbortController; on timeout the caller
+ *   - 30 s request timeout via AbortController; on timeout the caller
  *     sees a thrown error and falls through to "judge unavailable".
+ *     (Production raised from the original 12 s after real audits with
+ *     judgments + 2 rewrites hit the wall — see the merged "fix judge
+ *     timeout" change in `app/api/judge`.)
  *   - Returns `usage` so the route can log cost-per-audit.
  */
 
@@ -21,7 +24,9 @@ export interface AnthropicCallParams {
   system: string;
   messages: AnthropicMessage[];
   maxOutputTokens: number;
-  /** Hard request timeout — defaults to 12_000ms. Resend's pattern. */
+  /** Hard request timeout — defaults to 30_000ms. Raised from 12s
+   * after real-profile audits with rewrites consistently hit the
+   * original wall. */
   timeoutMs?: number;
 }
 
@@ -37,7 +42,14 @@ export interface AnthropicResult {
   stopReason: string | null;
 }
 
-const DEFAULT_TIMEOUT_MS = 12_000;
+/**
+ * Default Anthropic upstream timeout. Exported so route + test code
+ * can refer to the same number rather than duplicating the magic
+ * value. Caller-side timeouts (see `httpJudge.ts`) MUST sit above
+ * this — see `__tests__/timeoutInvariants.test.ts`.
+ */
+export const ANTHROPIC_DEFAULT_TIMEOUT_MS = 30_000;
+const DEFAULT_TIMEOUT_MS = ANTHROPIC_DEFAULT_TIMEOUT_MS;
 
 interface AnthropicContentBlock {
   type: string;
