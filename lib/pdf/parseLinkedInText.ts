@@ -11,6 +11,32 @@ const SECTION_HEADERS = [
   'Top Skills',
   'Languages',
   'Certifications',
+  // ORIGINAL goal: recognise Publications / Patents / Honors-Awards
+  // sections so their content gets stripped from the identity slice
+  // between Certifications and Summary (the "Erum Quadri" failure
+  // class). Codex (R3 P2 + R4 P2) flagged that bare singletons —
+  // `Awards`, `Publications`, `Publication`, `Patents`, `Patent` —
+  // collide with sidebar items whose text is exactly that string
+  // (a Top Skill literally called "Patents", a Certification called
+  // "Awards"). In lenient mode (real exports run sections together
+  // with no blank lines) the boundary check is skipped, the bare
+  // label matches the sidebar item, and that item gets promoted to a
+  // section header — truncating its parent block.
+  //
+  // The compound `Honors-Awards` variants are unambiguous and stay
+  // in the list (they cover LinkedIn's documented label forms). The
+  // bare nouns are removed. The synthetic test fixtures never
+  // actually reproduced the Publications-bleed-into-identity bug, so
+  // dropping them costs only speculative defensive value; if a real
+  // verifiable case surfaces, they come back with a tighter
+  // disambiguation gate (require strict blank-above, OR require a
+  // structural neighbour like "(YYYY)" / "Patent N,NNN,NNN" /
+  // "Co-Authors:").
+  'Honors-Awards',
+  'Honors and Awards',
+  'Honors and awards',
+  'Honors & Awards',
+  'Honors & awards',
   'Summary',
   'Experience',
   'Education',
@@ -19,12 +45,22 @@ type SectionHeader = (typeof SECTION_HEADERS)[number];
 
 // Sidebar sections sit above the identity block in a LinkedIn PDF. Any of
 // them can be the last one before the name appears (Certifications is the
-// canonical trailing header, but the Certifications section is optional).
+// canonical trailing header, but the Certifications section is optional —
+// and Publications / Patents / Honors / Awards can run BELOW it when a
+// profile uses them).
 const SIDEBAR_HEADERS: ReadonlySet<SectionHeader> = new Set([
   'Contact',
   'Top Skills',
   'Languages',
   'Certifications',
+  // Bare `Publications` / `Publication` / `Patents` / `Patent` removed
+  // — see SECTION_HEADERS comment. Honors-Awards compound variants
+  // stay; they're unambiguous.
+  'Honors-Awards',
+  'Honors and Awards',
+  'Honors and awards',
+  'Honors & Awards',
+  'Honors & awards',
 ]);
 
 interface HeaderIndex {
@@ -268,6 +304,50 @@ function looksLikeName(line: string): boolean {
 }
 
 /**
+ * Permissive negative-of-`looksLikeName` for the legacy fallback.
+ *
+ * `looksLikeName` is conservative: it rejects 4+ word names, names with
+ * middle-initial punctuation ("John M. Smith"), single-token mononyms,
+ * and anything outside the strict 2-3 Title-Case word window. Those
+ * rejections are fine when there's a CLEAN candidate elsewhere in the
+ * slice, but the fallback is the path for slices where no line passed
+ * — including legitimate identity lines whose shape happens to fall
+ * outside the conservative window. So the fallback needs a SOFTER
+ * gate: reject only candidates that are unambiguously NOT names.
+ *
+ * Things a real name never contains:
+ *   - `|` (LinkedIn's canonical headline separator)
+ *   - `@`, `&`, `/`, `•`, `·` (headline punctuation / emoji bullets)
+ *   - ` at ` (case-insensitive — "Director at Acme")
+ *   - `?` `!` `:` at end (true sentence markers — trailing `.` IS
+ *     allowed for dotted suffixes like "Jr." / "Sr." / "Ph.D.")
+ *   - more than 5 whitespace-separated tokens (real full names cap
+ *     out around 4-5; longer is a headline / publication title)
+ *   - commas — real names rarely contain them, but short headline
+ *     fragments do ("Senior Director, Data"). (Codex R6 P2.)
+ *   - any token in CERT_DISQUALIFIERS — short title-shaped fragments
+ *     like "Engineering Manager" or "Senior Counsel" slip the other
+ *     checks because they have no punctuation, but the disqualifier
+ *     word list (engineer / manager / director / senior / etc.)
+ *     catches them. Real names don't contain these tokens.
+ *     (Codex R6 P2.)
+ */
+function obviouslyNotAName(line: string): boolean {
+  const t = line.trim();
+  if (!t) return true;
+  if (/[|@&/•·,]/.test(t)) return true;
+  if (/\sat\s/i.test(t)) return true;
+  if (/[?!:]$/.test(t)) return true;
+  const words = t.split(/\s+/);
+  if (words.length > 5) return true;
+  for (const w of words) {
+    const lower = w.toLowerCase().replace(/[.,]+$/, '');
+    if (CERT_DISQUALIFIERS.has(lower)) return true;
+  }
+  return false;
+}
+
+/**
  * Identity (NAME / HEADLINE / LOCATION) sits between the last sidebar
  * section and the first main section. Three shapes have to be handled:
  *
@@ -341,20 +421,34 @@ function extractIdentity(
   }
 
   // Legacy fallback for slices where no line passes the name heuristic.
+  // Validate the candidate against a SOFTER check (`obviouslyNotAName`)
+  // before emitting it: reject only clearly-wrong candidates (pipes,
+  // ampersands, sentence punctuation, " at "), so legitimate names
+  // that `looksLikeName` itself rejects — 4+ word names, names with
+  // middle-initial punctuation like "John M. Smith", single-token
+  // mononyms — still come through the fallback. (Codex R1 P2 on PR
+  // #22 — without this softening, my Round-0 strict-fallback guard
+  // would have regressed clean profiles whose identity line happens
+  // to fail the conservative `looksLikeName` heuristic.)
+  const candidate =
+    slice.length === 1 ? slice[0]!
+    : slice.length === 2 ? slice[0]!
+    : slice[slice.length - 3]!;
+  const honestCandidate = obviouslyNotAName(candidate) ? null : candidate;
   if (slice.length === 1) {
     return {
-      name: slice[0]!, headline: null, location: null,
+      name: honestCandidate, headline: null, location: null,
       trailingSidebarItems: [], trailingHeader,
     };
   }
   if (slice.length === 2) {
     return {
-      name: slice[0]!, headline: null, location: slice[1]!,
+      name: honestCandidate, headline: null, location: slice[1]!,
       trailingSidebarItems: [], trailingHeader,
     };
   }
   return {
-    name: slice[slice.length - 3]!,
+    name: honestCandidate,
     headline: slice[slice.length - 2]!,
     location: slice[slice.length - 1]!,
     trailingSidebarItems: slice.slice(0, slice.length - 3),
