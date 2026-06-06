@@ -79,6 +79,20 @@ export default function PrivacyPage() {
           secret). We never store your raw IP.
         </li>
         <li>
+          During each upload, the audit pipeline calls an internal{' '}
+          <b>AI judge service</b> (the same Anthropic-backed proxy hosted on
+          our infrastructure) to evaluate the qualitative parts of your
+          Headline and About. To keep that service usable for everyone, we
+          rate-limit calls per IP &mdash; so the audit pipeline forwards a
+          one-way <b>SHA-256 hash of your IP</b> (peppered with the same
+          server secret) to the judge service as a rate-limit key. This hash
+          is kept for at most <b>25 hours</b> in a short-lived counter
+          (separate from the 90-day audit record). It is never linked to
+          your audit record unless you also submit your email. If you upload
+          without submitting an email, no part of your identity is retained
+          beyond that 25-hour rate-limit window.
+        </li>
+        <li>
           If you fill in the optional self-assessed checklist (photo, banner,
           activity, recommendations, featured), those answers are saved on the
           same audit record. They are recorded for the report only; they are{' '}

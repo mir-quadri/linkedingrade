@@ -146,8 +146,36 @@ function inferRoleFamilyHint(profile: ProfileData): string | null {
  * a missing banner judgment isn't a sign of AI degradation.
  *
  * `rewrites` is metadata, not a scoring judgment, so it's not included.
+ *
+ * Mode-aware (B3 Unit 2): the PDF MVP proxy only judges Headline + About
+ * + cross-cutting buzzwords (`lib/judge/buildPrompt.ts`). currentExperience,
+ * photo, banner, featured and keywords are NOT requested in PDF mode, so
+ * their absence from `judgeResponse` mustn't be counted as degradation —
+ * otherwise a clean proxy response would always report `partial`. Full
+ * mode (extension audit) keeps the broader expectation set.
  */
-function expectedJudgeKeys(profile: ProfileData): (keyof JudgeResponse)[] {
+function expectedJudgeKeys(profile: ProfileData, mode: ScoringMode = 'full'): (keyof JudgeResponse)[] {
+  if (mode === 'pdf') {
+    // In PDF mode the only graded sections that consume an AI
+    // judgment are Headline and About — Career Arc and Current
+    // Experience are structural-only in the 4-section MVP. We do
+    // NOT expect `buzzwords` here even though the proxy may emit it:
+    // it's consumed only by `scoreKeywordHealth`, which is not in
+    // `PDF_AUDIT_SECTIONS` and therefore not in the user's composite
+    // or letter-grade UI. Including buzzwords in `expectedJudgeKeys`
+    // would surface `judgeStatus: 'partial'` (and an opaque warning
+    // banner) on every audit where the model legitimately omitted
+    // the optional buzzwords block, despite both graded sections
+    // being fully judged. (Round 6 F4.)
+    const expected: (keyof JudgeResponse)[] = [];
+    if (profile.headline.data?.trim()) expected.push('headline');
+    if (profile.about.data?.trim()) expected.push('about');
+    return expected;
+  }
+  return expectedJudgeKeysFull(profile);
+}
+
+function expectedJudgeKeysFull(profile: ProfileData): (keyof JudgeResponse)[] {
   const expected: (keyof JudgeResponse)[] = [];
   if (profile.headline.data?.trim()) expected.push('headline');
   if (profile.about.data?.trim()) expected.push('about');
@@ -203,7 +231,20 @@ export function runScoring(
     warnings.push(`Seniority assumed: ${seniority.rationale}`);
   }
 
-  type RawResult = { rawScore: number; reasons: string[]; oneLineWhy: string; needsReview: boolean };
+  type RawResult = {
+    rawScore: number;
+    reasons: string[];
+    oneLineWhy: string;
+    needsReview: boolean;
+    /**
+     * OPTIONAL signal: `true` iff the AI judge ACTUALLY raised the
+     * section's score above its structural-only floor. Today only
+     * `scoreHeadline` and `scoreAbout` set it — every other scorer
+     * leaves it undefined, which means "not applicable; trust
+     * `needsReview` alone for cap decisions". (Codex Round 4 P2.)
+     */
+    judgeLifted?: boolean;
+  };
   const rawByID: Partial<Record<SectionId, RawResult>> = {
     headline: scoreHeadline(profile, judgeResponse.headline),
     photo: scorePhoto(profile, judgeResponse.photo),
@@ -230,7 +271,23 @@ export function runScoring(
     // band — structural cues can't distinguish A-grade originality from clever
     // cliché-stuffing. The AI judge lifts B+ → A later; it never drops a
     // structural grade. See `lib/engine/README.md`.
-    if (raw.needsReview) adjusted = Math.min(adjusted, B_PLUS_CEILING);
+    //
+    // Codex Round 4 P2: the cap also applies when the judge REPLIED
+    // but didn't actually lift the section above its structural
+    // floor. Without this, a complete-but-harsh judgment (which
+    // clears `needsReview`) would let the seniority modifier turn a
+    // "judge said this is bad" headline into an A grade. For scorers
+    // that don't compute `judgeLifted` (every non-headline/about
+    // section today), the field is undefined → falsy on the
+    // strict-check below → BUT we only apply the additional gate to
+    // scorers that opt in via setting the field. Photo/banner/etc.
+    // leave `judgeLifted` undefined and stay uncapped here when
+    // `needsReview` is false (their existing behaviour).
+    if (raw.needsReview) {
+      adjusted = Math.min(adjusted, B_PLUS_CEILING);
+    } else if (raw.judgeLifted === false) {
+      adjusted = Math.min(adjusted, B_PLUS_CEILING);
+    }
     return {
       id: meta.id,
       label: meta.label,
@@ -289,7 +346,7 @@ export function runScoring(
   // have asked the judge for (based on profile content) against what
   // came back; report 'partial'/'unavailable' only when the AI itself
   // didn't cover what it was asked.
-  const expectedAI = expectedJudgeKeys(profile);
+  const expectedAI = expectedJudgeKeys(profile, mode);
   const presentAI = expectedAI.filter((k) => judgeResponse[k] != null);
   const missingAI = expectedAI.length - presentAI.length;
   let judgeStatus: AuditResult['judgeStatus'] = 'ok';

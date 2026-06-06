@@ -64,10 +64,15 @@ export async function POST(request: Request) {
 
   const emailedAt = new Date().toISOString();
   // The email submit IS the consent moment, so this is the right
-  // place to capture user-agent and the hashed IP — matches the
-  // privacy policy's "If you submit your email, we also store ..."
-  // wording. Upload-only visitors don't reach this path and so don't
-  // have UA / IP hash retained.
+  // place to capture user-agent and the hashed IP onto the AUDIT
+  // RECORD — matches the privacy policy's "If you submit your email,
+  // we also store ..." wording. Upload-only visitors don't reach this
+  // path and so don't have UA / IP hash on the audit record.
+  //
+  // (Separately, the AI judge proxy receives a SHA-256-hashed IP as
+  // its per-IP rate-limit key on every upload — that's a 25-hour
+  // counter, not an audit-record field, and is disclosed in
+  // /privacy under "AI judge service".)
   const userAgent = request.headers.get('user-agent');
   const ipHash = hashIp(extractIp(request.headers));
   const updated = await store.attachEmail(auditId, email, emailedAt, userAgent, ipHash);

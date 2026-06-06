@@ -7,6 +7,14 @@ export interface AboutScore {
   reasons: string[];
   oneLineWhy: string;
   needsReview: boolean;
+  /**
+   * Codex Round 4 P2 — true when the AI judge ACTUALLY raised the score
+   * above the structural-only floor. See `HeadlineScore.judgeLifted`
+   * for the rationale: a complete-but-harsh judgment clears
+   * `needsReview` but does NOT confirm any above-B+ signal, and the
+   * cap in `runScoring` must continue to hold for it.
+   */
+  judgeLifted: boolean;
 }
 
 /** Cap on the cliché-opener penalty (raw points). See `scoreAbout`. */
@@ -36,6 +44,7 @@ export function scoreAbout(
         ? 'About could not be extracted — flagged for review.'
         : 'No About section — the strongest free-text slot is unused.',
       needsReview: extractionMissed,
+      judgeLifted: false,
     };
   }
 
@@ -70,6 +79,15 @@ export function scoreAbout(
     score -= 4;
     reasons.push('Some buzzword phrasing — recruiters notice.');
   }
+
+  // Lift-only invariant (B3 Unit 2): the structural score IS the floor.
+  // The AI judge may RAISE a section above its structural value (and above
+  // the B+ cap, toward A) but must NEVER drop it below this floor — a
+  // judge that returns harsh booleans for a structurally-decent About
+  // shouldn't be able to turn a B into a D. Snapshot the structural score
+  // before applying judgment adjustments, then take `max(floor, adjusted)`
+  // at the end.
+  const structuralFloor = clamp(score);
 
   // AI judgment is the heart of this section. Track which booleans actually
   // landed — the proxy prompt allows fields to be omitted, so missing fields
@@ -117,12 +135,26 @@ export function scoreAbout(
     reasons.push('Hook/range/CTA assessment pending AI review.');
   }
 
+  // Lift-only invariant: never below the structural floor when judgment
+  // is present. Without judgment, the structural score IS the score —
+  // no max() needed (structural == floor by definition).
+  const judgeAdjusted = clamp(score);
+  const rawScore = judgment
+    ? Math.max(structuralFloor, judgeAdjusted)
+    : judgeAdjusted;
+  // Codex Round 4 P2 — see HeadlineScore.judgeLifted for rationale.
+  const judgeLifted = !!judgment && judgeAdjusted > structuralFloor;
   return {
-    rawScore: clamp(score),
+    rawScore,
     reasons,
-    oneLineWhy: oneLine(score, !!judgment, judgment),
+    // Codex Round 2 P2: derive the summary from the FINAL rawScore, not
+    // the pre-floor `score`. A harsh judgment on a structurally strong
+    // About would otherwise surface a B/A grade with a "needs work"
+    // narrative — score and explanation disagreeing.
+    oneLineWhy: oneLine(rawScore, !!judgment, judgment),
     // No judgment, or most of the AI booleans missing → flag degraded coverage.
     needsReview: !judgment || unknownFields >= 3,
+    judgeLifted,
   };
 }
 

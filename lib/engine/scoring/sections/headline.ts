@@ -8,6 +8,17 @@ export interface HeadlineScore {
   reasons: string[];
   oneLineWhy: string;
   needsReview: boolean;
+  /**
+   * Codex Round 4 P2 — true when the AI judge ACTUALLY raised the score
+   * above the structural-only floor. `needsReview === false` alone is
+   * not enough: a complete-but-harsh judgment (all booleans returned,
+   * all unfavourable) clears `needsReview` but does NOT confirm any
+   * above-B+ signal. Without this distinction `runScoring` would skip
+   * the B+ cap and let the seniority modifier push a "judge said this
+   * is bad" headline to A-/A. The cap fires when `needsReview ||
+   * !judgeLifted`.
+   */
+  judgeLifted: boolean;
 }
 
 const MOBILE_TRUNCATION_CHARS = 70;
@@ -86,6 +97,7 @@ export function scoreHeadline(
         ? 'Headline could not be extracted — flagged for review.'
         : 'Headline is missing — recruiters see nothing under your name.',
       needsReview: extractionMissed,
+      judgeLifted: false,
     };
   }
 
@@ -159,6 +171,15 @@ export function scoreHeadline(
   // judge (below) may lift above this; structural-only headlines cannot.
   score = Math.min(score, B_PLUS_CEILING);
 
+  // Lift-only invariant (B3 Unit 2): the structural score IS the floor.
+  // The AI judge may RAISE a section above its structural value (and above
+  // the B+ cap, toward A) but must NEVER drop it below this floor — a
+  // judge that returns harsh booleans for a structurally-decent headline
+  // shouldn't be able to turn a B into a D. Snapshot the structural score
+  // before applying judgment adjustments, then take `max(floor, adjusted)`
+  // at the end.
+  const structuralFloor = clamp(score);
+
   // Track how many of the AI boolean fields actually came back. The proxy
   // prompt allows fields to be omitted, so a partial object (e.g. notes-only)
   // shouldn't be treated as a confident "all false" judgment — that misclassifies
@@ -210,13 +231,34 @@ export function scoreHeadline(
     if (judgment.notes) reasons.push(judgment.notes);
   }
 
-  const oneLineWhy = oneLine(score, !!judgment, judgment);
+  // Lift-only invariant: never below the structural floor when judgment
+  // is present. Without judgment, the structural score IS the score —
+  // no max() needed (structural == floor by definition).
+  const judgeAdjusted = clamp(score);
+  const rawScore = judgment
+    ? Math.max(structuralFloor, judgeAdjusted)
+    : judgeAdjusted;
+  // Codex Round 4 P2 — `judgeLifted` is true only when the judge
+  // ACTUALLY pushed above the structural floor. A complete-but-harsh
+  // judgment (all booleans present, all unfavourable) clears
+  // `needsReview` but does NOT confirm any above-B+ signal; without
+  // this flag, runScoring would skip the B+ cap and let the
+  // seniority modifier turn a "judge said this is bad" headline into
+  // an A-/A grade.
+  const judgeLifted = !!judgment && judgeAdjusted > structuralFloor;
+  // Codex Round 2 P2: derive the summary from the FINAL rawScore, not
+  // the pre-floor `score`. Otherwise a harsh judgment on a structurally
+  // strong headline could surface a high grade with a "does little
+  // work" narrative — the score the user sees and the sentence
+  // explaining it would disagree.
+  const oneLineWhy = oneLine(rawScore, !!judgment, judgment);
   return {
-    rawScore: clamp(score),
+    rawScore,
     reasons,
     oneLineWhy,
     // No judgment, or most boolean fields missing → degraded coverage.
     needsReview: !judgment || unknownFields >= 3,
+    judgeLifted,
   };
 }
 
