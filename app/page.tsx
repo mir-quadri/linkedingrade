@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { WAITLIST_CTA, EXTENSION_COMING_SOON, AUDIT_CTA } from "@/lib/copy";
+
 import AuditPreviewCard from "./components/AuditPreviewCard";
 import AuditReportCard from "./components/AuditReportCard";
 import PricingTier, { type Feature } from "./components/PricingTier";
@@ -41,28 +43,48 @@ function Hero() {
               gets a grade<em>.</em>
             </h1>
             <p className="lede">
-              A 30-second Chrome extension audits any profile and returns a{" "}
-              <b>6-page report</b> — letter grade A through F, recruiter heat
-              map, before/after rewrites, and a priority action plan.{" "}
-              <b>No hedging, no horoscopes.</b> Brutal where it matters,
-              specific everywhere.
+              A 30-second Chrome extension — <b>coming soon</b> — will audit any
+              profile and return a 6-page report: letter grade A through F,
+              recruiter heat map, before/after rewrites, and a priority action
+              plan. Today, drop your profile PDF for an honest grade on the{" "}
+              <b>4 sections recruiters scan first.</b> No hedging, no horoscopes.
+              Brutal where it matters, specific everywhere.
             </p>
 
             <WaitlistForm
-              buttonLabel="Audit my profile →"
+              buttonLabel={WAITLIST_CTA}
               fineprint={[
-                "Free for 1 audit · no card",
+                "We email you at launch",
                 "Chrome & Edge",
                 "SOC 2 in progress",
               ]}
             />
+
+            <p
+              style={{
+                margin: "10px 0 0",
+                fontSize: 13.5,
+                color: "var(--text-2)",
+              }}
+            >
+              Want a grade today?{" "}
+              <Link
+                href="/audit"
+                style={{
+                  color: "var(--text)",
+                  borderBottom: "1px solid var(--border-2)",
+                }}
+              >
+                {AUDIT_CTA}
+              </Link>
+            </p>
 
             <div className="proof-strip">
               <div className="proof-cell">
                 <span className="num">
                   31<span style={{ color: "var(--accent)" }}>s</span>
                 </span>
-                <span className="lbl">Median audit</span>
+                <span className="lbl">Target median</span>
               </div>
               <div className="proof-cell">
                 <span className="num">6</span>
@@ -168,13 +190,14 @@ function SampleAudit() {
                 maxWidth: "46ch",
               }}
             >
-              The 6-page PDF includes line-by-line rewrites for the About and
-              top three Experience entries, the exact phrasing flagged as
-              cliché, and the three highest-leverage fixes ranked by
-              minutes-to-implement.
+              The full 6-page PDF — line-by-line rewrites for the About and top
+              three Experience entries, the exact phrasing flagged as cliché, and
+              the highest-leverage fixes ranked by minutes-to-implement — ships
+              with the Chrome extension. The live audit grades the 4 sections
+              recruiters scan first, free today.
             </p>
             <div style={{ display: "flex", gap: 10, marginTop: 8, flexWrap: "wrap" }}>
-              <Link href="#cta" className="btn btn-primary">
+              <Link href="/audit" className="btn btn-primary">
                 Run yours
               </Link>
               <Link href="#pricing" className="btn btn-ghost">
@@ -396,10 +419,10 @@ function WhyExtension() {
                 maxWidth: "38ch",
               }}
             >
-              Pin the extension, hit any profile, click once. A 6-page PDF lands
-              in your downloads before you&apos;d have finished typing the
-              system prompt. Built for the cadence of an actual job search or an
-              actual sourcing day.
+              Once it ships, you&apos;ll pin the extension, hit any profile, and
+              click once — a 6-page PDF in your downloads before you&apos;d have
+              finished typing the system prompt. Built for the cadence of an
+              actual job search or an actual sourcing day.
             </p>
             <div
               className="font-mono"
@@ -658,11 +681,11 @@ function BuiltFor() {
 
 function Pricing() {
   const free: Feature[] = [
-    { label: (<><b>1</b> audit · ever</>) },
-    { label: "6-page PDF · watermark" },
-    { label: "Grade + heat map" },
-    { label: "No before/after rewrites", excluded: true },
-    { label: "No history, no exports", excluded: true },
+    { label: "Composite grade + score" },
+    { label: (<><b>4</b> graded sections</>) },
+    { label: "Top wins + highest-leverage fixes" },
+    { label: "Emailed report + permanent link" },
+    { label: "8 more sections in the extension", excluded: true },
   ];
   const pro: Feature[] = [
     { label: (<><b>25</b> audits / month</>) },
@@ -695,22 +718,23 @@ function Pricing() {
             Four prices. <em>One product.</em> Cancel in two clicks.
           </h2>
           <p className="deck">
-            No trial, no card on file for the free audit. The paid plans differ
-            on volume and exports, not on the quality of the audit. Whichever
-            tier you&apos;re on, you get the same rubric and the same 6-page
-            report.
+            No trial, no card for the free audit — it grades the 4 sections
+            recruiters scan first, today. The paid plans add the full
+            12-section report, volume, and exports when the Chrome extension
+            ships.
           </p>
         </div>
 
         <div className="price-grid">
           <PricingTier
             tier="Tier 00 · Free"
-            name="Single audit"
+            name="PDF audit"
             price="$0"
-            per="/ one-time"
-            blurb="One audit on any profile, full PDF, watermarked. For the curious."
+            per="/ no card"
+            blurb="Drop your LinkedIn PDF and grade the 4 sections recruiters scan first — composite, section grades, top wins, and your highest-leverage fixes."
             features={free}
-            ctaLabel="Install free"
+            ctaLabel={AUDIT_CTA}
+            ctaHref="/audit"
           />
           <PricingTier
             featured
@@ -753,19 +777,23 @@ function FinalCTA() {
         <div>
           <div className="meta-line">
             <span>§ 05 — ACTION</span>
-            <span>30 SECONDS · CHROME / EDGE · FREE</span>
+            <span>CHROME EXTENSION · COMING SOON</span>
           </div>
           <h2>
             Find out what your profile is <em>actually</em> worth.
           </h2>
           <p>
-            Free for your first audit. No card. No tab-switching. The PDF lands
-            in your downloads before your coffee.
+            {EXTENSION_COMING_SOON} Join the waitlist and we&apos;ll email you
+            the moment it ships. Want a grade today? Drop your profile PDF for an
+            honest read on the 4 sections recruiters scan first —{" "}
+            <Link href="/audit" style={{ color: "inherit", borderBottom: "1px solid currentColor" }}>
+              {AUDIT_CTA}
+            </Link>
           </p>
         </div>
         <WaitlistForm
-          buttonLabel="Install & audit →"
-          fineprint={["Chrome & Edge", "No card required", "2-click uninstall"]}
+          buttonLabel={WAITLIST_CTA}
+          fineprint={["Chrome & Edge", "No card required", "We email you at launch"]}
         />
       </div>
     </section>

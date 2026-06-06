@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { WAITLIST_CTA_SHORT } from "@/lib/copy";
+
 import BrandLockup from "./BrandLockup";
 import ThemeToggle from "./ThemeToggle";
 
@@ -15,11 +17,12 @@ export default function SiteNav() {
           <Link href="/#how">How it works</Link>
           <Link href="/#audiences">Built for</Link>
           <Link href="/#pricing">Pricing</Link>
+          <Link href="/audit">Audit</Link>
         </div>
         <div className="nav-cta">
           <ThemeToggle />
           <Link href="/#cta" className="btn btn-primary">
-            Install free
+            {WAITLIST_CTA_SHORT}
           </Link>
         </div>
       </div>

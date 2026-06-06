@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { EXTENSION_COMING_SOON } from "@/lib/copy";
+
 import Logo from "./Logo";
 import Wordmark from "./Wordmark";
 
@@ -37,8 +39,9 @@ export default function SiteFooter() {
                 lineHeight: 1.5,
               }}
             >
-              The honest LinkedIn audit. 30-second Chrome extension, 6-page
-              report, real letter grade. Independent and not affiliated with
+              The honest LinkedIn audit. Drop your profile PDF, get a real
+              letter grade on the 4 sections recruiters scan first.{" "}
+              {EXTENSION_COMING_SOON} Independent and not affiliated with
               LinkedIn Corp.
             </p>
           </div>

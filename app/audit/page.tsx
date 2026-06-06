@@ -27,7 +27,7 @@ export default function AuditPage() {
             <p className="deck">
               Drop your LinkedIn &ldquo;Save to PDF&rdquo; export and get a graded audit of the 4
               sections recruiters scan first: Headline, About, Current Role, and Career Arc. The
-              full 12-section audit lives in the Chrome extension.
+              full 12-section audit is coming soon in the Chrome extension.
             </p>
           </header>
           <AuditFlow />
