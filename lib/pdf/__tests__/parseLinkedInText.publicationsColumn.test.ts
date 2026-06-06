@@ -345,6 +345,63 @@ B.S., Computer Science
     expect(profile.fullName).toBe('John Smith Jr.');
   });
 
+  it('short headline fragment `Senior Director, Data` is rejected by the fallback (Codex R6 P2 — comma + disqualifier words)', () => {
+    // Codex R6 P2: the soft `obviouslyNotAName` gate was missing
+    // (a) a comma check and (b) reuse of CERT_DISQUALIFIERS. A
+    // degenerate fallback slice ending in a short comma-bearing
+    // headline fragment ("Senior Director, Data") slipped through.
+    const COMMA_FRAGMENT = `Contact
+555-0113 (Mobile)
+example13@example.com
+Top Skills
+Brand Strategy
+Marketing Operations
+Engineering Leadership
+Certifications
+Senior Director, Data
+Summary
+Some summary content here.
+Experience
+Acme
+Senior Director
+January 2023 - Present (1 year 11 months)
+San Francisco
+Education
+Stanford University
+M.S., Computer Science
+`;
+    const profile = parseLinkedInText(COMMA_FRAGMENT);
+    expect(profile.fullName).toBeNull();
+  });
+
+  it('short headline fragment `Engineering Manager` is rejected by the fallback (Codex R6 P2 — disqualifier words)', () => {
+    // No comma, no pipe, no "at" — looks like a plausible candidate
+    // to the R5 gate. CERT_DISQUALIFIERS catches "engineering" and
+    // "manager" so the soft gate now rejects it.
+    const NO_COMMA_FRAGMENT = `Contact
+555-0114 (Mobile)
+example14@example.com
+Top Skills
+Brand Strategy
+Marketing Operations
+Engineering Leadership
+Certifications
+Engineering Manager
+Summary
+Some summary content here.
+Experience
+Acme
+Engineering Manager
+January 2023 - Present (1 year 11 months)
+San Francisco
+Education
+Stanford University
+B.S., Computer Science
+`;
+    const profile = parseLinkedInText(NO_COMMA_FRAGMENT);
+    expect(profile.fullName).toBeNull();
+  });
+
   it('headline-fragment fallback returns null name — does not emit a garbled fullName', () => {
     // Degenerate slice that the old legacy fallback would have
     // emitted as a name. The slice between Certifications and Summary

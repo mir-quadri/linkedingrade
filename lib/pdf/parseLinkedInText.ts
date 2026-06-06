@@ -319,22 +319,31 @@ function looksLikeName(line: string): boolean {
  *   - `|` (LinkedIn's canonical headline separator)
  *   - `@`, `&`, `/`, `•`, `·` (headline punctuation / emoji bullets)
  *   - ` at ` (case-insensitive — "Director at Acme")
- *   - sentence-ending `.?!:` (period after a single capital letter
- *     IS allowed — "John M. Smith" — but the LINE shouldn't end with
- *     `.?!:` because real names don't)
+ *   - `?` `!` `:` at end (true sentence markers — trailing `.` IS
+ *     allowed for dotted suffixes like "Jr." / "Sr." / "Ph.D.")
  *   - more than 5 whitespace-separated tokens (real full names cap
  *     out around 4-5; longer is a headline / publication title)
- *
- * Matches the engine-side `isSuspiciousName` rules so the parser and
- * the engine agree on what a not-a-name looks like.
+ *   - commas — real names rarely contain them, but short headline
+ *     fragments do ("Senior Director, Data"). (Codex R6 P2.)
+ *   - any token in CERT_DISQUALIFIERS — short title-shaped fragments
+ *     like "Engineering Manager" or "Senior Counsel" slip the other
+ *     checks because they have no punctuation, but the disqualifier
+ *     word list (engineer / manager / director / senior / etc.)
+ *     catches them. Real names don't contain these tokens.
+ *     (Codex R6 P2.)
  */
 function obviouslyNotAName(line: string): boolean {
   const t = line.trim();
   if (!t) return true;
-  if (/[|@&/•·]/.test(t)) return true;
+  if (/[|@&/•·,]/.test(t)) return true;
   if (/\sat\s/i.test(t)) return true;
   if (/[?!:]$/.test(t)) return true;
-  if (t.split(/\s+/).length > 5) return true;
+  const words = t.split(/\s+/);
+  if (words.length > 5) return true;
+  for (const w of words) {
+    const lower = w.toLowerCase().replace(/[.,]+$/, '');
+    if (CERT_DISQUALIFIERS.has(lower)) return true;
+  }
   return false;
 }
 
