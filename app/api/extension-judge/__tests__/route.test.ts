@@ -235,4 +235,24 @@ describe('POST /api/extension-judge — per-IP rate limit', () => {
     // Only the first (allowed) call reached the proxy.
     expect(fetchSpy).toHaveBeenCalledTimes(1);
   });
+
+  it('counts rejected (invalid) requests against the budget — rate limit precedes parsing (Codex P2)', async () => {
+    process.env.EXTENSION_JUDGE_RATE_LIMIT_PER_DAY = '1';
+    // First request is malformed JSON: it must still consume the slot.
+    const bad = new Request('http://localhost/api/extension-judge', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', origin: EXT_ORIGIN },
+      body: '{not json',
+    });
+    const firstRes = await POST(bad);
+    expect(firstRes.status).toBe(400);
+
+    // A subsequent valid request from the same (no-IP) bucket is now
+    // rate-limited — the invalid request already spent the quota.
+    fetchSpy.mockResolvedValue(makeProxyOk());
+    const secondRes = await POST(makeRequest(VALID_REQUEST, { origin: EXT_ORIGIN }));
+    expect(secondRes.status).toBe(200);
+    expect(((await secondRes.json()) as { status: string }).status).toBe('judge_unavailable');
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
 });

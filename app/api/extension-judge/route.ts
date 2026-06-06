@@ -74,7 +74,31 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
 
-  // 2. Parse + validate + cap input (before any upstream work).
+  // 2. Per-IP daily rate limit — the real abuse bound for this
+  //    unauthenticated endpoint. Applied BEFORE body parsing so that
+  //    malformed / oversized payloads also consume budget: otherwise a
+  //    spoofed-origin script could force unbounded JSON-parse +
+  //    validation work without ever spending its documented quota
+  //    (Codex P2). Reuses the proxy's key derivation + limiter;
+  //    `memoryOnly` keeps a raw IP out of persistent KV when
+  //    `IP_HASH_PEPPER` is unset.
+  const { rateLimitKey, memoryOnly, keyShape } = deriveJudgeRateKey(
+    request.headers,
+    RATE_KEY_PREFIX,
+  );
+  const limit = numericEnv('EXTENSION_JUDGE_RATE_LIMIT_PER_DAY', DEFAULT_RATE_LIMIT_PER_DAY);
+  const decision = await consumeJudgeRateLimit(rateLimitKey, limit, undefined, { memoryOnly });
+  if (!decision.allowed) {
+    console.warn(
+      `[api/extension-judge] rate-limited origin=extension keyShape=${keyShape} ` +
+        `count=${decision.count} limit=${decision.limit} backend=${decision.backend}`,
+    );
+    // auditId isn't parsed yet (rate limit precedes parsing); null is
+    // fine — the extension treats every judge_unavailable identically.
+    return withCorsHeaders(judgeUnavailable('rate_limited', null), origin, allowed);
+  }
+
+  // 3. Parse + validate + cap input (before any upstream work).
   let payload: unknown;
   try {
     payload = await request.json();
@@ -94,24 +118,6 @@ export async function POST(request: Request): Promise<Response> {
     );
   }
   const { request: judgeRequest, auditId } = parsed.value;
-
-  // 3. Per-IP daily rate limit — the real abuse bound for this
-  //    unauthenticated endpoint. Reuses the proxy's key derivation +
-  //    limiter; `memoryOnly` keeps a raw IP out of persistent KV when
-  //    `IP_HASH_PEPPER` is unset.
-  const { rateLimitKey, memoryOnly, keyShape } = deriveJudgeRateKey(
-    request.headers,
-    RATE_KEY_PREFIX,
-  );
-  const limit = numericEnv('EXTENSION_JUDGE_RATE_LIMIT_PER_DAY', DEFAULT_RATE_LIMIT_PER_DAY);
-  const decision = await consumeJudgeRateLimit(rateLimitKey, limit, undefined, { memoryOnly });
-  if (!decision.allowed) {
-    console.warn(
-      `[api/extension-judge] rate-limited origin=extension keyShape=${keyShape} ` +
-        `count=${decision.count} limit=${decision.limit} backend=${decision.backend}`,
-    );
-    return withCorsHeaders(judgeUnavailable('rate_limited', auditId), origin, allowed);
-  }
 
   // 4. Relay to the proxy via the shared HttpJudge path. `createServerJudge`
   //    adds `X-Judge-Auth` from env and forwards the end-user IP so the
