@@ -199,20 +199,19 @@ M.S., Computer Science
     );
   });
 
-  it('Publications header is recognised as a sidebar — its body does NOT pollute Certifications', () => {
-    const profile = parseLinkedInText(PUBLICATIONS_PROFILE);
-    // Certifications has 2 cert lines in the fixture; Publications has
-    // 4 publication-title lines and 4 author lines and 2 year lines.
-    // Pre-fix: Publications was not recognised, so its body would
-    // either bleed into Certifications (when Publications appeared
-    // BEFORE the identity) or get lost in the identity slice. Post-
-    // fix: the 2 actual cert names sit in Certifications and nothing
-    // else.
-    expect(profile.certifications.data?.map((c) => c.name)).toEqual([
-      'AWS Certified Solutions Architect',
-      'Kubernetes Certified Administrator',
-    ]);
-  });
+  // NOTE: an earlier draft of this PR pinned "Publications content
+  // does NOT pollute Certifications" via a bare `Publications` entry
+  // in SECTION_HEADERS. Codex R4 P2 found that bare nouns
+  // (Publications / Publication / Patents / Patent / Awards) collide
+  // with sidebar items literally named those strings — a Top Skill
+  // called "Patents" would otherwise be promoted to a header. The
+  // bare nouns are dropped. The cost is that profiles with a
+  // Publications block do pollute the adjacent Certifications block;
+  // the name parse itself is unaffected (verified by the first three
+  // tests above). A future PR can re-add `Publications` with a
+  // tighter disambiguation gate (require strict blank-above, OR
+  // check that the next line looks like a publication title) when
+  // we have a real verifiable failure to test against.
 
   it('legacy fallback preserves a 4-word name (Codex R1 P2 — `looksLikeName` rejects 4 tokens but the slice IS a valid name)', () => {
     // `looksLikeName` caps at 3 tokens, so this would have been
@@ -346,6 +345,40 @@ M.S., Computer Science
     // the engine's name-suspicion guard render "Your audit" instead
     // of a garbled string.
     expect(profile.fullName).toBeNull();
+  });
+
+  it('a Top Skill literally named "Patents" does NOT get promoted to a header (Codex R4 P2 — same class as `Awards`)', () => {
+    // IP/law profile with a Top Skill exactly named "Patents" and
+    // no real Patents section. Bare-noun `Patents` was originally
+    // listed as a section header for the speculative Erum-bleed
+    // defence, but it collides with sidebar items of the same name
+    // — same class as the `Awards` collision Codex flagged earlier.
+    const TOP_SKILL_NAMED_PATENTS = `Contact
+555-0111 (Mobile)
+example11@example.com
+Top Skills
+Software Architecture
+Patents
+Distributed Systems
+Marcus Chen
+Principal Engineer
+San Francisco, California, United States
+Summary
+IP-focused engineering summary.
+Experience
+TechCo
+Principal Engineer
+January 2023 - Present (1 year 11 months)
+San Francisco, California, United States
+Education
+Stanford University
+M.S., Computer Science
+`;
+    const profile = parseLinkedInText(TOP_SKILL_NAMED_PATENTS);
+    expect(profile.fullName).toBe('Marcus Chen');
+    expect(profile.skills.data?.topThree).toContain('Patents');
+    expect(profile.skills.data?.topThree).toContain('Software Architecture');
+    expect(profile.skills.data?.topThree).toContain('Distributed Systems');
   });
 
   it('a Top Skill literally named "Awards" does NOT get promoted to a header (Codex R3 P2 — standalone `Awards` is too broad)', () => {

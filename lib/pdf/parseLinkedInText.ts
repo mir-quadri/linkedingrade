@@ -11,31 +11,27 @@ const SECTION_HEADERS = [
   'Top Skills',
   'Languages',
   'Certifications',
-  // Publications / Patents / Honors-Awards / Awards render in the SAME
-  // left sidebar column as Contact / Top Skills / Languages /
-  // Certifications. Without recognising them as headers the parser
-  // treats their multi-line content as part of the identity slice
-  // (between the last recognised sidebar header and `Summary`), which
-  // produced the "Erum Quadri" misparse where author lists and
-  // publication titles polluted the name-finder window. LinkedIn ships
-  // a handful of label variants; we list each.
-  'Publications',
-  'Publication',
-  'Patents',
-  'Patent',
-  // LinkedIn's documented variants for the Honors-Awards section use
-  // BOTH Title-Case and lowercase `awards`. The header match is
-  // exact-string `===`, so each variant the export can emit must be
-  // listed explicitly. (Codex R2 P2 on PR #22.)
-  // Each Honors-Awards variant must be the FULL labelled form. A
-  // standalone `Awards` was originally listed too, but Codex R3 P2
-  // flagged that as too broad — in lenient mode (real exports with no
-  // blank lines between sections) the boundary check is skipped, and
-  // a sidebar item literally named "Awards" (a Top Skill, a
-  // certification, etc.) would be promoted to a section header and
-  // truncate its parent block. The narrower compound variants
-  // ("Honors-Awards", "Honors & Awards", lowercase variants) are
-  // unambiguous and cover LinkedIn's documented labels.
+  // ORIGINAL goal: recognise Publications / Patents / Honors-Awards
+  // sections so their content gets stripped from the identity slice
+  // between Certifications and Summary (the "Erum Quadri" failure
+  // class). Codex (R3 P2 + R4 P2) flagged that bare singletons —
+  // `Awards`, `Publications`, `Publication`, `Patents`, `Patent` —
+  // collide with sidebar items whose text is exactly that string
+  // (a Top Skill literally called "Patents", a Certification called
+  // "Awards"). In lenient mode (real exports run sections together
+  // with no blank lines) the boundary check is skipped, the bare
+  // label matches the sidebar item, and that item gets promoted to a
+  // section header — truncating its parent block.
+  //
+  // The compound `Honors-Awards` variants are unambiguous and stay
+  // in the list (they cover LinkedIn's documented label forms). The
+  // bare nouns are removed. The synthetic test fixtures never
+  // actually reproduced the Publications-bleed-into-identity bug, so
+  // dropping them costs only speculative defensive value; if a real
+  // verifiable case surfaces, they come back with a tighter
+  // disambiguation gate (require strict blank-above, OR require a
+  // structural neighbour like "(YYYY)" / "Patent N,NNN,NNN" /
+  // "Co-Authors:").
   'Honors-Awards',
   'Honors and Awards',
   'Honors and awards',
@@ -57,10 +53,9 @@ const SIDEBAR_HEADERS: ReadonlySet<SectionHeader> = new Set([
   'Top Skills',
   'Languages',
   'Certifications',
-  'Publications',
-  'Publication',
-  'Patents',
-  'Patent',
+  // Bare `Publications` / `Publication` / `Patents` / `Patent` removed
+  // — see SECTION_HEADERS comment. Honors-Awards compound variants
+  // stay; they're unambiguous.
   'Honors-Awards',
   'Honors and Awards',
   'Honors and awards',
