@@ -295,7 +295,18 @@ const CERT_DISQUALIFIERS = new Set([
   // narrow without adding structural disambiguation. The principle
   // for inclusion: a noun that recurs as a LinkedIn headline component
   // AND is vanishingly rare as a personal-name token.
-  'expansion', 'growth', 'success', 'development', 'innovation',
+  // NOTE on real-name collisions (Codex R10 P2): the inclusion
+  // criterion is "common LinkedIn headline component AND vanishingly
+  // rare as a personal-name token IN ANY MAJOR NAMING TRADITION".
+  // West African / Nigerian virtue-name conventions use words like
+  // `Success`, `Wisdom`, `Glory`, `Victory` AS given names — those
+  // must NOT be added here even when they appear as headline wrap
+  // targets, because rejecting them nulls a real user's name. The
+  // wrap-target failure mode (`Customer Success` shown as the user's
+  // name) is regrettable but a lesser harm than blanking out an
+  // actual Nigerian user named Isaac Success. `success` was removed
+  // in 6449c00's follow-up after R10 P2 flagged this collision.
+  'expansion', 'growth', 'development', 'innovation',
   'excellence', 'experience', 'performance', 'enablement',
   'engagement', 'acquisition', 'retention', 'optimization',
   'efficiency', 'delivery', 'partnerships',

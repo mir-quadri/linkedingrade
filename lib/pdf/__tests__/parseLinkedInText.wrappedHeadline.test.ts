@@ -300,10 +300,15 @@ B.Eng., Computer Engineering
     // `growth`, `success` (plus `development`, `innovation`,
     // `excellence`, etc.) to `CERT_DISQUALIFIERS` so `looksLikeName`
     // rejects them and the walk-backwards reaches the real name.
+    // `Customer Success` was removed from this fixture set after Codex
+    // R10 P2: `success` is a documented West African / Nigerian given
+    // name (Isaac Success, Success Johnson). Disqualifying `success`
+    // would null those users' names, which is worse than letting
+    // `Customer Success` slip through as a wrap target. The wrap-target
+    // failure mode is accepted; the real-name failure mode is not.
     const wrapTargets = [
       { name: 'Sara Patel', wrap: 'Global Expansion' },
       { name: 'Omar Rivera', wrap: 'Business Growth' },
-      { name: 'Priya Shah', wrap: 'Customer Success' },
     ];
     for (const { name, wrap } of wrapTargets) {
       const fixture = `Contact
@@ -336,6 +341,43 @@ B.S., Economics
       expect(profile.fullName, `wrap target "${wrap}" should not shadow "${name}"`).toBe(name);
       expect(profile.fullName).not.toBe(wrap);
     }
+  });
+
+  it('does NOT reject real West African / Nigerian virtue names (Codex R10 P2: Isaac Success)', () => {
+    // Codex R10 P2 flagged that adding `success` to CERT_DISQUALIFIERS
+    // would null real users with virtue-pattern names — `Success` is a
+    // documented West African / Nigerian given name and surname
+    // (Isaac Success the footballer, Success Johnson, etc.). The
+    // inclusion criterion now explicitly excludes virtue words used
+    // as given names in any major naming tradition; `success` was
+    // removed from the disqualifier list in the R10 P2 follow-up.
+    const ISAAC_SUCCESS_FIXTURE = `Contact
+555-0240 (Mobile)
+example-isaac@example.com
+Top Skills
+Football Strategy
+Leadership
+Languages
+English
+Yoruba
+Certifications
+Football Coaching Diploma
+Isaac Success
+Professional Footballer
+Lagos, Nigeria
+Summary
+Footballer summary.
+Experience
+LagosFC
+Striker
+January 2023 - Present (1 year 11 months)
+Lagos, Nigeria
+Education
+University of Lagos
+B.A., Sports Science
+`;
+    const profile = parseLinkedInText(ISAAC_SUCCESS_FIXTURE);
+    expect(profile.fullName).toBe('Isaac Success');
   });
 
   it('wrap targets Codex R8 P2 named (Strategic Leadership / Change Management) do NOT shadow the real name', () => {
