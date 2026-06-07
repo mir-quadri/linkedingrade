@@ -33,42 +33,80 @@ import { parseLinkedInText } from '../parseLinkedInText';
  * wrapped-pipe-headline + location, with realistic surrounding sidebar
  * content. PII-scrubbed. Swap for the verbatim capture when available.
  */
-describe('parseLinkedInText — wrapped-headline name extraction (Erum Manzoor profile shape)', () => {
-  // Synthetic reconstruction. Structure matches the documented
-  // Erum Manzoor failure mode: long headline wraps onto a second
-  // line that is a 2-word Title-Case fragment which would pass
-  // `looksLikeName` and shadow the real name. All identifying
-  // info is fabricated.
-  const ERUM_SHAPED_FIXTURE = `Contact
-555-0200 (Mobile)
+describe('parseLinkedInText — wrapped-headline name extraction (Erum Manzoor profile)', () => {
+  // Verbatim pdf-parse@1.1.1 output from Erum Manzoor's real LinkedIn
+  // PDF export, PII-scrubbed (email → placeholder, LinkedIn/Instagram
+  // handles → placeholders, location → different metro area). The
+  // identity-block structure is preserved exactly — including the
+  // wrapped sidebar items (`Strategic Management: Business` / `Strategy
+  // from Wharton: Competitive` / `Advantage` is one cert title wrapped
+  // across three physical lines) and the wrapped headline that
+  // motivated this PR:
+  //
+  //   Erum Manzoor                                                 ← real name
+  //   Executive Leader | Motorsports | … | Venture Capital |       ← headline L1
+  //   Digital Transformation                                       ← wrap target
+  //   Dallas-Fort Worth Metroplex                                  ← location
+  //
+  // Pre-fix bug: the backwards walk hit "Digital Transformation"
+  // (2 Title-Case words, both passing `looksLikeName`) and picked it
+  // as `fullName`. Post-fix: `transformation` is in `CERT_DISQUALIFIERS`,
+  // so `looksLikeName` rejects the wrap target and the walk reaches
+  // "Erum Manzoor" naturally.
+  const ERUM_REAL_PDF = `Contact
 example-erum@example.com
-www.linkedin.com/in/example-erum
-(LinkedIn)
+www.linkedin.com/in/
+example-erum-svp (LinkedIn)
+www.instagram.com/
+example-erum-personal (Personal)
 Top Skills
-Strategic Leadership
-Mergers and Acquisitions
-Venture Capital
+Computer Science
+Engineering Management
+Systems Engineering
 Languages
-English
-French
+Urdu (Native or Bilingual)
+English (Native or Bilingual)
 Certifications
-Executive Leadership Program
+Strategic Management: Business
+Strategy from Wharton: Competitive
+Advantage
+CSPO
+TOGAF 9 Certified
+Strategic Management: Connected
+Strategy
+Post Graduate Program in Artificial
+Intelligence and Machine Learning
+Publications
+Navigating Data Privacy in
+AI-Balancing Innovation with
+Compliance
+Building Ethical AI: How To Take A
+User-Centered Approach
+How to use AI in Transformation
+Projects
+How To Balance Innovation With
+Reliability In New Tech Initiatives
+Helpful Tools And Techniques
+For Collaboration Across Tech
+Ecosystems
 Erum Manzoor
 Executive Leader | Motorsports | Automation | Venture Capital |
 Digital Transformation
-New York City Metropolitan Area
+Greater Boston Area
 Summary
-Executive leader with deep operating experience across motorsports,
-venture capital, and enterprise automation.
+Executive leader with deep operating experience.
 Experience
-RaceCo
+SomeCo
 Chief Operating Officer
 January 2023 - Present (1 year 11 months)
-New York City Metropolitan Area
+Greater Boston Area
 Education
 Wharton School
 MBA, Strategy
 `;
+  // Backwards-compat alias for the regression-guard tests below that
+  // still reference the old name. Both names point at the real PDF text.
+  const ERUM_SHAPED_FIXTURE = ERUM_REAL_PDF;
 
   it('picks the real name above the wrapped headline, NOT the continuation fragment below', () => {
     const profile = parseLinkedInText(ERUM_SHAPED_FIXTURE);

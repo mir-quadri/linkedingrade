@@ -330,6 +330,45 @@ const CERT_DISQUALIFIERS = new Set([
 ]);
 
 /**
+ * Accepted limitation of the disqualifier-based wrapped-headline fix
+ * (PR #24, Codex R7–R13 P2 discussion). The vocabulary above catches
+ * the common LinkedIn wrap-target nouns that motivated the PR
+ * (`Digital Transformation`, `Data Science`, `Customer Success` etc.)
+ * but it is by construction enumerative. Two failure modes survive,
+ * and the trade-off is deliberate:
+ *
+ *   1. Unenumerated wrap-target — a LinkedIn headline that wraps to a
+ *      2-3 word Title-Case phrase NOT in `CERT_DISQUALIFIERS` (e.g. a
+ *      noun nobody has surfaced yet). The walk-backwards picks the
+ *      wrap target as `fullName`. The engine-side `isSuspiciousName`
+ *      guard in `lib/engine/scoring/index.ts` does not catch this
+ *      (no pipes, ≤5 words, no `@/&/•`), so the WRONG name reaches
+ *      the UI. This is the residual class Codex flagged through R13
+ *      and is the cost of NOT going structural.
+ *
+ *   2. Real personal-name collision — a real user whose given or
+ *      surname IS one of the disqualifier tokens. Their `fullName`
+ *      is nulled; the UI degrades to "Your audit" via the
+ *      `nameConfidence: 'low'` path. Accepted because the
+ *      degradation is graceful — neutral header instead of a wrong
+ *      name. `success` was REMOVED from the vocab after R10 P2
+ *      surfaced a documented West African virtue-name tradition
+ *      (Isaac Success). The inclusion criterion is now "common
+ *      LinkedIn headline component AND vanishingly rare as a
+ *      personal-name token in any major naming tradition"; new
+ *      collisions are removed the same way as `success`.
+ *
+ * The structural alternative (positional / pipe-count / continuation
+ * heuristics) was attempted across six commits (R1–R6 P2) before
+ * being reverted: at slice length ≥ 5 the wrap-headline shape and
+ * the no-headline cert-bleed shape are structurally identical (every
+ * signal — position, prev-ends-with-`|`, pipe count, length, name-
+ * shaped line above — returns the same answer for both), so no
+ * structural rule distinguishes them without a content classifier.
+ * See the worked trace in the R9 P2 discussion on the PR.
+ */
+
+/**
  * Does this line read like a person's full name? LinkedIn names render in
  * Title Case across 2-4 words ("Mir Quadri", "Jane Doe", "Mary O'Brien",
  * "Jean-Luc Picard"), without connector words ("of", "the", "and") and
