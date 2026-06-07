@@ -449,8 +449,17 @@ function extractIdentity(
     if (k === 0) return false;
     const prev = slice[k - 1]!;
     if (!prev.endsWith('|')) return false;
+    // Codex R4 P2: a two-segment headline (`Phrase A | Phrase B`) has
+    // only ONE pipe, so requiring ≥2 pipes here would miss a real wrap
+    // of the form `Strategic Advisor |` / `Digital Transformation`. The
+    // R1 P2 single-pipe cert test is still protected by the position
+    // constraint alone (the cert sits at length-4, not length-3 — the
+    // position check at length-2 finds the headline above it and walks
+    // past). Relaxing to ≥1: any `|`-terminated line at length-3 is a
+    // candidate headline source; the name-above-prev check below is
+    // the final defence against sidebar-bleed false positives.
     const pipeCount = (prev.match(/\|/g) ?? []).length;
-    if (pipeCount < 2) return false;
+    if (pipeCount < 1) return false;
     // Final defence: a real wrapped-headline structure always has a
     // real name TWO+ slots above the wrap target (name → L1 →
     // continuation → location). If no line above the `|`-multi

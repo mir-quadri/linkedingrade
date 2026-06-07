@@ -213,6 +213,45 @@ M.S., Computer Science
     expect(profile.fullName).toBe('Jane Doe');
   });
 
+  it('a TWO-segment wrapped headline (`Phrase A |` / `Phrase B`) — single pipe — still gets the name and reassembles (Codex R4 P2)', () => {
+    // Codex R4 P2: real LinkedIn headlines can have just one
+    // separator (`Strategic Advisor | Digital Transformation`). When
+    // the headline wraps after the only `|`, the continuation line
+    // (`Digital Transformation`) sits at slice.length - 2 with
+    // exactly ONE pipe on the L1 line. The R1 P2 pipeCount ≥ 2
+    // threshold would have missed this and let "Digital
+    // Transformation" become the name.
+    const TWO_SEGMENT_WRAP = `Contact
+555-0205 (Mobile)
+example-mark@example.com
+Top Skills
+Strategic Planning
+Corporate Strategy
+Mergers and Acquisitions
+Languages
+English
+Certifications
+Strategic Leadership Program
+Mark Thompson
+Strategic Advisor |
+Digital Transformation
+Singapore
+Summary
+Strategic advisor summary.
+Experience
+ConsultingCo
+Strategic Advisor
+January 2023 - Present (1 year 11 months)
+Singapore
+Education
+INSEAD
+MBA
+`;
+    const profile = parseLinkedInText(TWO_SEGMENT_WRAP);
+    expect(profile.fullName).toBe('Mark Thompson');
+    expect(profile.headline.data).toBe('Strategic Advisor | Digital Transformation');
+  });
+
   it('a profile WITHOUT a wrapped headline still picks the closest-to-bottom name (regression guard for the legacy walk-backwards behaviour)', () => {
     // Sidebar slice that runs ["Cert One", "Alex Example",
     // "Engineer", "Remote"] — the comment on `extractIdentity` calls
