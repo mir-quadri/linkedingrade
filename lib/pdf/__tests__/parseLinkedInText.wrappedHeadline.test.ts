@@ -96,6 +96,46 @@ MBA, Strategy
     expect(profile.fullName).not.toBe('Digital Transformation');
   });
 
+  it('a wrapped cert title ending with a SINGLE `|` does NOT swallow the real name as a continuation (Codex R1 P2)', () => {
+    // Codex flagged this case: a wrapped certification or skill
+    // title like `Some Program |` followed by `Jane Doe` would
+    // make the naive `endsWith('|')` check treat the name as a
+    // headline continuation and skip it, returning a null /
+    // headline-fragment name. The continuation check requires the
+    // pipe-ending line to ALSO contain at least one OTHER `|` — a
+    // real LinkedIn headline always has multiple pipes
+    // (`Phrase | Phrase | Phrase |`) while a stray-pipe cert title
+    // has exactly one.
+    const SINGLE_PIPE_CERT = `Contact
+555-0202 (Mobile)
+example-jane@example.com
+Top Skills
+Project Management
+Process Improvement
+Compliance
+Languages
+English
+Certifications
+Project Management Professional
+Some Program |
+Jane Doe
+Senior Compliance Officer
+Toronto, Canada
+Summary
+Compliance officer summary.
+Experience
+BankCo
+Senior Compliance Officer
+January 2023 - Present (1 year 11 months)
+Toronto, Canada
+Education
+University of Toronto
+B.Comm., Finance
+`;
+    const profile = parseLinkedInText(SINGLE_PIPE_CERT);
+    expect(profile.fullName).toBe('Jane Doe');
+  });
+
   it('a profile WITHOUT a wrapped headline still picks the closest-to-bottom name (regression guard for the legacy walk-backwards behaviour)', () => {
     // Sidebar slice that runs ["Cert One", "Alex Example",
     // "Engineer", "Remote"] — the comment on `extractIdentity` calls

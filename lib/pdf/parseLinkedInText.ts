@@ -417,9 +417,21 @@ function extractIdentity(
   // always `|`, and a continuation line is by definition the line
   // immediately after one that ends with `|`. Exclude continuation
   // lines from name candidacy.
+  // The previous line must look like a headline line — LinkedIn renders
+  // headlines as `Phrase | Phrase | Phrase |` (multiple `|` separators
+  // between Title-Case phrases). A single trailing `|` alone is not
+  // enough: a wrapped certification or skill title like `Some Program |`
+  // is also `|`-terminated, and treating it as a headline line would
+  // make the loop skip the real name that follows. Require at least
+  // TWO total `|` characters, ruling out the single-pipe cert-title
+  // shape while still recognising every real wrapped headline.
+  // (Codex R1 P2 on PR #24.)
   const isHeadlineContinuation = (k: number): boolean => {
     if (k === 0) return false;
-    return slice[k - 1]!.trimEnd().endsWith('|');
+    const prev = slice[k - 1]!.trimEnd();
+    if (!prev.endsWith('|')) return false;
+    const pipeCount = (prev.match(/\|/g) ?? []).length;
+    return pipeCount >= 2;
   };
   let nameIdx = -1;
   for (let k = slice.length - 2; k >= 0; k--) {
