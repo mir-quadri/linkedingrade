@@ -272,6 +272,23 @@ const CERT_DISQUALIFIERS = new Set([
   'partner', 'owner', 'recruiter', 'coach', 'mentor', 'advisor',
   'architect', 'scientist', 'researcher', 'product', 'program',
   'project', 'operations', 'finance', 'marketing', 'sales',
+  // Common industry-concept SUFFIX words. These show up as the wrap
+  // target of a long LinkedIn headline (`Phrase | Phrase |` /
+  // `Digital Transformation`) — when the wrap target is a 2-3
+  // Title-Case word phrase from concept vocabulary, it slips past
+  // the strict `looksLikeName` heuristic and gets picked as the
+  // name. Examples Codex / the user surfaced on PR #24:
+  //   - "Digital Transformation"  (Erum's profile)
+  //   - "Data Science"            (Codex R6 P2 trace)
+  //   - "Cloud Architecture"      (Codex R5 P2 trace)
+  // Adding the suffix words to the disqualifier list catches these
+  // structurally — no continuation-skip machinery required, no
+  // wrap-vs-sidebar-bleed structural ambiguity. Real person names
+  // very rarely contain these tokens.
+  'transformation', 'science', 'architecture', 'analytics',
+  'strategy', 'technology', 'intelligence', 'automation', 'learning',
+  'infrastructure', 'systems', 'solutions', 'services', 'consulting',
+  'communications', 'media', 'relations',
 ]);
 
 /**
@@ -399,90 +416,20 @@ function extractIdentity(
   // the cert name first. From the bottom, "Remote" is location, "Engineer"
   // fails the length check, and "Alex Example" wins as the name.
   //
-  // BUT — when the headline wraps across multiple physical lines (LinkedIn
-  // pdf-parse output for a long headline), the wrap-target line can be a
-  // 2-word Title-Case fragment that ACCIDENTALLY passes `looksLikeName`.
-  // For Erum's profile:
-  //
-  //   "Erum Manzoor"                                           ← real name
-  //   "Executive Leader | Motorsports | … | Venture Capital |" ← headline L1
-  //   "Digital Transformation"                                 ← headline L2
-  //   "New York City Metropolitan Area"                        ← location
-  //
-  // Walking from second-to-last, "Digital Transformation" passes
-  // `looksLikeName` (2 Title-Case words, neither in CERT_DISQUALIFIERS)
-  // and wins — the parser surfaces the wrap target as the name and the
-  // real name "Erum Manzoor" is lost. Detect the wrap by the trailing
-  // `|` on the PREVIOUS slice line: LinkedIn's headline separator is
-  // always `|`, and a continuation line is by definition the line
-  // immediately after one that ends with `|`. Exclude continuation
-  // lines from name candidacy.
-  // A wrapped-headline CONTINUATION can only sit at one position in the
-  // identity slice — second-to-last:
-  //
-  //   [..., name, headline L1 (`Phrase | … |`), continuation, location]
-  //                                ^pos length-3   ^pos length-2  ^last
-  //
-  // That's the only place the wrap target can land: it must come AFTER
-  // L1 (LinkedIn writes the headline below the name) and BEFORE the
-  // location (the location is always the slice's last entry). Pinning
-  // the check to `slice.length - 2` rules out a whole class of false
-  // positives where a MULTI-PIPE sidebar item (e.g. a certification
-  // title `Cloud | Data |`) happens to sit immediately above the real
-  // name in the trailing-sidebar bleed — that line ends with `|` and
-  // has multiple pipes, but it's NOT a headline source because the
-  // wrap target wouldn't be at length-2 in that case. (Codex R2 P2 on
-  // PR #24.)
-  //
-  // Also keep the ≥2-pipe shape check on the previous line (Codex R1
-  // P2): real LinkedIn headlines use `|` as a phrase separator and
-  // always have multiple, while a stray-pipe cert title has just one.
-  const isHeadlineContinuation = (k: number): boolean => {
-    if (k !== slice.length - 2) return false;
-    // Require slice ≥ 5 (not just 4). Real LinkedIn profiles always
-    // have sidebar items between the last sidebar HEADER and the
-    // identity block — certifications, language entries, top-skills
-    // items — so a real wrapped-headline structure produces
-    // [sidebar item(s), name, L1, continuation, location] with
-    // length ≥ 5. The minimum-without-sidebar wrap case
-    // [name, L1, continuation, location] = length 4 is hypothetical
-    // (a profile with no certs / no languages / no top skills) and
-    // also lines up exactly with the no-headline + multi-item
-    // sidebar bleed shape Codex flagged in R3 + R5 P2:
-    // [cert A, cert B (`|`-ending), name, location]. Without a
-    // content-aware classifier the two are structurally identical
-    // at length=4. Pushing to ≥ 5 sacrifices the unlikely no-
-    // sidebar wrap case to fix the more realistic
-    // no-headline-with-multi-cert-sidebar case.
-    if (slice.length < 5) return false;
-    if (k === 0) return false;
-    const prev = slice[k - 1]!;
-    if (!prev.endsWith('|')) return false;
-    // Codex R4 P2: a two-segment headline (`Phrase A | Phrase B`) has
-    // only ONE pipe, so requiring ≥2 pipes here would miss a real wrap
-    // of the form `Strategic Advisor |` / `Digital Transformation`. The
-    // R1 P2 single-pipe cert test is still protected by the position
-    // constraint alone (the cert sits at length-4, not length-3 — the
-    // position check at length-2 finds the headline above it and walks
-    // past). Relaxing to ≥1: any `|`-terminated line at length-3 is a
-    // candidate headline source; the name-above-prev check below is
-    // the final defence against sidebar-bleed false positives.
-    const pipeCount = (prev.match(/\|/g) ?? []).length;
-    if (pipeCount < 1) return false;
-    // Final defence: a real wrapped-headline structure always has a
-    // real name TWO+ slots above the wrap target (name → L1 →
-    // continuation → location). If no line above the `|`-multi
-    // predecessor passes `looksLikeName`, we're looking at a multi-
-    // pipe sidebar item in a no-headline-with-extra-sidebar export,
-    // not a headline L1 — don't skip the candidate. (Codex R3 P2.)
-    for (let j = k - 2; j >= 0; j--) {
-      if (looksLikeName(slice[j]!)) return true;
-    }
-    return false;
-  };
+  // Wrapped-headline note: when a long headline wraps onto a second physical
+  // line (LinkedIn pdf-parse output for `Phrase | … |` / `Digital
+  // Transformation` / location), the wrap-target line — `Digital
+  // Transformation` for Erum Manzoor's profile — used to slip past
+  // `looksLikeName` and get picked as the name. The fix doesn't need
+  // structural pattern-matching (every variant of it had a regression class
+  // — see PR #24's discussion). Instead, `CERT_DISQUALIFIERS` was extended
+  // to include common industry-concept suffix words ("transformation",
+  // "science", "architecture", "analytics", "strategy", "technology",
+  // "automation", "learning", etc.), which makes `looksLikeName` correctly
+  // reject the wrap target. The walk-backwards then naturally finds the
+  // real name above the headline.
   let nameIdx = -1;
   for (let k = slice.length - 2; k >= 0; k--) {
-    if (isHeadlineContinuation(k)) continue;
     if (looksLikeName(slice[k]!)) {
       nameIdx = k;
       break;
