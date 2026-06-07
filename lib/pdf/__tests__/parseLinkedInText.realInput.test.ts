@@ -118,6 +118,65 @@ Page 3 of 3
 -- 3 of 3 --
 `;
 
+// Real identity block from Dr. Shadé Zahrai's actual export. Reproduces two
+// classes that broke name extraction: a leading honorific ("Dr.") and an
+// accented letter ("é" in "Shadé"), plus the longest wrapped headline seen
+// yet (FOUR continuation lines). The sidebar/main scaffolding around the
+// identity slice is minimal but real-shaped so findHeaders resolves a
+// trailing sidebar header (Certifications) before the first main header
+// (Summary) — that's the boundary extractIdentity walks between.
+const INTERNATIONAL_NAME_PDF_TEXT = `Contact
+shade@example.com
+[www.linkedin.com/in/shadezahrai](https://www.linkedin.com/in/shadezahrai)
+(LinkedIn)
+Top Skills
+Leadership Development
+Public Speaking
+Executive Coaching
+Languages
+English
+Certifications
+Awards | Young Leader
+Future Leader Scholarship
+Dr. Shadé Zahrai
+Helping ambitious professionals lead themselves first – so they
+can lead everything else better | Award-winning Self-Leadership
+Educator to Fortune 500s, Behavioral Researcher | Author, BIG
+TRUST | Ex-Lawyer, MBA, PhD
+Ko Samui, Surat Thani, Thailand
+Summary
+Self-leadership educator and behavioral researcher.
+Experience
+Influenceing
+Founder
+January 2018 - Present (8 years)
+Ko Samui, Surat Thani, Thailand
+`;
+
+describe('parseLinkedInText - international name with honorific + 4-line headline (Shadé Zahrai)', () => {
+  const profile = parseLinkedInText(INTERNATIONAL_NAME_PDF_TEXT, {
+    extractedAt: '2026-06-07T00:00:00Z',
+  });
+
+  it('parses the honorific + accented name instead of falling back to "Anonymous"', () => {
+    // The bug rendered this profile as "Anonymous profile" because
+    // looksLikeName rejected "Dr." (trailing period) and the legacy
+    // fallback then promoted a pipe-bearing headline fragment that the
+    // suspicion guard cleared to null.
+    expect(profile.fullName).toBe('Dr. Shadé Zahrai');
+  });
+
+  it('reassembles the full four-line wrapped headline', () => {
+    expect(profile.headline.confidence).toBe('high');
+    expect(profile.headline.data).toBe(
+      'Helping ambitious professionals lead themselves first – so they ' +
+        'can lead everything else better | Award-winning Self-Leadership ' +
+        'Educator to Fortune 500s, Behavioral Researcher | Author, BIG ' +
+        'TRUST | Ex-Lawyer, MBA, PhD',
+    );
+  });
+});
+
 describe('parseLinkedInText - real LinkedIn "Save to PDF" export', () => {
   const profile = parseLinkedInText(REAL_PDF_TEXT, {
     extractedAt: '2026-05-21T00:00:00Z',
