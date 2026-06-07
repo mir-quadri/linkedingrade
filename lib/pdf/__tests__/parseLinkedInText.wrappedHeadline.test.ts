@@ -252,6 +252,47 @@ MBA
     expect(profile.headline.data).toBe('Strategic Advisor | Digital Transformation');
   });
 
+  it('a NO-HEADLINE length=4 profile with a name-shaped cert above a pipe-ending cert still picks the name (Codex R5 P2)', () => {
+    // Codex R5 P2: `['Cloud Architecture', 'Some Program |', 'Jane
+    // Doe', 'Toronto']` — slice length=4 — the R3 P2 length ≥ 4
+    // guard let this through, and the name-above-prev scan matched
+    // 'Cloud Architecture' (no disqualifier tokens), so `Jane Doe`
+    // was being skipped. Fix: tighten the slice-length floor to ≥ 5.
+    // Real LinkedIn profiles with content always have ≥ 1 sidebar
+    // item between the last sidebar header and the identity block,
+    // so a real wrapped-headline structure produces ≥ 5 lines. The
+    // length=4 no-sidebar wrap case is hypothetical and aligns with
+    // the no-headline cert-bleed shape; without a content
+    // classifier the two are indistinguishable.
+    const NO_HEADLINE_LEN4_CERT_BLEED = `Contact
+555-0206 (Mobile)
+example-jane4@example.com
+Top Skills
+Architecture
+Programs
+Strategy
+Languages
+English
+Certifications
+Cloud Architecture
+Some Program |
+Jane Doe
+Toronto, Canada
+Summary
+Architect summary.
+Experience
+ConsultingCo
+Cloud Architect
+January 2023 - Present (1 year 11 months)
+Toronto, Canada
+Education
+University of Toronto
+B.Eng., Computer Engineering
+`;
+    const profile = parseLinkedInText(NO_HEADLINE_LEN4_CERT_BLEED);
+    expect(profile.fullName).toBe('Jane Doe');
+  });
+
   it('a profile WITHOUT a wrapped headline still picks the closest-to-bottom name (regression guard for the legacy walk-backwards behaviour)', () => {
     // Sidebar slice that runs ["Cert One", "Alex Example",
     // "Engineer", "Remote"] — the comment on `extractIdentity` calls

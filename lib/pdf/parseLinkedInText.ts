@@ -439,13 +439,22 @@ function extractIdentity(
   // always have multiple, while a stray-pipe cert title has just one.
   const isHeadlineContinuation = (k: number): boolean => {
     if (k !== slice.length - 2) return false;
-    // A wrap structure needs at minimum 4 lines: name + L1 +
-    // continuation + location. Profiles with NO headline at all
-    // produce shorter slices (cert + name + location = 3), and in
-    // that shape `slice.length - 2` is the REAL NAME, not a wrap
-    // continuation — skipping it would null `fullName`. (Codex R3
-    // P2 on PR #24.)
-    if (slice.length < 4) return false;
+    // Require slice ≥ 5 (not just 4). Real LinkedIn profiles always
+    // have sidebar items between the last sidebar HEADER and the
+    // identity block — certifications, language entries, top-skills
+    // items — so a real wrapped-headline structure produces
+    // [sidebar item(s), name, L1, continuation, location] with
+    // length ≥ 5. The minimum-without-sidebar wrap case
+    // [name, L1, continuation, location] = length 4 is hypothetical
+    // (a profile with no certs / no languages / no top skills) and
+    // also lines up exactly with the no-headline + multi-item
+    // sidebar bleed shape Codex flagged in R3 + R5 P2:
+    // [cert A, cert B (`|`-ending), name, location]. Without a
+    // content-aware classifier the two are structurally identical
+    // at length=4. Pushing to ≥ 5 sacrifices the unlikely no-
+    // sidebar wrap case to fix the more realistic
+    // no-headline-with-multi-cert-sidebar case.
+    if (slice.length < 5) return false;
     if (k === 0) return false;
     const prev = slice[k - 1]!;
     if (!prev.endsWith('|')) return false;
