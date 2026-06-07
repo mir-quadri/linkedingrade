@@ -338,6 +338,49 @@ B.S., Economics
     }
   });
 
+  it('wrap targets Codex R8 P2 named (Strategic Leadership / Change Management) do NOT shadow the real name', () => {
+    // Codex R8 P2 surfaced two more wrap targets where the noun
+    // morphology slipped past the disqualifier list — `leader` was
+    // there but not `leadership`, `manager` was there but not
+    // `management`. R8 P2 adds both morphological variants (mirroring
+    // the existing `engineer`/`engineering` pairing).
+    const wrapTargets = [
+      { name: 'Lina Park', wrap: 'Strategic Leadership' },
+      { name: 'Jordan Lee', wrap: 'Change Management' },
+    ];
+    for (const { name, wrap } of wrapTargets) {
+      const fixture = `Contact
+555-0220 (Mobile)
+example@example.com
+Top Skills
+Strategic Planning
+Operations
+Leadership
+Languages
+English
+Certifications
+Some Program
+${name}
+Senior Director | Operations | Strategy |
+${wrap}
+San Francisco Bay Area
+Summary
+Summary text.
+Experience
+SomeCo
+Senior Director
+January 2023 - Present (1 year 11 months)
+San Francisco Bay Area
+Education
+Stanford University
+B.S., Economics
+`;
+      const profile = parseLinkedInText(fixture);
+      expect(profile.fullName, `wrap target "${wrap}" should not shadow "${name}"`).toBe(name);
+      expect(profile.fullName).not.toBe(wrap);
+    }
+  });
+
   it('a profile WITHOUT a wrapped headline still picks the closest-to-bottom name (regression guard for the legacy walk-backwards behaviour)', () => {
     // Sidebar slice that runs ["Cert One", "Alex Example",
     // "Engineer", "Remote"] — the comment on `extractIdentity` calls

@@ -299,6 +299,13 @@ const CERT_DISQUALIFIERS = new Set([
   'excellence', 'experience', 'performance', 'enablement',
   'engagement', 'acquisition', 'retention', 'optimization',
   'efficiency', 'delivery', 'partnerships',
+  // Codex R8 P2: morphological variants of tokens already in the
+  // list (`leader` → `leadership`, `manager` → `management`) plus
+  // common -ance/-ment/-ence headline nouns. Pairing the noun-form
+  // with the agent-form mirrors the existing `engineer`/`engineering`
+  // pattern above.
+  'leadership', 'management', 'governance', 'compliance',
+  'procurement', 'improvement',
 ]);
 
 /**
