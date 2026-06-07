@@ -175,6 +175,44 @@ M.S., Computer Science
     expect(profile.fullName).toBe('Jane Smith');
   });
 
+  it('a NO-HEADLINE profile with a multi-pipe sidebar item directly above the name still picks the name (Codex R3 P2)', () => {
+    // The R2 P2 position-only check assumed `slice.length - 2` is
+    // always the wrap target. But profiles WITHOUT a headline have
+    // shorter slices (cert + name + location = 3), and there
+    // `slice.length - 2` IS the real name. Skipping it would null
+    // `fullName`. Two new guards: require slice ≥ 4 (wrap needs
+    // name + L1 + continuation + location), AND require a name-
+    // shaped line above the `|`-multi predecessor (real wrap has a
+    // name TWO+ slots above the wrap target; no-headline bleed
+    // doesn't).
+    const NO_HEADLINE_MULTIPIPE_SIDEBAR = `Contact
+555-0204 (Mobile)
+example-jane3@example.com
+Top Skills
+Cloud Architecture
+Data Engineering
+Distributed Systems
+Languages
+English
+Certifications
+Cloud | Data |
+Jane Doe
+Seattle, Washington, United States
+Summary
+Cloud architect summary.
+Experience
+TechCo
+Cloud Architect
+January 2023 - Present (1 year 11 months)
+Seattle, Washington, United States
+Education
+University of Washington
+M.S., Computer Science
+`;
+    const profile = parseLinkedInText(NO_HEADLINE_MULTIPIPE_SIDEBAR);
+    expect(profile.fullName).toBe('Jane Doe');
+  });
+
   it('a profile WITHOUT a wrapped headline still picks the closest-to-bottom name (regression guard for the legacy walk-backwards behaviour)', () => {
     // Sidebar slice that runs ["Cert One", "Alex Example",
     // "Engineer", "Remote"] — the comment on `extractIdentity` calls

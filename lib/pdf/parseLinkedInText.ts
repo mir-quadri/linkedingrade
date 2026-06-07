@@ -439,11 +439,28 @@ function extractIdentity(
   // always have multiple, while a stray-pipe cert title has just one.
   const isHeadlineContinuation = (k: number): boolean => {
     if (k !== slice.length - 2) return false;
+    // A wrap structure needs at minimum 4 lines: name + L1 +
+    // continuation + location. Profiles with NO headline at all
+    // produce shorter slices (cert + name + location = 3), and in
+    // that shape `slice.length - 2` is the REAL NAME, not a wrap
+    // continuation — skipping it would null `fullName`. (Codex R3
+    // P2 on PR #24.)
+    if (slice.length < 4) return false;
     if (k === 0) return false;
     const prev = slice[k - 1]!;
     if (!prev.endsWith('|')) return false;
     const pipeCount = (prev.match(/\|/g) ?? []).length;
-    return pipeCount >= 2;
+    if (pipeCount < 2) return false;
+    // Final defence: a real wrapped-headline structure always has a
+    // real name TWO+ slots above the wrap target (name → L1 →
+    // continuation → location). If no line above the `|`-multi
+    // predecessor passes `looksLikeName`, we're looking at a multi-
+    // pipe sidebar item in a no-headline-with-extra-sidebar export,
+    // not a headline L1 — don't skip the candidate. (Codex R3 P2.)
+    for (let j = k - 2; j >= 0; j--) {
+      if (looksLikeName(slice[j]!)) return true;
+    }
+    return false;
   };
   let nameIdx = -1;
   for (let k = slice.length - 2; k >= 0; k--) {
