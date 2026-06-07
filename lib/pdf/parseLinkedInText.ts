@@ -330,6 +330,7 @@ const CERT_DISQUALIFIERS = new Set([
 ]);
 
 /**
+/**
  * Accepted limitation of the disqualifier-based wrapped-headline fix
  * (PR #24, Codex R7–R13 P2 discussion). The vocabulary above catches
  * the common LinkedIn wrap-target nouns that motivated the PR
@@ -369,19 +370,47 @@ const CERT_DISQUALIFIERS = new Set([
  */
 
 /**
+ * Leading honorifics that precede a real name on LinkedIn ("Dr. Shadé
+ * Zahrai", "Prof. Jane Doe"). Stored lowercase, period-stripped, for
+ * case-insensitive lookup. We strip a single leading honorific before the
+ * name-token checks because (a) its trailing period would fail the
+ * per-word letter class and (b) it inflates the word count out of the
+ * 2-3 word name window.
+ */
+const HONORIFICS = new Set([
+  'dr', 'prof', 'mr', 'mrs', 'ms', 'mx', 'miss',
+  'sir', 'dame', 'rev', 'fr', 'hon', 'capt', 'col', 'lt', 'sgt', 'gen',
+]);
+
+/**
  * Does this line read like a person's full name? LinkedIn names render in
  * Title Case across 2-4 words ("Mir Quadri", "Jane Doe", "Mary O'Brien",
- * "Jean-Luc Picard"), without connector words ("of", "the", "and") and
- * without cert-y nouns ("Certified", "Practitioner", …). The heuristic is
- * conservative — when it returns false we fall back to the legacy "last
- * three lines" identity slot, which preserves the pre-existing behaviour
- * for malformed inputs.
+ * "Jean-Luc Picard"), optionally behind an honorific ("Dr. Shadé Zahrai"),
+ * without connector words ("of", "the", "and") and without cert-y nouns
+ * ("Certified", "Practitioner", …). The heuristic is conservative — when it
+ * returns false we fall back to the legacy "last three lines" identity slot,
+ * which preserves the pre-existing behaviour for malformed inputs.
+ *
+ * Letter classes are Unicode-aware (`\p{Lu}` for the leading capital,
+ * `\p{L}` for the rest, both under the `u` flag) so international names with
+ * accents/diacritics — both inside a token ("Shadé") AND at its start
+ * ("Ángela", "Øyvind", "Élodie") — match instead of being dropped to the
+ * "Anonymous profile" fallback.
  */
 function looksLikeName(line: string): boolean {
   const t = line.trim();
   if (!t) return false;
   if (/[.?!:]$/.test(t)) return false; // sentences / bullets
-  const words = t.split(/\s+/);
+  let words = t.split(/\s+/);
+  // Strip a single leading honorific ("Dr.", "Prof", "Ms.") — but only when
+  // doing so still leaves a 2-word name behind, so a bare "Mr Anderson"
+  // (which would collapse to one token) isn't misread, and an actual first
+  // name that happens to collide with an honorific token can't erase the
+  // whole candidate.
+  const firstBare = words[0]!.replace(/\.$/, '').toLowerCase();
+  if (words.length >= 3 && HONORIFICS.has(firstBare)) {
+    words = words.slice(1);
+  }
   // 2-3 word Title-Case names cover the LinkedIn norm ("Mir Quadri",
   // "No Summary Person"). 4+ word candidates are far more likely to be
   // a cert title ("Amazon Web Services Cloud", "Project Management and
@@ -389,7 +418,7 @@ function looksLikeName(line: string): boolean {
   // being promoted into the identity slot.
   if (words.length < 2 || words.length > 3) return false;
   for (const w of words) {
-    if (!/^[A-Z][\p{L}'\-]*$/u.test(w)) return false;
+    if (!/^\p{Lu}[\p{L}'\-]*$/u.test(w)) return false;
     const lower = w.toLowerCase();
     if (CONNECTOR_WORDS.has(lower)) return false;
     if (CERT_DISQUALIFIERS.has(lower)) return false;
