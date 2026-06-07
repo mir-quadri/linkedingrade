@@ -398,8 +398,32 @@ function extractIdentity(
   // ["Cert One", "Alex Example", "Engineer", "Remote"] would otherwise pick
   // the cert name first. From the bottom, "Remote" is location, "Engineer"
   // fails the length check, and "Alex Example" wins as the name.
+  //
+  // BUT — when the headline wraps across multiple physical lines (LinkedIn
+  // pdf-parse output for a long headline), the wrap-target line can be a
+  // 2-word Title-Case fragment that ACCIDENTALLY passes `looksLikeName`.
+  // For Erum's profile:
+  //
+  //   "Erum Manzoor"                                           ← real name
+  //   "Executive Leader | Motorsports | … | Venture Capital |" ← headline L1
+  //   "Digital Transformation"                                 ← headline L2
+  //   "New York City Metropolitan Area"                        ← location
+  //
+  // Walking from second-to-last, "Digital Transformation" passes
+  // `looksLikeName` (2 Title-Case words, neither in CERT_DISQUALIFIERS)
+  // and wins — the parser surfaces the wrap target as the name and the
+  // real name "Erum Manzoor" is lost. Detect the wrap by the trailing
+  // `|` on the PREVIOUS slice line: LinkedIn's headline separator is
+  // always `|`, and a continuation line is by definition the line
+  // immediately after one that ends with `|`. Exclude continuation
+  // lines from name candidacy.
+  const isHeadlineContinuation = (k: number): boolean => {
+    if (k === 0) return false;
+    return slice[k - 1]!.trimEnd().endsWith('|');
+  };
   let nameIdx = -1;
   for (let k = slice.length - 2; k >= 0; k--) {
+    if (isHeadlineContinuation(k)) continue;
     if (looksLikeName(slice[k]!)) {
       nameIdx = k;
       break;
