@@ -381,6 +381,48 @@ B.S., Economics
     }
   });
 
+  it('wrap targets Codex R9 P2 named (New Markets / Retail Banking) do NOT shadow the real name', () => {
+    // Codex R9 P2 named sector-noun wrap targets — the earlier
+    // additions covered FUNCTION nouns (transformation, strategy,
+    // leadership) but missed sector labels. R9 P2 adds `markets`,
+    // `banking`, plus the obvious adjacent sector tokens.
+    const wrapTargets = [
+      { name: 'Renu Iyer', wrap: 'New Markets' },
+      { name: 'Daniel Cho', wrap: 'Retail Banking' },
+    ];
+    for (const { name, wrap } of wrapTargets) {
+      const fixture = `Contact
+555-0230 (Mobile)
+example@example.com
+Top Skills
+Strategic Planning
+Operations
+Leadership
+Languages
+English
+Certifications
+Some Program
+${name}
+Senior Director | Operations | Strategy |
+${wrap}
+San Francisco Bay Area
+Summary
+Summary text.
+Experience
+SomeCo
+Senior Director
+January 2023 - Present (1 year 11 months)
+San Francisco Bay Area
+Education
+Stanford University
+B.S., Economics
+`;
+      const profile = parseLinkedInText(fixture);
+      expect(profile.fullName, `wrap target "${wrap}" should not shadow "${name}"`).toBe(name);
+      expect(profile.fullName).not.toBe(wrap);
+    }
+  });
+
   it('a profile WITHOUT a wrapped headline still picks the closest-to-bottom name (regression guard for the legacy walk-backwards behaviour)', () => {
     // Sidebar slice that runs ["Cert One", "Alex Example",
     // "Engineer", "Remote"] — the comment on `extractIdentity` calls

@@ -306,6 +306,16 @@ const CERT_DISQUALIFIERS = new Set([
   // pattern above.
   'leadership', 'management', 'governance', 'compliance',
   'procurement', 'improvement',
+  // Codex R9 P2: industry/domain SECTOR nouns. The vocab kept covering
+  // FUNCTION nouns (transformation, strategy, …) but missed sector
+  // labels that recur as headline suffixes — "New Markets", "Retail
+  // Banking", "Investment Banking", "Capital Markets". Same inclusion
+  // principle as the rest: sector noun common as a LinkedIn headline
+  // component, vanishingly rare as a personal-name token.
+  'markets', 'banking', 'lending', 'trading', 'investment', 'capital',
+  'insurance', 'wealth', 'portfolio', 'manufacturing', 'logistics',
+  'cybersecurity', 'networking', 'healthcare', 'sustainability',
+  'research',
 ]);
 
 /**
