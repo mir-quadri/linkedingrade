@@ -289,6 +289,16 @@ const CERT_DISQUALIFIERS = new Set([
   'strategy', 'technology', 'intelligence', 'automation', 'learning',
   'infrastructure', 'systems', 'solutions', 'services', 'consulting',
   'communications', 'media', 'relations',
+  // Codex R7 P2 + independent review: the vocabulary above misses
+  // common headline-suffix nouns like "Global Expansion", "Business
+  // Growth", "Customer Success". Widening here keeps the failure mode
+  // narrow without adding structural disambiguation. The principle
+  // for inclusion: a noun that recurs as a LinkedIn headline component
+  // AND is vanishingly rare as a personal-name token.
+  'expansion', 'growth', 'success', 'development', 'innovation',
+  'excellence', 'experience', 'performance', 'enablement',
+  'engagement', 'acquisition', 'retention', 'optimization',
+  'efficiency', 'delivery', 'partnerships',
 ]);
 
 /**
