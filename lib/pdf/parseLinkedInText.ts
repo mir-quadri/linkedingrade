@@ -417,18 +417,30 @@ function extractIdentity(
   // always `|`, and a continuation line is by definition the line
   // immediately after one that ends with `|`. Exclude continuation
   // lines from name candidacy.
-  // The previous line must look like a headline line — LinkedIn renders
-  // headlines as `Phrase | Phrase | Phrase |` (multiple `|` separators
-  // between Title-Case phrases). A single trailing `|` alone is not
-  // enough: a wrapped certification or skill title like `Some Program |`
-  // is also `|`-terminated, and treating it as a headline line would
-  // make the loop skip the real name that follows. Require at least
-  // TWO total `|` characters, ruling out the single-pipe cert-title
-  // shape while still recognising every real wrapped headline.
-  // (Codex R1 P2 on PR #24.)
+  // A wrapped-headline CONTINUATION can only sit at one position in the
+  // identity slice — second-to-last:
+  //
+  //   [..., name, headline L1 (`Phrase | … |`), continuation, location]
+  //                                ^pos length-3   ^pos length-2  ^last
+  //
+  // That's the only place the wrap target can land: it must come AFTER
+  // L1 (LinkedIn writes the headline below the name) and BEFORE the
+  // location (the location is always the slice's last entry). Pinning
+  // the check to `slice.length - 2` rules out a whole class of false
+  // positives where a MULTI-PIPE sidebar item (e.g. a certification
+  // title `Cloud | Data |`) happens to sit immediately above the real
+  // name in the trailing-sidebar bleed — that line ends with `|` and
+  // has multiple pipes, but it's NOT a headline source because the
+  // wrap target wouldn't be at length-2 in that case. (Codex R2 P2 on
+  // PR #24.)
+  //
+  // Also keep the ≥2-pipe shape check on the previous line (Codex R1
+  // P2): real LinkedIn headlines use `|` as a phrase separator and
+  // always have multiple, while a stray-pipe cert title has just one.
   const isHeadlineContinuation = (k: number): boolean => {
+    if (k !== slice.length - 2) return false;
     if (k === 0) return false;
-    const prev = slice[k - 1]!.trimEnd();
+    const prev = slice[k - 1]!;
     if (!prev.endsWith('|')) return false;
     const pipeCount = (prev.match(/\|/g) ?? []).length;
     return pipeCount >= 2;

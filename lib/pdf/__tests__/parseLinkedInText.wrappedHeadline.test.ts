@@ -136,6 +136,45 @@ B.Comm., Finance
     expect(profile.fullName).toBe('Jane Doe');
   });
 
+  it('a MULTI-pipe sidebar item (e.g. `Cloud | Data |`) directly above the name does NOT trigger the continuation skip (Codex R2 P2)', () => {
+    // Codex flagged this case: a cert/skill title with MULTIPLE pipes
+    // ending in `|` (`Cloud | Data |`) would have passed the R1 P2
+    // pipe-count check (≥2 pipes) and falsely triggered the
+    // continuation skip, swallowing the real name below. The R2 P2
+    // fix adds a POSITION check — the continuation only fires when
+    // the candidate is at `slice.length - 2` (the only place a wrap
+    // target can land: between headline L1 and the location). A
+    // sidebar bleed item is somewhere else in the slice and won't
+    // trigger the skip.
+    const MULTI_PIPE_SIDEBAR_ITEM = `Contact
+555-0203 (Mobile)
+example-jane2@example.com
+Top Skills
+Cloud Architecture
+Data Engineering
+Distributed Systems
+Languages
+English
+Certifications
+Cloud | Data |
+Jane Smith
+Cloud Architect
+Seattle, Washington, United States
+Summary
+Cloud architect summary.
+Experience
+TechCo
+Cloud Architect
+January 2023 - Present (1 year 11 months)
+Seattle, Washington, United States
+Education
+University of Washington
+M.S., Computer Science
+`;
+    const profile = parseLinkedInText(MULTI_PIPE_SIDEBAR_ITEM);
+    expect(profile.fullName).toBe('Jane Smith');
+  });
+
   it('a profile WITHOUT a wrapped headline still picks the closest-to-bottom name (regression guard for the legacy walk-backwards behaviour)', () => {
     // Sidebar slice that runs ["Cert One", "Alex Example",
     // "Engineer", "Remote"] — the comment on `extractIdentity` calls
