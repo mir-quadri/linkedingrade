@@ -272,7 +272,101 @@ const CERT_DISQUALIFIERS = new Set([
   'partner', 'owner', 'recruiter', 'coach', 'mentor', 'advisor',
   'architect', 'scientist', 'researcher', 'product', 'program',
   'project', 'operations', 'finance', 'marketing', 'sales',
+  // Common industry-concept SUFFIX words. These show up as the wrap
+  // target of a long LinkedIn headline (`Phrase | Phrase |` /
+  // `Digital Transformation`) — when the wrap target is a 2-3
+  // Title-Case word phrase from concept vocabulary, it slips past
+  // the strict `looksLikeName` heuristic and gets picked as the
+  // name. Examples Codex / the user surfaced on PR #24:
+  //   - "Digital Transformation"  (Erum's profile)
+  //   - "Data Science"            (Codex R6 P2 trace)
+  //   - "Cloud Architecture"      (Codex R5 P2 trace)
+  // Adding the suffix words to the disqualifier list catches these
+  // structurally — no continuation-skip machinery required, no
+  // wrap-vs-sidebar-bleed structural ambiguity. Real person names
+  // very rarely contain these tokens.
+  'transformation', 'science', 'architecture', 'analytics',
+  'strategy', 'technology', 'intelligence', 'automation', 'learning',
+  'infrastructure', 'systems', 'solutions', 'services', 'consulting',
+  'communications', 'media', 'relations',
+  // Codex R7 P2 + independent review: the vocabulary above misses
+  // common headline-suffix nouns like "Global Expansion", "Business
+  // Growth", "Customer Success". Widening here keeps the failure mode
+  // narrow without adding structural disambiguation. The principle
+  // for inclusion: a noun that recurs as a LinkedIn headline component
+  // AND is vanishingly rare as a personal-name token.
+  // NOTE on real-name collisions (Codex R10 P2): the inclusion
+  // criterion is "common LinkedIn headline component AND vanishingly
+  // rare as a personal-name token IN ANY MAJOR NAMING TRADITION".
+  // West African / Nigerian virtue-name conventions use words like
+  // `Success`, `Wisdom`, `Glory`, `Victory` AS given names — those
+  // must NOT be added here even when they appear as headline wrap
+  // targets, because rejecting them nulls a real user's name. The
+  // wrap-target failure mode (`Customer Success` shown as the user's
+  // name) is regrettable but a lesser harm than blanking out an
+  // actual Nigerian user named Isaac Success. `success` was removed
+  // in 6449c00's follow-up after R10 P2 flagged this collision.
+  'expansion', 'growth', 'development', 'innovation',
+  'excellence', 'experience', 'performance', 'enablement',
+  'engagement', 'acquisition', 'retention', 'optimization',
+  'efficiency', 'delivery', 'partnerships',
+  // Codex R8 P2: morphological variants of tokens already in the
+  // list (`leader` → `leadership`, `manager` → `management`) plus
+  // common -ance/-ment/-ence headline nouns. Pairing the noun-form
+  // with the agent-form mirrors the existing `engineer`/`engineering`
+  // pattern above.
+  'leadership', 'management', 'governance', 'compliance',
+  'procurement', 'improvement',
+  // Codex R9 P2: industry/domain SECTOR nouns. The vocab kept covering
+  // FUNCTION nouns (transformation, strategy, …) but missed sector
+  // labels that recur as headline suffixes — "New Markets", "Retail
+  // Banking", "Investment Banking", "Capital Markets". Same inclusion
+  // principle as the rest: sector noun common as a LinkedIn headline
+  // component, vanishingly rare as a personal-name token.
+  'markets', 'banking', 'lending', 'trading', 'investment', 'capital',
+  'insurance', 'wealth', 'portfolio', 'manufacturing', 'logistics',
+  'cybersecurity', 'networking', 'healthcare', 'sustainability',
+  'research',
 ]);
+
+/**
+ * Accepted limitation of the disqualifier-based wrapped-headline fix
+ * (PR #24, Codex R7–R13 P2 discussion). The vocabulary above catches
+ * the common LinkedIn wrap-target nouns that motivated the PR
+ * (`Digital Transformation`, `Data Science`, `Customer Success` etc.)
+ * but it is by construction enumerative. Two failure modes survive,
+ * and the trade-off is deliberate:
+ *
+ *   1. Unenumerated wrap-target — a LinkedIn headline that wraps to a
+ *      2-3 word Title-Case phrase NOT in `CERT_DISQUALIFIERS` (e.g. a
+ *      noun nobody has surfaced yet). The walk-backwards picks the
+ *      wrap target as `fullName`. The engine-side `isSuspiciousName`
+ *      guard in `lib/engine/scoring/index.ts` does not catch this
+ *      (no pipes, ≤5 words, no `@/&/•`), so the WRONG name reaches
+ *      the UI. This is the residual class Codex flagged through R13
+ *      and is the cost of NOT going structural.
+ *
+ *   2. Real personal-name collision — a real user whose given or
+ *      surname IS one of the disqualifier tokens. Their `fullName`
+ *      is nulled; the UI degrades to "Your audit" via the
+ *      `nameConfidence: 'low'` path. Accepted because the
+ *      degradation is graceful — neutral header instead of a wrong
+ *      name. `success` was REMOVED from the vocab after R10 P2
+ *      surfaced a documented West African virtue-name tradition
+ *      (Isaac Success). The inclusion criterion is now "common
+ *      LinkedIn headline component AND vanishingly rare as a
+ *      personal-name token in any major naming tradition"; new
+ *      collisions are removed the same way as `success`.
+ *
+ * The structural alternative (positional / pipe-count / continuation
+ * heuristics) was attempted across six commits (R1–R6 P2) before
+ * being reverted: at slice length ≥ 5 the wrap-headline shape and
+ * the no-headline cert-bleed shape are structurally identical (every
+ * signal — position, prev-ends-with-`|`, pipe count, length, name-
+ * shaped line above — returns the same answer for both), so no
+ * structural rule distinguishes them without a content classifier.
+ * See the worked trace in the R9 P2 discussion on the PR.
+ */
 
 /**
  * Does this line read like a person's full name? LinkedIn names render in
@@ -398,6 +492,19 @@ function extractIdentity(
   // ["Cert One", "Alex Example", "Engineer", "Remote"] would otherwise pick
   // the cert name first. From the bottom, "Remote" is location, "Engineer"
   // fails the length check, and "Alex Example" wins as the name.
+  //
+  // Wrapped-headline note: when a long headline wraps onto a second physical
+  // line (LinkedIn pdf-parse output for `Phrase | … |` / `Digital
+  // Transformation` / location), the wrap-target line — `Digital
+  // Transformation` for Erum Manzoor's profile — used to slip past
+  // `looksLikeName` and get picked as the name. The fix doesn't need
+  // structural pattern-matching (every variant of it had a regression class
+  // — see PR #24's discussion). Instead, `CERT_DISQUALIFIERS` was extended
+  // to include common industry-concept suffix words ("transformation",
+  // "science", "architecture", "analytics", "strategy", "technology",
+  // "automation", "learning", etc.), which makes `looksLikeName` correctly
+  // reject the wrap target. The walk-backwards then naturally finds the
+  // real name above the headline.
   let nameIdx = -1;
   for (let k = slice.length - 2; k >= 0; k--) {
     if (looksLikeName(slice[k]!)) {
