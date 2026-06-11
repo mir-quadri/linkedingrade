@@ -261,26 +261,36 @@ function hasSectionEvidence(lines: string[], labelIdx: number): boolean {
 
 /**
  * Weaker, position-dependent evidence for a gated bare-noun label: is the
- * FIRST content line below it title-shaped (3+ words, no sentence-ending
- * punctuation, not a location)? On its own this would re-admit the
- * "multi-word skill names below a skill named Patents" false positive
- * (Codex R1 P2), so callers only consult it once a GATE_ANCHOR_HEADERS
- * header has already been matched — i.e. the scan is provably past the Top
- * Skills region where that collision lives. Together the two checks admit
- * real title-only Publications/Patents blocks (Codex R2 P2) without
- * re-opening the skills-truncation hole.
+ * line directly below it title-shaped (3+ words, no sentence-ending
+ * punctuation, not a location, and NOT name-shaped)? On its own this would
+ * re-admit the "multi-word skill names below a skill named Patents" false
+ * positive (Codex R1 P2), so callers only consult it once a
+ * GATE_ANCHOR_HEADERS header has already been matched — i.e. the scan is
+ * provably past the Top Skills region where that collision lives. Together
+ * the two checks admit real title-only Publications/Patents blocks (Codex
+ * R2 P2) without re-opening the skills-truncation hole.
+ *
+ * The `looksLikeName` rejection is what stops the scan at IDENTITY content
+ * (Codex R3 P2): for a certification literally named "Publications" sitting
+ * at the end of the cert list, the line below the label is the person's
+ * name — that line must not open the gate, or the phantom header would
+ * truncate the certifications slice. Only the line immediately below is
+ * consulted (normalizeLines already dropped blank lines), so headline /
+ * summary content further down can never be reached. Residual accepted
+ * false positive: a certification named "Publications"/"Patents" MID-list,
+ * where the line below is another multi-word cert title — indistinguishable
+ * from a real title-only section without a content classifier, and
+ * vanishingly rare.
  */
 function hasTitleShapedContent(lines: string[], labelIdx: number): boolean {
-  for (let k = labelIdx + 1; k < lines.length; k++) {
-    const t = lines[k]!.trim();
-    if (!t) continue;
-    return (
-      t.split(/\s+/).length >= 3 &&
-      !/[.?!]$/.test(t) &&
-      !looksLikeLocationLine(t)
-    );
-  }
-  return false;
+  if (labelIdx + 1 >= lines.length) return false;
+  const t = lines[labelIdx + 1]!.trim();
+  return (
+    t.split(/\s+/).length >= 3 &&
+    !/[.?!]$/.test(t) &&
+    !looksLikeLocationLine(t) &&
+    !looksLikeName(t)
+  );
 }
 
 /**
@@ -1269,8 +1279,22 @@ function parseEducation(lines: string[]): EducationItem[] {
           i += 1;
           continue;
         }
-        // Wrap shape B: the continuation line is followed by a standalone date.
-        if (i + 1 < lines.length && STANDALONE_EDU_DATES.test(lines[i + 1]!.trim())) {
+        // Wrap shape B: the continuation line is followed by a standalone
+        // date. Without the parenthesised anchor of shape A, this shape is
+        // ambiguous against `School / long-undated-degree / School2 / Dates2`
+        // for institution names the school-name guard can't recognise
+        // ("General Assembly", "HEC Paris" — Codex R3 P2). The tie-break: a
+        // genuine wrap tail is a phrase FRAGMENT — a single word
+        // ("Engineering", the production Sidra case) or a run-on starting
+        // lowercase ("and Data") — whereas a school name is a multi-word
+        // Title-Case line. Multi-word capitalised continuations are treated
+        // as the next entry's school.
+        const contIsFragment = !/\s/.test(cont) || /^[a-z]/.test(cont);
+        if (
+          contIsFragment &&
+          i + 1 < lines.length &&
+          STANDALONE_EDU_DATES.test(lines[i + 1]!.trim())
+        ) {
           const mergedDegree = `${detail} ${cont}`.replace(/\s+/g, ' ').trim();
           items.push({ school, degree: mergedDegree || null, dates: lines[i + 1]!.trim() });
           i += 2;

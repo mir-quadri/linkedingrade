@@ -210,6 +210,51 @@ M.S., Computer Science
     ]);
   });
 
+  // Codex R3 P2 (this PR): a CERTIFICATION literally named "Publications"
+  // at the end of the cert list must not open the anchored gate off the
+  // identity content below it — the line under the label is the person's
+  // name, which the title-shaped check rejects. Identity stays intact and
+  // the cert content is not truncated. (NOTE: the 1-word "Publications"
+  // line folding into the previous cert title is the pre-existing
+  // reassembleCertifications wrap behaviour, not part of this gate.)
+  it('a certification literally named "Publications" does not open the gate on identity content', () => {
+    const profile = parseLinkedInText(`Contact
+555-0312 (Mobile)
+example-erum3@example.com
+Top Skills
+Negotiation
+Strategy
+Operations
+Languages
+English
+Certifications
+Strategic Negotiation Program
+Publications
+Erum Tariq
+Operations Director | Supply Chain | Logistics
+Dubai, United Arab Emirates
+Summary
+Operations summary.
+Experience
+SomeCo
+Operations Director
+January 2023 - Present (1 year 11 months)
+Dubai, United Arab Emirates
+Education
+American University of Sharjah
+B.S., Industrial Engineering
+`);
+    expect(profile.fullName).toBe('Erum Tariq');
+    expect(profile.headline.data).toBe(
+      'Operations Director | Supply Chain | Logistics',
+    );
+    const certText = (profile.certifications.data ?? [])
+      .map((c) => c.name ?? '')
+      .join(' ');
+    expect(certText).toContain('Strategic Negotiation Program');
+    expect(certText).toContain('Publications');
+  });
+
   // Codex R1 P2 (this PR): multi-word skill names below a skill literally
   // named "Patents" must NOT count as section evidence. Complete noun-phrase
   // items ("Intellectual Property Strategy") don't break mid-phrase the way
@@ -501,6 +546,56 @@ MIT
         dates: null,
       },
       { school: 'MIT', degree: null, dates: '2011 - 2015' },
+    ]);
+  });
+
+  // Codex R3 P2 (this PR): keyword-less multi-word school names ("General
+  // Assembly", "HEC Paris") after a long undated degree must not be folded
+  // as wrap tails. A genuine wrap tail is a phrase fragment (single word or
+  // lowercase run-on); a multi-word Title-Case line is the next school.
+  it('does not fold a keyword-less multi-word school into a long undated degree', () => {
+    const profile = parseLinkedInText(`Contact
+555-0313 (Mobile)
+example-lina2@example.com
+Top Skills
+Research
+Languages
+English
+Certifications
+Some Program
+Lina Park
+Researcher
+Paris, France
+Summary
+Researcher summary.
+Experience
+SomeCo
+Researcher
+January 2023 - Present (1 year 11 months)
+Paris, France
+Education
+First University
+Bachelor of Science in Computer Science
+General Assembly
+2015 - 2017
+Second University
+Master of Business Administration
+HEC Paris
+2018 - 2020
+`);
+    expect(profile.education.data).toEqual([
+      {
+        school: 'First University',
+        degree: 'Bachelor of Science in Computer Science',
+        dates: null,
+      },
+      { school: 'General Assembly', degree: null, dates: '2015 - 2017' },
+      {
+        school: 'Second University',
+        degree: 'Master of Business Administration',
+        dates: null,
+      },
+      { school: 'HEC Paris', degree: null, dates: '2018 - 2020' },
     ]);
   });
 });
