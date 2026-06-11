@@ -48,7 +48,7 @@ const SECTION_HEADERS = [
   // (a Top Skill called "Patents", a certification called "Publications"), so
   // they are GATED — see GATED_SIDEBAR_HEADERS / hasSectionEvidence below.
   // Only a label followed by genuine section content (a year line, a patent
-  // number, an Authors/Inventors line, or a run of multi-word title lines) is
+  // number, an Authors/Inventors line, or a mid-phrase wrapped title line) is
   // promoted to a header; a lone list item of the same text is not.
   'Publications',
   'Patents',
@@ -182,6 +182,26 @@ function normalizeLines(text: string): NormalizedLines {
 const STANDALONE_YEAR_LINE = /^(?:19|20)\d{2}$/;
 
 /**
+ * Final tokens that signal a MID-PHRASE line wrap. Publication / patent
+ * titles are long enough that the PDF column hard-wraps them, and the wrap
+ * point routinely lands after a preposition / article / conjunction
+ * ("Navigating Data Privacy in" / "How To Balance Innovation With"). A
+ * complete sidebar item — a skill or certification NAME — is a finished noun
+ * phrase and essentially never ends on one of these words, which is what
+ * separates real wrapped-title section content from a list of multi-word
+ * skills (Codex R1 P2 on this PR: `Patents` / `Intellectual Property
+ * Strategy` / `Technology Transfer Negotiations` must NOT count as
+ * evidence). Stored lowercase for case-insensitive comparison ("With" at a
+ * Title-Case wrap point still matches).
+ */
+const WRAP_BREAK_FINAL_WORDS = new Set([
+  'a', 'an', 'and', 'at', 'by', 'for', 'from', 'in', 'into', 'of', 'on',
+  'or', 'the', 'to', 'with', 'via', 'over', 'under', 'across', 'through',
+  'between', 'during', 'within', 'without', 'onto', 'toward', 'towards',
+  '&', '+',
+]);
+
+/**
  * Does the block immediately below `labelIdx` read like the body of a real
  * Publications / Patents / Honors section (as opposed to the label being a
  * lone sidebar item that merely shares the section's name)?
@@ -190,32 +210,26 @@ const STANDALONE_YEAR_LINE = /^(?:19|20)\d{2}$/;
  *   - a standalone year line ("2023") — every publication/patent/award has one;
  *   - a patent-number / "Patent ..." line with digits;
  *   - an "Authors:" / "Co-Inventors" style attribution line;
- *   - a run of two consecutive title-shaped lines (3+ words, not a sentence,
- *     not a location) — publication/patent titles are long and wrap, whereas
- *     a sidebar item named "Patents" is followed by the next short list item.
- *
- * The window deliberately skips lines that look like a location or a sentence
- * so the identity block / Summary that follows a (non-section) collision item
- * can't be mistaken for section content.
+ *   - a 3+ word line that breaks MID-PHRASE (final token is a preposition /
+ *     article / conjunction — see WRAP_BREAK_FINAL_WORDS): the signature of a
+ *     long wrapped title. Complete skill/cert names never end on those
+ *     tokens, so a run of ordinary multi-word sidebar items below a skill
+ *     literally named "Patents" does not satisfy the gate (Codex R1 P2).
  */
 function hasSectionEvidence(lines: string[], labelIdx: number): boolean {
   const end = Math.min(lines.length, labelIdx + 1 + 8);
-  let titleRun = 0;
   for (let k = labelIdx + 1; k < end; k++) {
     const t = lines[k]!.trim();
     if (!t) continue;
     if (STANDALONE_YEAR_LINE.test(t)) return true;
     if (/patent/i.test(t) && /\d/.test(t)) return true;
     if (/^(?:co-?)?(?:authors?|inventors?)\b/i.test(t)) return true;
-    const isTitleLike =
-      t.split(/\s+/).length >= 3 &&
-      !/[.?!]$/.test(t) &&
-      !looksLikeLocationLine(t);
-    if (isTitleLike) {
-      titleRun += 1;
-      if (titleRun >= 2) return true;
-    } else {
-      titleRun = 0;
+    const words = t.split(/\s+/);
+    if (
+      words.length >= 3 &&
+      WRAP_BREAK_FINAL_WORDS.has(words[words.length - 1]!.toLowerCase())
+    ) {
+      return true;
     }
   }
   return false;
@@ -627,17 +641,36 @@ function extractIdentity(
   // splits on its `|` separator, so the wrap-target line below sits directly
   // under a line that ENDS WITH `|`. Such a continuation line is part of the
   // headline, never the name — even when it happens to read like a 2-word
-  // Title-Case name ("Digital Transformation", "Customer Success"). We skip
-  // those candidates and keep walking up to the real name. If EVERY name-
-  // shaped candidate turns out to be a continuation (degenerate slice), we
-  // fall back to the closest-to-bottom one so a name is still surfaced rather
-  // than nulled.
+  // Title-Case name ("Digital Transformation", "Quiet Confidence"). We skip
+  // those candidates and keep walking up to the real name.
+  //
+  // The skip is deliberately constrained to the wrapped-headline SHAPE
+  // (Codex R1 P2 on this PR — an unconstrained "prev ends with |" check
+  // skipped real names sitting below pipe-ended cert titles):
+  //   - position: only the line at `slice.length - 2` can be the final wrap
+  //     target (the location is always the last line; anything higher that
+  //     reads like a name is identity or sidebar content, not a wrap tail);
+  //   - pipe density: the line above must carry ≥ 2 pipes. A pipe-RICH line
+  //     is a real headline L1 ("Founder | Speaker | Investor | Author |");
+  //     a stray single-pipe cert title ("Some Program |") is not. The
+  //     single-pipe wrap case ("Strategic Advisor |" / "Digital
+  //     Transformation") is already covered by the CERT_DISQUALIFIERS
+  //     vocabulary, so it doesn't need — and must not get — the structural
+  //     skip.
+  // If EVERY name-shaped candidate turns out to be a continuation
+  // (degenerate slice, e.g. a no-headline profile whose only name sits under
+  // a pipe-rich sidebar item), we fall back to the closest-to-bottom one so
+  // a name is still surfaced rather than nulled.
   let nameIdx = -1;
   let continuationFallback = -1;
   for (let k = slice.length - 2; k >= 0; k--) {
     if (!looksLikeName(slice[k]!)) continue;
     const prev = k > 0 ? slice[k - 1]! : '';
-    if (/\|\s*$/.test(prev)) {
+    if (
+      k === slice.length - 2 &&
+      /\|\s*$/.test(prev) &&
+      (prev.match(/\|/g) ?? []).length >= 2
+    ) {
       if (continuationFallback === -1) continuationFallback = k;
       continue;
     }

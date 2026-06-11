@@ -164,6 +164,41 @@ M.S., Computer Science
       'Distributed Systems',
     ]);
   });
+
+  // Codex R1 P2 (this PR): multi-word skill names below a skill literally
+  // named "Patents" must NOT count as section evidence. Complete noun-phrase
+  // items ("Intellectual Property Strategy") don't break mid-phrase the way
+  // wrapped publication/patent titles do, so the gate stays closed and the
+  // skills list survives intact.
+  it('a "Patents" skill followed by multi-word skills is not promoted — skills list survives', () => {
+    const profile = parseLinkedInText(`Contact
+555-0307 (Mobile)
+example-marcus2@example.com
+Top Skills
+Patents
+Intellectual Property Strategy
+Technology Transfer Negotiations
+Marcus Chen
+Principal Engineer
+San Francisco, California, United States
+Summary
+IP-focused engineering summary.
+Experience
+TechCo
+Principal Engineer
+January 2023 - Present (1 year 11 months)
+San Francisco, California, United States
+Education
+Stanford University
+M.S., Computer Science
+`);
+    expect(profile.fullName).toBe('Marcus Chen');
+    expect(profile.skills.data?.topThree).toEqual([
+      'Patents',
+      'Intellectual Property Strategy',
+      'Technology Transfer Negotiations',
+    ]);
+  });
 });
 
 describe('parseLinkedInText — pipe-rich headline ending in a two-word phrase', () => {
@@ -209,6 +244,42 @@ B.A., Economics
     expect(profile.headline.data).toBe(
       'Founder | Speaker | Investor | Author | Quiet Confidence',
     );
+  });
+
+  // Codex R1 P2 (this PR): the continuation skip must be constrained to the
+  // wrapped-headline shape. A single-pipe-ended cert title ("Some Program |")
+  // above the real name, with another name-shaped cert ("Dale Carnegie")
+  // higher in the slice, must still resolve to the closest-to-bottom identity
+  // name — not skip it and surface the certification.
+  it('a pipe-ended cert above the name does not skip the real name onto an earlier name-shaped cert', () => {
+    const profile = parseLinkedInText(`Contact
+555-0308 (Mobile)
+example-jane5@example.com
+Top Skills
+Project Management
+Process Improvement
+Compliance
+Languages
+English
+Certifications
+Dale Carnegie
+Some Program |
+Jane Doe
+Senior Engineer
+Toronto, Canada
+Summary
+S.
+Experience
+BankCo
+Senior Engineer
+January 2023 - Present (1 year 11 months)
+Toronto, Canada
+Education
+University of Toronto
+B.Comm., Finance
+`);
+    expect(profile.fullName).toBe('Jane Doe');
+    expect(profile.fullName).not.toBe('Dale Carnegie');
   });
 });
 
