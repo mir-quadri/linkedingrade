@@ -83,6 +83,51 @@ MBA, Strategy
     expect(certNames.some((n) => /Publications|Digital Transformation/.test(n))).toBe(false);
   });
 
+  // Codex R2 P2 (this PR): publication metadata beyond the title is optional
+  // on LinkedIn, so a real Publications block can be TITLE-ONLY — no year
+  // lines, no author lines, and wrap points that don't land on a stop word.
+  // The anchored-position rule (a Certifications/Languages/Honors header was
+  // already matched, so the scan is past the Top Skills collision zone) must
+  // still promote the label.
+  it('Bug 2: a title-only Publications block (no years/authors/stop-word wraps) is still a boundary', () => {
+    const profile = parseLinkedInText(`Contact
+555-0309 (Mobile)
+example-priya2@example.com
+Top Skills
+Computer Science
+Engineering Management
+Systems Engineering
+Languages
+English
+Certifications
+TOGAF 9 Certified
+Publications
+Distributed Systems Architecture
+Patterns at Cloud Scale
+Priya Anand
+Executive Leader | Motorsports | Automation | Venture Capital |
+Digital Transformation
+Greater Boston Area
+Summary
+Executive leader with deep operating experience.
+Experience
+SomeCo
+Chief Operating Officer
+January 2023 - Present (1 year 11 months)
+Greater Boston Area
+Education
+Wharton School
+MBA, Strategy
+`);
+    expect(profile.fullName).toBe('Priya Anand');
+    expect(profile.headline.data).toBe(
+      'Executive Leader | Motorsports | Automation | Venture Capital | Digital Transformation',
+    );
+    expect(profile.certifications.data).toEqual([
+      { name: 'TOGAF 9 Certified', issuer: null, date: null },
+    ]);
+  });
+
   // Bug 2 (Patents variant): the contact column carries a Patents block with
   // patent-number / inventor evidence below Certifications.
   const PATENTS_PROFILE = `Contact
@@ -380,6 +425,82 @@ M.S., Chemistry (2015 - 2017)
         degree: 'M.S., Chemistry',
         dates: '2015 - 2017',
       },
+    ]);
+  });
+
+  // Codex R2 P2 (this PR): an undated entry followed by a school-only entry
+  // whose next line is its date range must NOT fold the second school into
+  // the first entry's degree. The short-degree length guard and the
+  // school-name guard both block the false wrap fold; the degree-less entry
+  // keeps its dates in the dates field, not the degree field.
+  it('does not merge the next school into an undated degree (standalone-date shape)', () => {
+    const profile = parseLinkedInText(`Contact
+555-0310 (Mobile)
+example-sidra2@example.com
+Top Skills
+Research
+Languages
+English
+Certifications
+Some Program
+Sidra Khan
+Researcher
+Toronto, Canada
+Summary
+Researcher summary.
+Experience
+SomeCo
+Researcher
+January 2023 - Present (1 year 11 months)
+Toronto, Canada
+Education
+First University
+B.S., Biology
+Second University
+2015 - 2017
+`);
+    expect(profile.education.data).toEqual([
+      { school: 'First University', degree: 'B.S., Biology', dates: null },
+      { school: 'Second University', degree: null, dates: '2015 - 2017' },
+    ]);
+  });
+
+  // Acronym schools ("MIT") after a LONG undated degree line: the
+  // school-name guard's all-caps token check keeps the fold from firing
+  // even when the length guard alone would allow it.
+  it('does not fold an acronym school into a long undated degree above it', () => {
+    const profile = parseLinkedInText(`Contact
+555-0311 (Mobile)
+example-omar2@example.com
+Top Skills
+Research
+Languages
+English
+Certifications
+Some Program
+Omar Haddad
+Researcher
+Boston, Massachusetts, United States
+Summary
+Researcher summary.
+Experience
+SomeCo
+Researcher
+January 2023 - Present (1 year 11 months)
+Boston, Massachusetts, United States
+Education
+First University
+Bachelor of Science in Computer Science
+MIT
+2011 - 2015
+`);
+    expect(profile.education.data).toEqual([
+      {
+        school: 'First University',
+        degree: 'Bachelor of Science in Computer Science',
+        dates: null,
+      },
+      { school: 'MIT', degree: null, dates: '2011 - 2015' },
     ]);
   });
 });

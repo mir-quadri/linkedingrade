@@ -97,6 +97,30 @@ const GATED_SIDEBAR_HEADERS: ReadonlySet<SectionHeader> = new Set([
   'Patents',
 ]);
 
+/**
+ * Headers whose presence EARLIER in the order-aware scan anchors a gated
+ * bare-noun label to the lower contact column. The realistic label collision
+ * — a Top Skill literally named "Patents" — sits in the Top Skills block,
+ * which renders ABOVE Languages / Certifications / Honors in every LinkedIn
+ * export. Once one of these anchors has been matched, the scan cursor is
+ * already past the skills region, so a later "Publications" / "Patents" line
+ * with title-shaped content below it is overwhelmingly a real section even
+ * without year / patent-number / author metadata (Codex R2 P2 on this PR:
+ * title-only Publications blocks — publication metadata beyond the title is
+ * optional on LinkedIn). The residual false positive — a CERTIFICATION
+ * literally named "Publications"/"Patents" followed by multi-word cert
+ * titles — is accepted as vanishingly rare.
+ */
+const GATE_ANCHOR_HEADERS: ReadonlySet<SectionHeader> = new Set([
+  'Languages',
+  'Certifications',
+  'Honors-Awards',
+  'Honors and Awards',
+  'Honors and awards',
+  'Honors & Awards',
+  'Honors & awards',
+]);
+
 interface HeaderIndex {
   header: SectionHeader;
   line: number;
@@ -236,6 +260,30 @@ function hasSectionEvidence(lines: string[], labelIdx: number): boolean {
 }
 
 /**
+ * Weaker, position-dependent evidence for a gated bare-noun label: is the
+ * FIRST content line below it title-shaped (3+ words, no sentence-ending
+ * punctuation, not a location)? On its own this would re-admit the
+ * "multi-word skill names below a skill named Patents" false positive
+ * (Codex R1 P2), so callers only consult it once a GATE_ANCHOR_HEADERS
+ * header has already been matched — i.e. the scan is provably past the Top
+ * Skills region where that collision lives. Together the two checks admit
+ * real title-only Publications/Patents blocks (Codex R2 P2) without
+ * re-opening the skills-truncation hole.
+ */
+function hasTitleShapedContent(lines: string[], labelIdx: number): boolean {
+  for (let k = labelIdx + 1; k < lines.length; k++) {
+    const t = lines[k]!.trim();
+    if (!t) continue;
+    return (
+      t.split(/\s+/).length >= 3 &&
+      !/[.?!]$/.test(t) &&
+      !looksLikeLocationLine(t)
+    );
+  }
+  return false;
+}
+
+/**
  * Match section headers in canonical LinkedIn-PDF order. For each header in
  * `SECTION_HEADERS`, take the first occurrence that appears *after* the
  * previously matched header — never before. Out-of-order content lines that
@@ -266,9 +314,18 @@ function findHeadersWithBoundary(
         // Bare-noun sidebar labels ("Publications", "Patents") only count as
         // a header when real section content follows — otherwise a sidebar
         // item literally named that string would be promoted, truncating its
-        // parent section.
-        if (GATED_SIDEBAR_HEADERS.has(header) && !hasSectionEvidence(lines, i)) {
-          continue;
+        // parent section. Two ways to clear the gate:
+        //   - hard / wrap evidence below the label (hasSectionEvidence), or
+        //   - an anchor header (Languages / Certifications / Honors) already
+        //     matched — the cursor is past the Top Skills collision zone —
+        //     plus title-shaped content below (covers title-only blocks
+        //     whose publication metadata is absent; Codex R2 P2).
+        if (GATED_SIDEBAR_HEADERS.has(header)) {
+          const anchorSeen = found.some((f) => GATE_ANCHOR_HEADERS.has(f.header));
+          const gateOpen =
+            hasSectionEvidence(lines, i) ||
+            (anchorSeen && hasTitleShapedContent(lines, i));
+          if (!gateOpen) continue;
         }
         found.push({ header, line: i });
         cursor = i + 1;
@@ -1104,6 +1161,33 @@ function parenHoldsDates(detail: string): boolean {
   return !!m && STANDALONE_EDU_DATES.test(m[2]!.trim());
 }
 
+/** Institution words that mark a line as a SCHOOL name. Used to stop the
+ * wrapped-degree fold from consuming the NEXT entry's school line (Codex R2
+ * P2 on this PR: `First University / B.S., Biology / Second University /
+ * 2015 - 2017` must keep "Second University" as its own entry). */
+const SCHOOL_NAME_KEYWORD =
+  /\b(?:university|universit\w*|universidad|college|school|schule|institute|institut\w*|academy|acad[ée]mie|polytechnic|politecnico|conservatory|seminary|lyc[ée]e)\b/i;
+
+/** Is this line plausibly the START of a new education entry (a school name)
+ * rather than the wrapped tail of the previous entry's degree? Catches both
+ * keyword-bearing names ("Second University") and acronym schools ("MIT",
+ * "NYU", "INSEAD") — a degree wrap tail is a phrase fragment, not a lone
+ * all-caps token. */
+function looksLikeSchoolLine(line: string): boolean {
+  const t = line.trim();
+  if (SCHOOL_NAME_KEYWORD.test(t)) return true;
+  if (/^[A-Z][A-Z.&'’-]+$/.test(t)) return true;
+  return false;
+}
+
+/** A degree line only wraps when it ran out of column width — short degree
+ * lines ("B.S., Biology") never produce a continuation, so a multi-word line
+ * after one is the next entry's school, not a wrap tail. The threshold sits
+ * well below the observed wrap points in production exports ("Master of
+ * Business Administration - Business" = 44 chars, "Bachelor of Science in
+ * Software" = 31) and well above real unwrapped short degrees. */
+const MIN_WRAPPED_DEGREE_LENGTH = 25;
+
 /**
  * Education entries come in these shapes, and any of the three fields can
  * wrap onto an extra physical line in the PDF export:
@@ -1139,6 +1223,14 @@ function parseEducation(lines: string[]): EducationItem[] {
     const detail = lines[i]!.trim();
     i += 1;
 
+    // Degree-less entry: the line after the school is already the date range
+    // ("Second University" / "2015 - 2017"). Without this, the dates would be
+    // stored as the degree.
+    if (STANDALONE_EDU_DATES.test(detail)) {
+      items.push({ school, degree: null, dates: detail });
+      continue;
+    }
+
     // Shape 1: dates parenthesised directly into the degree line.
     const parenMatch = detail.match(PAREN_TAIL);
     if (parenMatch) {
@@ -1158,23 +1250,32 @@ function parseEducation(lines: string[]): EducationItem[] {
     }
 
     // Wrapped degree: the line after `detail` is a continuation of the degree
-    // (not the next school) when it is anchored by a date terminator.
-    if (i < lines.length) {
+    // (not the next school) when ALL of these hold:
+    //   - `detail` is long enough to have actually wrapped (a short degree
+    //     line never produces a continuation — see MIN_WRAPPED_DEGREE_LENGTH);
+    //   - the candidate line doesn't read like a school name (Codex R2 P2:
+    //     an undated entry followed by a school-only entry with a standalone
+    //     date must not fold the second school into the first degree);
+    //   - the fold is anchored by a date terminator (parenthesised on the
+    //     continuation, or a standalone date-range line right after it).
+    if (i < lines.length && detail.length >= MIN_WRAPPED_DEGREE_LENGTH) {
       const cont = lines[i]!.trim();
-      // Wrap shape A: the continuation line itself ends with "(Dates)".
-      if (parenHoldsDates(cont)) {
-        const contMatch = cont.match(PAREN_TAIL)!;
-        const mergedDegree = `${detail} ${contMatch[1]!.trim()}`.replace(/\s+/g, ' ').trim();
-        items.push({ school, degree: mergedDegree || null, dates: contMatch[2]!.trim() });
-        i += 1;
-        continue;
-      }
-      // Wrap shape B: the continuation line is followed by a standalone date.
-      if (i + 1 < lines.length && STANDALONE_EDU_DATES.test(lines[i + 1]!.trim())) {
-        const mergedDegree = `${detail} ${cont}`.replace(/\s+/g, ' ').trim();
-        items.push({ school, degree: mergedDegree || null, dates: lines[i + 1]!.trim() });
-        i += 2;
-        continue;
+      if (!looksLikeSchoolLine(cont)) {
+        // Wrap shape A: the continuation line itself ends with "(Dates)".
+        if (parenHoldsDates(cont)) {
+          const contMatch = cont.match(PAREN_TAIL)!;
+          const mergedDegree = `${detail} ${contMatch[1]!.trim()}`.replace(/\s+/g, ' ').trim();
+          items.push({ school, degree: mergedDegree || null, dates: contMatch[2]!.trim() });
+          i += 1;
+          continue;
+        }
+        // Wrap shape B: the continuation line is followed by a standalone date.
+        if (i + 1 < lines.length && STANDALONE_EDU_DATES.test(lines[i + 1]!.trim())) {
+          const mergedDegree = `${detail} ${cont}`.replace(/\s+/g, ' ').trim();
+          items.push({ school, degree: mergedDegree || null, dates: lines[i + 1]!.trim() });
+          i += 2;
+          continue;
+        }
       }
     }
 
