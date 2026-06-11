@@ -225,6 +225,9 @@ const WRAP_BREAK_FINAL_WORDS = new Set([
   '&', '+',
 ]);
 
+/** All recognised section-header labels, for fast membership tests. */
+const SECTION_HEADER_LABELS: ReadonlySet<string> = new Set(SECTION_HEADERS);
+
 /**
  * Does the block immediately below `labelIdx` read like the body of a real
  * Publications / Patents / Honors section (as opposed to the label being a
@@ -239,12 +242,23 @@ const WRAP_BREAK_FINAL_WORDS = new Set([
  *     long wrapped title. Complete skill/cert names never end on those
  *     tokens, so a run of ordinary multi-word sidebar items below a skill
  *     literally named "Patents" does not satisfy the gate (Codex R1 P2).
+ *
+ * The scan stops at the SIDEBAR BLOCK boundary — the first line that is a
+ * recognised section header OR reads like a person's name (the identity
+ * block) — so summary / identity / main-section text below a non-section
+ * collision label can never contribute evidence (Codex R7 P2: in a no-blank
+ * export a wrapped summary line ending in "in"/"of", or a stray year, within
+ * the raw window could otherwise open the gate for a Top Skill named
+ * "Patents"/"Publications").
  */
 function hasSectionEvidence(lines: string[], labelIdx: number): boolean {
   const end = Math.min(lines.length, labelIdx + 1 + 8);
   for (let k = labelIdx + 1; k < end; k++) {
     const t = lines[k]!.trim();
     if (!t) continue;
+    // Reached the next section or the identity block — stop before any
+    // identity / main-section text can be read as section content.
+    if (SECTION_HEADER_LABELS.has(t) || looksLikeName(t)) return false;
     if (STANDALONE_YEAR_LINE.test(t)) return true;
     if (/patent/i.test(t) && /\d/.test(t)) return true;
     if (/^(?:co-?)?(?:authors?|inventors?)\b/i.test(t)) return true;

@@ -289,6 +289,43 @@ M.S., Computer Science
       'Technology Transfer Negotiations',
     ]);
   });
+
+  // Codex R7 P2 (this PR): with NO Languages/Certifications anchor, a Top
+  // Skill named "Patents" must not be promoted by evidence that actually
+  // lives in the identity / Summary block below it (a standalone year, an
+  // author-looking line, or a summary line wrapping after "in"/"of"). The
+  // evidence scan stops at the sidebar-block boundary (next header or the
+  // name line), so the skills list survives.
+  it('a "Patents" skill is not promoted by year/wrap evidence that lives in the identity/summary block', () => {
+    const profile = parseLinkedInText(`Contact
+555-0318 (Mobile)
+example-raj@example.com
+Top Skills
+Software Architecture
+Patents
+Distributed Systems
+Raj Mehta
+Principal Engineer
+San Francisco, California, United States
+Summary
+Building reliable systems since 2009 and investing in
+the next generation of infrastructure.
+Experience
+TechCo
+Principal Engineer
+January 2023 - Present (1 year 11 months)
+San Francisco, California, United States
+Education
+Stanford University
+M.S., Computer Science
+`);
+    expect(profile.fullName).toBe('Raj Mehta');
+    expect(profile.skills.data?.topThree).toEqual([
+      'Software Architecture',
+      'Patents',
+      'Distributed Systems',
+    ]);
+  });
 });
 
 describe('parseLinkedInText — pipe-rich headline ending in a two-word phrase', () => {
