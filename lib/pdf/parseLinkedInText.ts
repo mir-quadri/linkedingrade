@@ -37,6 +37,21 @@ const SECTION_HEADERS = [
   'Honors and awards',
   'Honors & Awards',
   'Honors & awards',
+  // Bare-noun contact-column sections. These render in the SAME left column
+  // as Contact / Top Skills / Languages / Certifications and, when present,
+  // sit BELOW Certifications and ABOVE the identity block. Recognising them
+  // as boundaries is what stops the Certifications / Top-Skills slice from
+  // over-running into the Publications/Patents content and the name+headline
+  // (the "certs contains publication titles + the person's name" bug class).
+  //
+  // The bare nouns collide with sidebar ITEMS literally named the same string
+  // (a Top Skill called "Patents", a certification called "Publications"), so
+  // they are GATED — see GATED_SIDEBAR_HEADERS / hasSectionEvidence below.
+  // Only a label followed by genuine section content (a year line, a patent
+  // number, an Authors/Inventors line, or a run of multi-word title lines) is
+  // promoted to a header; a lone list item of the same text is not.
+  'Publications',
+  'Patents',
   'Summary',
   'Experience',
   'Education',
@@ -61,6 +76,25 @@ const SIDEBAR_HEADERS: ReadonlySet<SectionHeader> = new Set([
   'Honors and awards',
   'Honors & Awards',
   'Honors & awards',
+  // Bare-noun sidebar sections (gated — see GATED_SIDEBAR_HEADERS). When a
+  // real Publications / Patents block sits below Certifications, IT becomes
+  // the trailing sidebar header before the identity block, so the cert slice
+  // (and Top Skills slice) stop cleanly at it instead of swallowing the
+  // publication titles and the name.
+  'Publications',
+  'Patents',
+]);
+
+/**
+ * Sidebar headers whose label is also a plausible single sidebar ITEM
+ * ("Patents" as a Top Skill, "Publications" as a certification). Matching one
+ * of these requires positive evidence that it heads a real section — see
+ * `hasSectionEvidence`. The compound Honors-Awards variants are NOT gated:
+ * nobody names a skill "Honors & Awards", so they stay unambiguous.
+ */
+const GATED_SIDEBAR_HEADERS: ReadonlySet<SectionHeader> = new Set([
+  'Publications',
+  'Patents',
 ]);
 
 interface HeaderIndex {
@@ -141,6 +175,52 @@ function normalizeLines(text: string): NormalizedLines {
   return { lines, isBlankAbove };
 }
 
+/** A line that is nothing but a 4-digit calendar year (publication / patent /
+ * award year). The single strongest signal that the lines below a bare-noun
+ * label are real section content rather than the label being a stray list
+ * item of the same name. */
+const STANDALONE_YEAR_LINE = /^(?:19|20)\d{2}$/;
+
+/**
+ * Does the block immediately below `labelIdx` read like the body of a real
+ * Publications / Patents / Honors section (as opposed to the label being a
+ * lone sidebar item that merely shares the section's name)?
+ *
+ * Positive signals, scanned over a short window below the label:
+ *   - a standalone year line ("2023") — every publication/patent/award has one;
+ *   - a patent-number / "Patent ..." line with digits;
+ *   - an "Authors:" / "Co-Inventors" style attribution line;
+ *   - a run of two consecutive title-shaped lines (3+ words, not a sentence,
+ *     not a location) — publication/patent titles are long and wrap, whereas
+ *     a sidebar item named "Patents" is followed by the next short list item.
+ *
+ * The window deliberately skips lines that look like a location or a sentence
+ * so the identity block / Summary that follows a (non-section) collision item
+ * can't be mistaken for section content.
+ */
+function hasSectionEvidence(lines: string[], labelIdx: number): boolean {
+  const end = Math.min(lines.length, labelIdx + 1 + 8);
+  let titleRun = 0;
+  for (let k = labelIdx + 1; k < end; k++) {
+    const t = lines[k]!.trim();
+    if (!t) continue;
+    if (STANDALONE_YEAR_LINE.test(t)) return true;
+    if (/patent/i.test(t) && /\d/.test(t)) return true;
+    if (/^(?:co-?)?(?:authors?|inventors?)\b/i.test(t)) return true;
+    const isTitleLike =
+      t.split(/\s+/).length >= 3 &&
+      !/[.?!]$/.test(t) &&
+      !looksLikeLocationLine(t);
+    if (isTitleLike) {
+      titleRun += 1;
+      if (titleRun >= 2) return true;
+    } else {
+      titleRun = 0;
+    }
+  }
+  return false;
+}
+
 /**
  * Match section headers in canonical LinkedIn-PDF order. For each header in
  * `SECTION_HEADERS`, take the first occurrence that appears *after* the
@@ -169,6 +249,13 @@ function findHeadersWithBoundary(
       // / etc. from being recorded as the real header — adjacent list items
       // don't carry the blank-above marker that real section headers do.
       if (lines[i]!.trim() === header && (!isBlankAbove || isBlankAbove[i])) {
+        // Bare-noun sidebar labels ("Publications", "Patents") only count as
+        // a header when real section content follows — otherwise a sidebar
+        // item literally named that string would be promoted, truncating its
+        // parent section.
+        if (GATED_SIDEBAR_HEADERS.has(header) && !hasSectionEvidence(lines, i)) {
+          continue;
+        }
         found.push({ header, line: i });
         cursor = i + 1;
         break;
@@ -534,13 +621,30 @@ function extractIdentity(
   // "automation", "learning", etc.), which makes `looksLikeName` correctly
   // reject the wrap target. The walk-backwards then naturally finds the
   // real name above the headline.
+  //
+  // Headline-continuation guard (the "never derive the name from a headline
+  // segment" invariant): a LinkedIn headline that wraps across physical lines
+  // splits on its `|` separator, so the wrap-target line below sits directly
+  // under a line that ENDS WITH `|`. Such a continuation line is part of the
+  // headline, never the name — even when it happens to read like a 2-word
+  // Title-Case name ("Digital Transformation", "Customer Success"). We skip
+  // those candidates and keep walking up to the real name. If EVERY name-
+  // shaped candidate turns out to be a continuation (degenerate slice), we
+  // fall back to the closest-to-bottom one so a name is still surfaced rather
+  // than nulled.
   let nameIdx = -1;
+  let continuationFallback = -1;
   for (let k = slice.length - 2; k >= 0; k--) {
-    if (looksLikeName(slice[k]!)) {
-      nameIdx = k;
-      break;
+    if (!looksLikeName(slice[k]!)) continue;
+    const prev = k > 0 ? slice[k - 1]! : '';
+    if (/\|\s*$/.test(prev)) {
+      if (continuationFallback === -1) continuationFallback = k;
+      continue;
     }
+    nameIdx = k;
+    break;
   }
+  if (nameIdx === -1) nameIdx = continuationFallback;
   if (nameIdx !== -1) {
     const name = slice[nameIdx]!;
     const sidebarItems = slice.slice(0, nameIdx);
@@ -954,18 +1058,39 @@ function toExperienceEntry(raw: RawExperience): ExperienceEntry {
 const STANDALONE_EDU_DATES =
   /^(?:(?:[A-Za-z]{3,9}\s+)?(?:19|20)\d{2})\s*[-–—]\s*(?:(?:[A-Za-z]{3,9}\s+)?(?:19|20)\d{2}|Present|Current)$/i;
 
+/** Parenthesised tail on a degree line — "Degree (Dates)". The captured
+ * groups are the degree text and the in-paren text. */
+const PAREN_TAIL = /^(.*?)\s*\(([^)]+)\)\s*$/;
+
+/** Does the parenthesised tail of a degree line actually hold a date range
+ * ("(2001 - 2003)", "(December 2022 - March 2023)") rather than some other
+ * parenthetical? Used to decide whether a wrapped degree's continuation line
+ * really terminates the entry. */
+function parenHoldsDates(detail: string): boolean {
+  const m = detail.match(PAREN_TAIL);
+  return !!m && STANDALONE_EDU_DATES.test(m[2]!.trim());
+}
+
 /**
- * Education entries come in two shapes:
- *   - Two lines: `School` then `Degree (Dates)` — dates parenthesised into
- *     the degree line.
- *   - Three lines: `School` then `Degree` then a standalone date-range
- *     line.
+ * Education entries come in these shapes, and any of the three fields can
+ * wrap onto an extra physical line in the PDF export:
+ *   - Two lines:   `School` / `Degree (Dates)` — dates parenthesised in.
+ *   - Three lines: `School` / `Degree` / standalone date-range line.
+ *   - Wrapped:     `School` / `Degree-part-1` / `Degree-part-2 (Dates)`, or
+ *                  `School` / `Degree-part-1` / `Degree-part-2` / date-range.
  *
- * The fixed `i += 2` walk treated the standalone date line as the next
- * school, corrupting every subsequent entry (the Codex P2 we're closing).
- * The loop now looks ahead — when the line after the degree matches a
- * date-range pattern, consume it as this entry's dates and skip it before
- * moving on.
+ * The earlier fixed two-line walk shifted every field by one as soon as a
+ * degree wrapped: the wrap continuation ("Management · (2001 - 2003)") was
+ * read as the NEXT school, and a standalone date below a wrapped degree
+ * ("Software Engineering" / "2018 - 2022") landed in the wrong entry. The
+ * loop now folds a single wrap-continuation line into the degree before
+ * consuming the dates, so fields never cross an entry boundary.
+ *
+ * A wrap continuation is only folded when it is anchored by a date terminator
+ * (parenthesised on the continuation, or a standalone date-range line right
+ * after it). Without that anchor the second line is treated as the start of
+ * the next entry — which preserves the plain `School` / `Degree` no-date
+ * shape that real exports also use.
  */
 function parseEducation(lines: string[]): EducationItem[] {
   const items: EducationItem[] = [];
@@ -980,18 +1105,46 @@ function parseEducation(lines: string[]): EducationItem[] {
     }
     const detail = lines[i]!.trim();
     i += 1;
-    const parenMatch = detail.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
+
+    // Shape 1: dates parenthesised directly into the degree line.
+    const parenMatch = detail.match(PAREN_TAIL);
     if (parenMatch) {
-      const degree = parenMatch[1]!.trim() || null;
-      const dates = parenMatch[2]!.trim();
-      items.push({ school, degree, dates });
+      items.push({
+        school,
+        degree: parenMatch[1]!.trim() || null,
+        dates: parenMatch[2]!.trim(),
+      });
       continue;
     }
+
+    // Shape 2: degree on its own line, dates on the next (standalone) line.
     if (i < lines.length && STANDALONE_EDU_DATES.test(lines[i]!.trim())) {
       items.push({ school, degree: detail || null, dates: lines[i]!.trim() });
       i += 1;
       continue;
     }
+
+    // Wrapped degree: the line after `detail` is a continuation of the degree
+    // (not the next school) when it is anchored by a date terminator.
+    if (i < lines.length) {
+      const cont = lines[i]!.trim();
+      // Wrap shape A: the continuation line itself ends with "(Dates)".
+      if (parenHoldsDates(cont)) {
+        const contMatch = cont.match(PAREN_TAIL)!;
+        const mergedDegree = `${detail} ${contMatch[1]!.trim()}`.replace(/\s+/g, ' ').trim();
+        items.push({ school, degree: mergedDegree || null, dates: contMatch[2]!.trim() });
+        i += 1;
+        continue;
+      }
+      // Wrap shape B: the continuation line is followed by a standalone date.
+      if (i + 1 < lines.length && STANDALONE_EDU_DATES.test(lines[i + 1]!.trim())) {
+        const mergedDegree = `${detail} ${cont}`.replace(/\s+/g, ' ').trim();
+        items.push({ school, degree: mergedDegree || null, dates: lines[i + 1]!.trim() });
+        i += 2;
+        continue;
+      }
+    }
+
     items.push({ school, degree: detail || null, dates: null });
   }
   return items;
