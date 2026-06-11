@@ -229,39 +229,49 @@ const WRAP_BREAK_FINAL_WORDS = new Set([
 const SECTION_HEADER_LABELS: ReadonlySet<string> = new Set(SECTION_HEADERS);
 
 /**
- * Does the block immediately below `labelIdx` read like the body of a real
- * Publications / Patents / Honors section (as opposed to the label being a
- * lone sidebar item that merely shares the section's name)?
- *
- * Positive signals, scanned over a short window below the label:
+ * HARD evidence that the block below `labelIdx` is a real Publications /
+ * Patents / Honors section — signals that essentially never appear inside a
+ * Top Skills / Certifications list, so they promote a gated bare-noun label
+ * WITHOUT needing an anchor header:
  *   - a standalone year line ("2023") — every publication/patent/award has one;
  *   - a patent-number / "Patent ..." line with digits;
- *   - an "Authors:" / "Co-Inventors" style attribution line;
- *   - a 3+ word line that breaks MID-PHRASE (final token is a preposition /
- *     article / conjunction — see WRAP_BREAK_FINAL_WORDS): the signature of a
- *     long wrapped title. Complete skill/cert names never end on those
- *     tokens, so a run of ordinary multi-word sidebar items below a skill
- *     literally named "Patents" does not satisfy the gate (Codex R1 P2).
+ *   - an "Authors:" / "Co-Inventors" style attribution line.
  *
  * The scan stops at the SIDEBAR BLOCK boundary — the first line that is a
  * recognised section header OR reads like a person's name (the identity
  * block) — so summary / identity / main-section text below a non-section
- * collision label can never contribute evidence (Codex R7 P2: in a no-blank
- * export a wrapped summary line ending in "in"/"of", or a stray year, within
- * the raw window could otherwise open the gate for a Top Skill named
- * "Patents"/"Publications").
+ * collision label can never contribute evidence (Codex R7 P2).
  */
-function hasSectionEvidence(lines: string[], labelIdx: number): boolean {
+function hasHardSectionEvidence(lines: string[], labelIdx: number): boolean {
   const end = Math.min(lines.length, labelIdx + 1 + 8);
   for (let k = labelIdx + 1; k < end; k++) {
     const t = lines[k]!.trim();
     if (!t) continue;
-    // Reached the next section or the identity block — stop before any
-    // identity / main-section text can be read as section content.
     if (SECTION_HEADER_LABELS.has(t) || looksLikeName(t)) return false;
     if (STANDALONE_YEAR_LINE.test(t)) return true;
     if (/patent/i.test(t) && /\d/.test(t)) return true;
     if (/^(?:co-?)?(?:authors?|inventors?)\b/i.test(t)) return true;
+  }
+  return false;
+}
+
+/**
+ * SOFT evidence: a 3+ word line that breaks MID-PHRASE (final token is a
+ * preposition / article / conjunction — see WRAP_BREAK_FINAL_WORDS), the
+ * signature of a long wrapped publication/patent title. Complete skill/cert
+ * names never end on those tokens, but a long SKILL can ("Machine Learning
+ * in" / "Production"), so this signal is ambiguous on its own and callers
+ * gate it behind an anchor header (Codex R8 P2: without that, a no-anchor
+ * Top Skill named "Publications" followed by a stop-word-wrapping skill
+ * would be promoted, truncating Top Skills). Same sidebar-block stop
+ * boundary as the hard scan.
+ */
+function hasWrappedTitleEvidence(lines: string[], labelIdx: number): boolean {
+  const end = Math.min(lines.length, labelIdx + 1 + 8);
+  for (let k = labelIdx + 1; k < end; k++) {
+    const t = lines[k]!.trim();
+    if (!t) continue;
+    if (SECTION_HEADER_LABELS.has(t) || looksLikeName(t)) return false;
     const words = t.split(/\s+/);
     if (
       words.length >= 3 &&
@@ -338,17 +348,23 @@ function findHeadersWithBoundary(
         // Bare-noun sidebar labels ("Publications", "Patents") only count as
         // a header when real section content follows — otherwise a sidebar
         // item literally named that string would be promoted, truncating its
-        // parent section. Two ways to clear the gate:
-        //   - hard / wrap evidence below the label (hasSectionEvidence), or
+        // parent section. Two tiers clear the gate:
+        //   - HARD evidence below the label (year / patent-number / authors
+        //     line) — unambiguous section content, promotes anchor-free; or
         //   - an anchor header (Languages / Certifications / Honors) already
         //     matched — the cursor is past the Top Skills collision zone —
-        //     plus title-shaped content below (covers title-only blocks
-        //     whose publication metadata is absent; Codex R2 P2).
+        //     PLUS a soft signal: a mid-phrase wrapped title
+        //     (hasWrappedTitleEvidence) or title-shaped content immediately
+        //     below (hasTitleShapedContent, covers title-only blocks whose
+        //     publication metadata is absent; Codex R2 P2). The soft signals
+        //     require the anchor because a long SKILL can mimic them (Codex
+        //     R8 P2: "Machine Learning in" / "Production").
         if (GATED_SIDEBAR_HEADERS.has(header)) {
           const anchorSeen = found.some((f) => GATE_ANCHOR_HEADERS.has(f.header));
           const gateOpen =
-            hasSectionEvidence(lines, i) ||
-            (anchorSeen && hasTitleShapedContent(lines, i));
+            hasHardSectionEvidence(lines, i) ||
+            (anchorSeen &&
+              (hasWrappedTitleEvidence(lines, i) || hasTitleShapedContent(lines, i)));
           if (!gateOpen) continue;
         }
         found.push({ header, line: i });

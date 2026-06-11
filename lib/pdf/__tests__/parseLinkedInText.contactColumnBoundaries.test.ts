@@ -326,6 +326,43 @@ M.S., Computer Science
       'Distributed Systems',
     ]);
   });
+
+  // Codex R8 P2 (this PR): with NO Languages/Certifications anchor, the SOFT
+  // mid-phrase-wrap signal must not promote a Top Skill named "Publications".
+  // A long skill can wrap at a stop word ("Machine Learning in" /
+  // "Production") and mimic a wrapped publication title, so only HARD
+  // evidence (year/patent#/authors) promotes anchor-free. The skill stays a
+  // skill and the list is not truncated.
+  it('a no-anchor "Publications" skill is not promoted by a stop-word-wrapping skill below it', () => {
+    const profile = parseLinkedInText(`Contact
+555-0319 (Mobile)
+example-priya3@example.com
+Top Skills
+Data Engineering
+Publications
+Machine Learning in
+Production
+Priya Anand
+Principal Data Scientist
+Seattle, Washington, United States
+Summary
+Data scientist summary.
+Experience
+DataCo
+Principal Data Scientist
+January 2023 - Present (1 year 11 months)
+Seattle, Washington, United States
+Education
+University of Washington
+M.S., Statistics
+`);
+    expect(profile.fullName).toBe('Priya Anand');
+    expect(profile.skills.data?.topThree).toEqual([
+      'Data Engineering',
+      'Publications',
+      'Machine Learning in',
+    ]);
+  });
 });
 
 describe('parseLinkedInText — pipe-rich headline ending in a two-word phrase', () => {
