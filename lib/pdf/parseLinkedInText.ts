@@ -237,17 +237,22 @@ const SECTION_HEADER_LABELS: ReadonlySet<string> = new Set(SECTION_HEADERS);
  *   - a patent-number / "Patent ..." line with digits;
  *   - an "Authors:" / "Co-Inventors" style attribution line.
  *
- * The scan stops at the SIDEBAR BLOCK boundary — the first line that is a
- * recognised section header OR reads like a person's name (the identity
- * block) — so summary / identity / main-section text below a non-section
- * collision label can never contribute evidence (Codex R7 P2).
+ * The scan stops only at the NEXT SECTION HEADER (Summary / Experience /
+ * Education or another sidebar header) — that boundary already prevents the
+ * window from reaching summary / main-section prose (Codex R7 P2). Unlike the
+ * soft scan it does NOT stop at a name-shaped line: a hard signal (standalone
+ * year, patent number, authors line) can never occur inside a name / headline
+ * / location, so a real block that OPENS with a short Title-Case title which
+ * happens to pass `looksLikeName` ("Publications" / "Data Privacy" / "2023")
+ * must still be allowed to reach the year/patent/author line below it (Codex
+ * R10 P2).
  */
 function hasHardSectionEvidence(lines: string[], labelIdx: number): boolean {
   const end = Math.min(lines.length, labelIdx + 1 + 8);
   for (let k = labelIdx + 1; k < end; k++) {
     const t = lines[k]!.trim();
     if (!t) continue;
-    if (SECTION_HEADER_LABELS.has(t) || looksLikeName(t)) return false;
+    if (SECTION_HEADER_LABELS.has(t)) return false;
     if (STANDALONE_YEAR_LINE.test(t)) return true;
     if (/patent/i.test(t) && /\d/.test(t)) return true;
     if (/^(?:co-?)?(?:authors?|inventors?)\b/i.test(t)) return true;

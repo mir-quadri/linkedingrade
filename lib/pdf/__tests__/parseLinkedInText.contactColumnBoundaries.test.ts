@@ -363,6 +363,49 @@ M.S., Statistics
       'Machine Learning in',
     ]);
   });
+
+  // Codex R10 P2 (this PR): a real no-anchor Publications block can OPEN with
+  // a short Title-Case title that passes looksLikeName ("Data Privacy")
+  // before the hard year line. The hard-evidence scan must not stop at that
+  // name-shaped title — it has to reach "2023" to promote the header. Once
+  // promoted, Publications becomes the trailing sidebar, so its label/title/
+  // year do NOT leak into the Top Skills list and the identity parses
+  // cleanly.
+  it('hard evidence (year) below a name-shaped publication title still promotes Publications (no anchor)', () => {
+    const profile = parseLinkedInText(`Contact
+555-0320 (Mobile)
+example-erum4@example.com
+Top Skills
+Data Engineering
+Machine Learning
+Publications
+Data Privacy
+2023
+Erum Khan
+Senior Data Scientist | Machine Learning Platforms
+San Francisco Bay Area
+Summary
+Data scientist summary.
+Experience
+DataCo
+Senior Data Scientist
+January 2023 - Present (1 year 11 months)
+San Francisco Bay Area
+Education
+Stanford University
+M.S., Computer Science
+`);
+    expect(profile.fullName).toBe('Erum Khan');
+    expect(profile.headline.data).toBe(
+      'Senior Data Scientist | Machine Learning Platforms',
+    );
+    // Publications was promoted to a boundary, so its label / title / year
+    // never leak into Top Skills.
+    expect(profile.skills.data?.topThree).toEqual([
+      'Data Engineering',
+      'Machine Learning',
+    ]);
+  });
 });
 
 describe('parseLinkedInText — pipe-rich headline ending in a two-word phrase', () => {
