@@ -371,6 +371,40 @@ B.Comm., Finance
     expect(profile.fullName).toBe('Jane Doe');
     expect(profile.fullName).not.toBe('Dale Carnegie');
   });
+
+  // Codex R4 P2 (this PR): a NO-HEADLINE profile whose trailing cert is a
+  // pipe-rich PRODUCT list ("AWS | Azure | GCP |") puts the real name at
+  // slice.length - 2. The skip must not fire there: a real headline L1
+  // carries job-title vocabulary in its segments, a product list does not.
+  it('a pipe-rich product-list cert above the name (no headline) does not skip the real name', () => {
+    const profile = parseLinkedInText(`Contact
+555-0314 (Mobile)
+example-jane6@example.com
+Top Skills
+Cloud Computing
+Infrastructure as Code
+Site Reliability
+Languages
+English
+Certifications
+Dale Carnegie
+AWS | Azure | GCP |
+Jane Doe
+Toronto, Canada
+Summary
+S.
+Experience
+CloudCo
+Site Reliability Engineer
+January 2023 - Present (1 year 11 months)
+Toronto, Canada
+Education
+University of Toronto
+B.A.Sc., Computer Engineering
+`);
+    expect(profile.fullName).toBe('Jane Doe');
+    expect(profile.fullName).not.toBe('Dale Carnegie');
+  });
 });
 
 describe('parseLinkedInText — wrapped multi-line education entries', () => {

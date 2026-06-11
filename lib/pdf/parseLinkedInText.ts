@@ -724,6 +724,17 @@ function extractIdentity(
   //     Transformation") is already covered by the CERT_DISQUALIFIERS
   //     vocabulary, so it doesn't need — and must not get — the structural
   //     skip.
+  //   - title vocabulary: the pipe-rich line must contain at least one
+  //     CERT_DISQUALIFIERS token. A real headline L1 describes roles /
+  //     domains ("Executive Leader | …", "Founder | Speaker | …") and
+  //     reliably carries that vocabulary; a pipe-separated PRODUCT list in
+  //     a trailing cert ("AWS | Azure | GCP |") does not — without this
+  //     check, a no-headline profile whose real name sits below such a
+  //     cert would have its name skipped in favour of an earlier
+  //     name-shaped cert (Codex R4 P2). Residual: a pipe-rich cert whose
+  //     segments DO contain title vocabulary ("PMP | Scrum Master |") in a
+  //     no-headline profile with a name-shaped cert above — structurally
+  //     identical to a real wrapped headline; accepted.
   // If EVERY name-shaped candidate turns out to be a continuation
   // (degenerate slice, e.g. a no-headline profile whose only name sits under
   // a pipe-rich sidebar item), we fall back to the closest-to-bottom one so
@@ -733,10 +744,15 @@ function extractIdentity(
   for (let k = slice.length - 2; k >= 0; k--) {
     if (!looksLikeName(slice[k]!)) continue;
     const prev = k > 0 ? slice[k - 1]! : '';
+    const prevHasTitleVocab = prev
+      .toLowerCase()
+      .split(/[^\p{L}'&+]+/u)
+      .some((w) => CERT_DISQUALIFIERS.has(w));
     if (
       k === slice.length - 2 &&
       /\|\s*$/.test(prev) &&
-      (prev.match(/\|/g) ?? []).length >= 2
+      (prev.match(/\|/g) ?? []).length >= 2 &&
+      prevHasTitleVocab
     ) {
       if (continuationFallback === -1) continuationFallback = k;
       continue;
