@@ -639,6 +639,21 @@ function obviouslyNotAName(line: string): boolean {
 }
 
 /**
+ * Is this pipe-separated line an acronym-dominant PRODUCT list ("AWS |
+ * Azure | GCP |") rather than a headline of Title-Case role/domain labels
+ * ("Speaker | Investor | Author |")? Majority rule over the segments: a
+ * lone acronym in an otherwise wordy headline ("CEO | Investor | Speaker |")
+ * doesn't flip it. Used to withhold the wrapped-headline continuation skip
+ * for pipe-rich trailing certs in no-headline profiles (Codex R4/R5 P2).
+ */
+function isAcronymPipeList(line: string): boolean {
+  const segments = line.split('|').map((s) => s.trim()).filter(Boolean);
+  if (segments.length < 2) return false;
+  const acronyms = segments.filter((s) => /^[A-Z0-9.&-]{2,6}$/.test(s)).length;
+  return acronyms * 2 > segments.length;
+}
+
+/**
  * Identity (NAME / HEADLINE / LOCATION) sits between the last sidebar
  * section and the first main section. Three shapes have to be handled:
  *
@@ -724,17 +739,20 @@ function extractIdentity(
   //     Transformation") is already covered by the CERT_DISQUALIFIERS
   //     vocabulary, so it doesn't need — and must not get — the structural
   //     skip.
-  //   - title vocabulary: the pipe-rich line must contain at least one
-  //     CERT_DISQUALIFIERS token. A real headline L1 describes roles /
-  //     domains ("Executive Leader | …", "Founder | Speaker | …") and
-  //     reliably carries that vocabulary; a pipe-separated PRODUCT list in
-  //     a trailing cert ("AWS | Azure | GCP |") does not — without this
-  //     check, a no-headline profile whose real name sits below such a
-  //     cert would have its name skipped in favour of an earlier
-  //     name-shaped cert (Codex R4 P2). Residual: a pipe-rich cert whose
-  //     segments DO contain title vocabulary ("PMP | Scrum Master |") in a
-  //     no-headline profile with a name-shaped cert above — structurally
-  //     identical to a real wrapped headline; accepted.
+  //   - segment shape: the pipe-rich line must NOT be an acronym-dominant
+  //     product list. A real headline L1 pipes Title-Case words ("Executive
+  //     Leader | Motorsports | …", "Speaker | Investor | Author |" — Codex
+  //     R5 P2: requiring title VOCABULARY here was too narrow, since common
+  //     headline labels fall outside any enumerable word list). A trailing
+  //     CERT that happens to be pipe-rich is typically a product/technology
+  //     list whose segments are short all-caps acronyms ("AWS | Azure |
+  //     GCP |" — Codex R4 P2); when a majority of segments are acronyms the
+  //     skip is withheld so a no-headline profile's real name below such a
+  //     cert isn't traded for an earlier name-shaped cert. Residual: a
+  //     pipe-rich cert of ordinary Title-Case words above the name in a
+  //     no-headline profile with a name-shaped cert higher up — that input
+  //     is line-for-line identical to a real wrapped headline, so no
+  //     structural rule can split the pair; accepted.
   // If EVERY name-shaped candidate turns out to be a continuation
   // (degenerate slice, e.g. a no-headline profile whose only name sits under
   // a pipe-rich sidebar item), we fall back to the closest-to-bottom one so
@@ -744,15 +762,11 @@ function extractIdentity(
   for (let k = slice.length - 2; k >= 0; k--) {
     if (!looksLikeName(slice[k]!)) continue;
     const prev = k > 0 ? slice[k - 1]! : '';
-    const prevHasTitleVocab = prev
-      .toLowerCase()
-      .split(/[^\p{L}'&+]+/u)
-      .some((w) => CERT_DISQUALIFIERS.has(w));
     if (
       k === slice.length - 2 &&
       /\|\s*$/.test(prev) &&
       (prev.match(/\|/g) ?? []).length >= 2 &&
-      prevHasTitleVocab
+      !isAcronymPipeList(prev)
     ) {
       if (continuationFallback === -1) continuationFallback = k;
       continue;

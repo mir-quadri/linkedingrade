@@ -405,6 +405,45 @@ B.A.Sc., Computer Engineering
     expect(profile.fullName).toBe('Jane Doe');
     expect(profile.fullName).not.toBe('Dale Carnegie');
   });
+
+  // Codex R5 P2 (this PR): a wrapped headline whose L1 labels all fall
+  // OUTSIDE the disqualifier vocabulary ("Speaker | Investor | Author |")
+  // must still trigger the continuation skip — the discriminator is the
+  // segment SHAPE (Title-Case words vs an acronym-dominant product list),
+  // not an enumerable word list.
+  it('a non-vocabulary pipe-rich wrapped headline still yields the real name, not the wrap tail', () => {
+    const profile = parseLinkedInText(`Contact
+555-0315 (Mobile)
+example-nina@example.com
+Top Skills
+Public Speaking
+Angel Investing
+Writing
+Languages
+English
+Certifications
+Some Program
+Nina Gomez
+Speaker | Investor | Author |
+Quiet Confidence
+Lisbon, Portugal
+Summary
+Speaker summary.
+Experience
+SomeCo
+Keynote Speaker
+January 2023 - Present (1 year 11 months)
+Lisbon, Portugal
+Education
+University of Lisbon
+B.A., Communications
+`);
+    expect(profile.fullName).toBe('Nina Gomez');
+    expect(profile.fullName).not.toBe('Quiet Confidence');
+    expect(profile.headline.data).toBe(
+      'Speaker | Investor | Author | Quiet Confidence',
+    );
+  });
 });
 
 describe('parseLinkedInText — wrapped multi-line education entries', () => {
