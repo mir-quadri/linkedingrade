@@ -444,6 +444,80 @@ B.A., Communications
       'Speaker | Investor | Author | Quiet Confidence',
     );
   });
+
+  // Codex R6 P2 (this PR): a SINGLE-pipe headline that wraps to a
+  // non-vocabulary tail. A headline only spills its tail onto a second line
+  // when L1 nearly filled the column, so a LONG single-pipe L1 is the
+  // wrap signal (a short stray-pipe cert like "Some Program |" is not, and
+  // a short single-pipe headline would never wrap in the first place).
+  it('a long single-pipe wrapped headline yields the real name, not the wrap tail', () => {
+    const profile = parseLinkedInText(`Contact
+555-0316 (Mobile)
+example-marco@example.com
+Top Skills
+Public Speaking
+Coaching
+Writing
+Languages
+English
+Certifications
+Some Program
+Marco Silva
+Helping ambitious founders build calm, focused companies |
+Quiet Confidence
+Lisbon, Portugal
+Summary
+Coach summary.
+Experience
+SomeCo
+Executive Coach
+January 2023 - Present (1 year 11 months)
+Lisbon, Portugal
+Education
+University of Lisbon
+B.A., Psychology
+`);
+    expect(profile.fullName).toBe('Marco Silva');
+    expect(profile.fullName).not.toBe('Quiet Confidence');
+    expect(profile.headline.data).toBe(
+      'Helping ambitious founders build calm, focused companies | Quiet Confidence',
+    );
+  });
+
+  // Guard for the symmetric case: a SHORT single-pipe stray-pipe cert above
+  // the real name (no headline) must NOT trigger the wrap skip — the real
+  // name at slice.length - 2 stays, it is not traded for an earlier
+  // name-shaped cert. This is the boundary the WRAP_L1_MIN_LENGTH threshold
+  // protects.
+  it('a short single-pipe cert above the name (no headline) does not skip the real name', () => {
+    const profile = parseLinkedInText(`Contact
+555-0317 (Mobile)
+example-jane7@example.com
+Top Skills
+Project Management
+Process Improvement
+Compliance
+Languages
+English
+Certifications
+Dale Carnegie
+Some Program |
+Jane Doe
+Toronto, Canada
+Summary
+S.
+Experience
+BankCo
+Compliance Officer
+January 2023 - Present (1 year 11 months)
+Toronto, Canada
+Education
+University of Toronto
+B.Comm., Finance
+`);
+    expect(profile.fullName).toBe('Jane Doe');
+    expect(profile.fullName).not.toBe('Dale Carnegie');
+  });
 });
 
 describe('parseLinkedInText — wrapped multi-line education entries', () => {

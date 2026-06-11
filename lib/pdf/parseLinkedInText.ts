@@ -639,6 +639,16 @@ function obviouslyNotAName(line: string): boolean {
 }
 
 /**
+ * Minimum length for a SINGLE-pipe line to be treated as a headline L1 that
+ * wrapped (vs. a short stray-pipe cert title). A headline only spills its
+ * tail onto a second physical line when the text up to the pipe nearly fills
+ * the PDF column — observed wrap points in real exports run 50–66 chars, so
+ * 40 sits safely below the shortest real wrap and well above stray-pipe
+ * certs like "Some Program |" (14) / "Strategic Advisor |" (19).
+ */
+const WRAP_L1_MIN_LENGTH = 40;
+
+/**
  * Is this pipe-separated line an acronym-dominant PRODUCT list ("AWS |
  * Azure | GCP |") rather than a headline of Title-Case role/domain labels
  * ("Speaker | Investor | Author |")? Majority rule over the segments: a
@@ -732,42 +742,51 @@ function extractIdentity(
   //   - position: only the line at `slice.length - 2` can be the final wrap
   //     target (the location is always the last line; anything higher that
   //     reads like a name is identity or sidebar content, not a wrap tail);
-  //   - pipe density: the line above must carry ≥ 2 pipes. A pipe-RICH line
-  //     is a real headline L1 ("Founder | Speaker | Investor | Author |");
-  //     a stray single-pipe cert title ("Some Program |") is not. The
-  //     single-pipe wrap case ("Strategic Advisor |" / "Digital
-  //     Transformation") is already covered by the CERT_DISQUALIFIERS
-  //     vocabulary, so it doesn't need — and must not get — the structural
-  //     skip.
-  //   - segment shape: the pipe-rich line must NOT be an acronym-dominant
-  //     product list. A real headline L1 pipes Title-Case words ("Executive
-  //     Leader | Motorsports | …", "Speaker | Investor | Author |" — Codex
-  //     R5 P2: requiring title VOCABULARY here was too narrow, since common
-  //     headline labels fall outside any enumerable word list). A trailing
-  //     CERT that happens to be pipe-rich is typically a product/technology
-  //     list whose segments are short all-caps acronyms ("AWS | Azure |
-  //     GCP |" — Codex R4 P2); when a majority of segments are acronyms the
-  //     skip is withheld so a no-headline profile's real name below such a
-  //     cert isn't traded for an earlier name-shaped cert. Residual: a
-  //     pipe-rich cert of ordinary Title-Case words above the name in a
-  //     no-headline profile with a name-shaped cert higher up — that input
-  //     is line-for-line identical to a real wrapped headline, so no
-  //     structural rule can split the pair; accepted.
-  // If EVERY name-shaped candidate turns out to be a continuation
-  // (degenerate slice, e.g. a no-headline profile whose only name sits under
-  // a pipe-rich sidebar item), we fall back to the closest-to-bottom one so
-  // a name is still surfaced rather than nulled.
+  //   - wrap plausibility: the line above must look like a headline L1 that
+  //     actually wrapped. Two sufficient shapes:
+  //       (a) PIPE-RICH — ≥ 2 pipes ("Founder | Speaker | Investor |
+  //           Author |"). No certification title carries two internal pipes,
+  //           so this is unambiguously a headline.
+  //       (b) LONG single-pipe — exactly one pipe but the line is long enough
+  //           to have filled the PDF column before wrapping (observed
+  //           headline wrap points run 50–66 chars; see
+  //           WRAP_L1_MIN_LENGTH). This covers single-pipe headlines whose
+  //           tail is NOT in the disqualifier vocabulary ("Helping founders
+  //           build calm companies |" / "Quiet Confidence" — Codex R6 P2).
+  //     A STRAY-pipe cert title ("Some Program |", 14 chars) is short and
+  //     single-pipe, so it satisfies neither shape and does not trigger the
+  //     skip — the real name below it is preserved (Codex R1 P2). A
+  //     single-pipe headline short enough to dodge (b) (e.g. "Founder |
+  //     Quiet Confidence") would not wrap at all — the PDF keeps it on one
+  //     line — so the two-physical-line shape can't arise for it.
+  //   - segment shape: the line must NOT be an acronym-dominant product list.
+  //     A real headline L1 pipes Title-Case words ("Executive Leader |
+  //     Motorsports | …" — Codex R5 P2: requiring title VOCABULARY here was
+  //     too narrow, since common headline labels fall outside any enumerable
+  //     word list). A trailing CERT that happens to be pipe-rich is typically
+  //     a product/technology list whose segments are short all-caps acronyms
+  //     ("AWS | Azure | GCP |" — Codex R4 P2); when a majority of segments
+  //     are acronyms the skip is withheld so a no-headline profile's real
+  //     name below such a cert isn't traded for an earlier name-shaped cert.
+  // Residual: a pipe-rich / long cert of ordinary Title-Case words directly
+  // above the name in a no-headline profile with a name-shaped cert higher up
+  // — line-for-line identical to a real wrapped headline, so no structural
+  // rule can split the pair; accepted.
+  //
+  // If EVERY name-shaped candidate turns out to be a continuation (degenerate
+  // slice), we fall back to the closest-to-bottom one so a name is still
+  // surfaced rather than nulled.
   let nameIdx = -1;
   let continuationFallback = -1;
   for (let k = slice.length - 2; k >= 0; k--) {
     if (!looksLikeName(slice[k]!)) continue;
     const prev = k > 0 ? slice[k - 1]! : '';
-    if (
-      k === slice.length - 2 &&
+    const pipeCount = (prev.match(/\|/g) ?? []).length;
+    const looksLikeWrappedL1 =
       /\|\s*$/.test(prev) &&
-      (prev.match(/\|/g) ?? []).length >= 2 &&
-      !isAcronymPipeList(prev)
-    ) {
+      (pipeCount >= 2 || prev.length >= WRAP_L1_MIN_LENGTH) &&
+      !isAcronymPipeList(prev);
+    if (k === slice.length - 2 && looksLikeWrappedL1) {
       if (continuationFallback === -1) continuationFallback = k;
       continue;
     }
