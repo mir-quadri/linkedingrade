@@ -862,4 +862,45 @@ HEC Paris
       { school: 'HEC Paris', degree: null, dates: '2018 - 2020' },
     ]);
   });
+
+  // Codex R11 P2 (this PR): a degree that wraps MID-PHRASE on a stop word
+  // ("Bachelor of Business Administration in") must fold its multi-word
+  // Title-Case continuation ("Management Information Systems") as the degree
+  // tail, not split it into a bogus second school. The mid-phrase-wrap
+  // signal on the degree line distinguishes this from the R3 "complete
+  // degree / next school" shape.
+  it('folds a multi-word wrapped degree tail when the degree line ends mid-phrase', () => {
+    const profile = parseLinkedInText(`Contact
+555-0321 (Mobile)
+example-nadia@example.com
+Top Skills
+Research
+Languages
+English
+Certifications
+Some Program
+Nadia Rahman
+Researcher
+Dhaka, Bangladesh
+Summary
+Researcher summary.
+Experience
+SomeCo
+Researcher
+January 2023 - Present (1 year 11 months)
+Dhaka, Bangladesh
+Education
+First University
+Bachelor of Business Administration in
+Management Information Systems
+2014 - 2018
+`);
+    expect(profile.education.data).toEqual([
+      {
+        school: 'First University',
+        degree: 'Bachelor of Business Administration in Management Information Systems',
+        dates: '2014 - 2018',
+      },
+    ]);
+  });
 });

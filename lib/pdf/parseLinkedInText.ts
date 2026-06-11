@@ -1381,15 +1381,24 @@ function parseEducation(lines: string[]): EducationItem[] {
         // date. Without the parenthesised anchor of shape A, this shape is
         // ambiguous against `School / long-undated-degree / School2 / Dates2`
         // for institution names the school-name guard can't recognise
-        // ("General Assembly", "HEC Paris" — Codex R3 P2). The tie-break: a
-        // genuine wrap tail is a phrase FRAGMENT — a single word
-        // ("Engineering", the production Sidra case) or a run-on starting
-        // lowercase ("and Data") — whereas a school name is a multi-word
-        // Title-Case line. Multi-word capitalised continuations are treated
-        // as the next entry's school.
+        // ("General Assembly", "HEC Paris" — Codex R3 P2). Fold the
+        // continuation as a degree tail when EITHER:
+        //   - it's a phrase FRAGMENT — a single word ("Engineering", the
+        //     production Sidra case) or a lowercase run-on ("and Data"); OR
+        //   - the degree line itself ends MID-PHRASE on a stop word
+        //     ("Bachelor of Business Administration in" / "Management
+        //     Information Systems" — Codex R11 P2). A mid-phrase wrap means
+        //     the next line completes the degree, even when that completion
+        //     is a multi-word Title-Case phrase.
+        // A COMPLETE degree line ("...Computer Science") followed by a
+        // multi-word Title-Case line is still treated as the next school —
+        // that line satisfies neither branch, so "General Assembly" / "HEC
+        // Paris" stay their own entries.
+        const detailLastWord = detail.split(/\s+/).pop()!.toLowerCase();
+        const detailWrapsMidPhrase = WRAP_BREAK_FINAL_WORDS.has(detailLastWord);
         const contIsFragment = !/\s/.test(cont) || /^[a-z]/.test(cont);
         if (
-          contIsFragment &&
+          (contIsFragment || detailWrapsMidPhrase) &&
           i + 1 < lines.length &&
           STANDALONE_EDU_DATES.test(lines[i + 1]!.trim())
         ) {
