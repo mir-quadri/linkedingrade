@@ -88,6 +88,25 @@ describe('sendAuditEmail', () => {
     expect(body.textContent).toContain('Lead with a measurable outcome.');
   });
 
+  // Codex P2 on the Brevo swap: deployments migrated from Resend may
+  // still carry the display-name EMAIL_FROM format. Brevo requires a
+  // bare address in sender.email — the whole string would 400.
+  it('extracts the bare address when EMAIL_FROM uses the legacy display-name format', async () => {
+    process.env.BREVO_API_KEY = 'xkeysib_test';
+    process.env.EMAIL_FROM = 'LinkedInGrade <audit@linkedingrade.com>';
+    fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify({ messageId: 'em_123' }), { status: 201 }));
+    const ok = await sendAuditEmail({
+      email: 'user@example.com',
+      fullName: 'Jane Doe',
+      audit,
+      resultUrl: 'https://linkedingrade.com/audit/result/abc',
+    });
+    expect(ok).toBe(true);
+    const [, init] = fetchSpy.mock.calls[0]!;
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body.sender).toEqual({ email: 'audit@linkedingrade.com', name: 'LinkedInGrade' });
+  });
+
   it('returns false (fail-soft) when the Brevo API responds non-2xx', async () => {
     process.env.BREVO_API_KEY = 'xkeysib_test';
     process.env.EMAIL_FROM = 'audit@linkedingrade.com';

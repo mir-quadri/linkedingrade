@@ -101,7 +101,7 @@ export default function PrivacyPage() {
         </li>
         <li>
           Two third parties receive audit-flow data in production:{' '}
-          <b>Resend</b> (resend.com), which sends the transactional email,
+          <b>Brevo</b> (brevo.com), which sends the transactional email,
           and <b>Vercel KV</b> backed by <b>Upstash</b> (upstash.com), which
           stores the audit record — including the email association — under
           a 90-day expiry. No other third parties are involved.

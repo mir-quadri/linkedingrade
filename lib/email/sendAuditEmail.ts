@@ -19,6 +19,18 @@ interface SendAuditEmailParams {
 const DEFAULT_TIMEOUT_MS = 5_000;
 
 /**
+ * Brevo requires `sender.email` to be a bare address, but deployments
+ * migrated from Resend may still carry the previously documented
+ * display-name format (`LinkedInGrade <audit@linkedingrade.com>`) in
+ * `EMAIL_FROM`. Accept both: extract the address from angle brackets
+ * when present, otherwise use the value as-is.
+ */
+function parseFromAddress(from: string): string {
+  const match = from.match(/<\s*([^<>\s]+@[^<>\s]+)\s*>/);
+  return match ? match[1]! : from.trim();
+}
+
+/**
  * Send the post-audit transactional email via Brevo.
  *
  * Fail-soft contract: when `BREVO_API_KEY` is absent (the most common case
@@ -48,7 +60,7 @@ export async function sendAuditEmail(params: SendAuditEmailParams): Promise<bool
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        sender: { email: from, name: 'LinkedInGrade' },
+        sender: { email: parseFromAddress(from), name: 'LinkedInGrade' },
         to: [{ email: params.email }],
         subject: buildSubject(params.audit),
         htmlContent: buildHtml(params),
