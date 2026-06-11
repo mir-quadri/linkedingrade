@@ -26,7 +26,7 @@ const audit: AuditResult = {
 };
 
 describe('sendAuditEmail', () => {
-  const originalKey = process.env.RESEND_API_KEY;
+  const originalKey = process.env.BREVO_API_KEY;
   const originalFrom = process.env.EMAIL_FROM;
   const fetchSpy = vi.spyOn(globalThis, 'fetch');
 
@@ -34,12 +34,12 @@ describe('sendAuditEmail', () => {
     fetchSpy.mockReset();
   });
   afterEach(() => {
-    process.env.RESEND_API_KEY = originalKey;
+    process.env.BREVO_API_KEY = originalKey;
     process.env.EMAIL_FROM = originalFrom;
   });
 
-  it('returns false and does NOT call fetch when RESEND_API_KEY is missing', async () => {
-    delete process.env.RESEND_API_KEY;
+  it('returns false and does NOT call fetch when BREVO_API_KEY is missing', async () => {
+    delete process.env.BREVO_API_KEY;
     process.env.EMAIL_FROM = 'audit@linkedingrade.com';
     const ok = await sendAuditEmail({
       email: 'user@example.com',
@@ -52,7 +52,7 @@ describe('sendAuditEmail', () => {
   });
 
   it('returns false and does NOT call fetch when EMAIL_FROM is missing', async () => {
-    process.env.RESEND_API_KEY = 'rk_test';
+    process.env.BREVO_API_KEY = 'xkeysib_test';
     delete process.env.EMAIL_FROM;
     const ok = await sendAuditEmail({
       email: 'user@example.com',
@@ -64,10 +64,10 @@ describe('sendAuditEmail', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it('posts to the Resend API and returns true on success', async () => {
-    process.env.RESEND_API_KEY = 'rk_test';
+  it('posts to the Brevo API and returns true on success', async () => {
+    process.env.BREVO_API_KEY = 'xkeysib_test';
     process.env.EMAIL_FROM = 'audit@linkedingrade.com';
-    fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify({ id: 'em_123' }), { status: 200 }));
+    fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify({ messageId: 'em_123' }), { status: 201 }));
     const ok = await sendAuditEmail({
       email: 'user@example.com',
       fullName: 'Jane Doe',
@@ -77,16 +77,38 @@ describe('sendAuditEmail', () => {
     expect(ok).toBe(true);
     expect(fetchSpy).toHaveBeenCalledTimes(1);
     const [url, init] = fetchSpy.mock.calls[0]!;
-    expect(url).toBe('https://api.resend.com/emails');
+    expect(url).toBe('https://api.brevo.com/v3/smtp/email');
+    const headers = (init as RequestInit).headers as Record<string, string>;
+    expect(headers['api-key']).toBe('xkeysib_test');
     const body = JSON.parse((init as RequestInit).body as string);
-    expect(body.to).toEqual(['user@example.com']);
+    expect(body.sender).toEqual({ email: 'audit@linkedingrade.com', name: 'LinkedInGrade' });
+    expect(body.to).toEqual([{ email: 'user@example.com' }]);
     expect(body.subject).toContain('B');
-    expect(body.html).toContain('Lead with a measurable outcome.');
-    expect(body.text).toContain('Lead with a measurable outcome.');
+    expect(body.htmlContent).toContain('Lead with a measurable outcome.');
+    expect(body.textContent).toContain('Lead with a measurable outcome.');
   });
 
-  it('returns false (fail-soft) when the Resend API responds non-2xx', async () => {
-    process.env.RESEND_API_KEY = 'rk_test';
+  // Codex P2 on the Brevo swap: deployments migrated from Resend may
+  // still carry the display-name EMAIL_FROM format. Brevo requires a
+  // bare address in sender.email — the whole string would 400.
+  it('extracts the bare address when EMAIL_FROM uses the legacy display-name format', async () => {
+    process.env.BREVO_API_KEY = 'xkeysib_test';
+    process.env.EMAIL_FROM = 'LinkedInGrade <audit@linkedingrade.com>';
+    fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify({ messageId: 'em_123' }), { status: 201 }));
+    const ok = await sendAuditEmail({
+      email: 'user@example.com',
+      fullName: 'Jane Doe',
+      audit,
+      resultUrl: 'https://linkedingrade.com/audit/result/abc',
+    });
+    expect(ok).toBe(true);
+    const [, init] = fetchSpy.mock.calls[0]!;
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body.sender).toEqual({ email: 'audit@linkedingrade.com', name: 'LinkedInGrade' });
+  });
+
+  it('returns false (fail-soft) when the Brevo API responds non-2xx', async () => {
+    process.env.BREVO_API_KEY = 'xkeysib_test';
     process.env.EMAIL_FROM = 'audit@linkedingrade.com';
     fetchSpy.mockResolvedValueOnce(new Response('{"error":"unauthorized"}', { status: 401 }));
     const ok = await sendAuditEmail({
@@ -99,7 +121,7 @@ describe('sendAuditEmail', () => {
   });
 
   it('returns false (fail-soft) when fetch itself rejects', async () => {
-    process.env.RESEND_API_KEY = 'rk_test';
+    process.env.BREVO_API_KEY = 'xkeysib_test';
     process.env.EMAIL_FROM = 'audit@linkedingrade.com';
     fetchSpy.mockRejectedValueOnce(new Error('network down'));
     const ok = await sendAuditEmail({
@@ -111,15 +133,15 @@ describe('sendAuditEmail', () => {
     expect(ok).toBe(false);
   });
 
-  // Codex P2 regression: a stalled Resend connection used to block the
+  // Codex P2 regression: a stalled Brevo connection used to block the
   // email-gate response until the serverless function timed out, even
   // though the audit was already persisted. The hard timeout caps the
   // gate response time and lets the route return its full payload.
   it('aborts the fetch after the configured timeout and returns false', async () => {
-    process.env.RESEND_API_KEY = 'rk_test';
+    process.env.BREVO_API_KEY = 'xkeysib_test';
     process.env.EMAIL_FROM = 'audit@linkedingrade.com';
     // Honour the AbortSignal: hang until aborted, then reject. This is
-    // what a stuck Resend connection looks like from this side.
+    // what a stuck Brevo connection looks like from this side.
     fetchSpy.mockImplementationOnce((_url: unknown, init?: RequestInit) => {
       return new Promise((_resolve, reject) => {
         const signal = init?.signal;
