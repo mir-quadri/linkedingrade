@@ -70,7 +70,7 @@ describe('POST /api/audit/email — already-gated record is immutable (Codex P2)
   beforeEach(() => {
     delete process.env.KV_REST_API_URL;
     delete process.env.KV_REST_API_TOKEN;
-    delete process.env.RESEND_API_KEY;
+    delete process.env.BREVO_API_KEY;
     delete process.env.EMAIL_FROM;
     __resetAuditStoreForTests();
     fetchSpy.mockReset();

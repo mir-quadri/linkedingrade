@@ -7,9 +7,9 @@ interface SendAuditEmailParams {
   audit: AuditResult;
   resultUrl: string;
   /**
-   * Hard timeout for the Resend request, in milliseconds. The default
-   * keeps the email-gate response time bounded even when Resend is slow
-   * — without this, a stalled Resend connection blocks the gate until
+   * Hard timeout for the Brevo request, in milliseconds. The default
+   * keeps the email-gate response time bounded even when Brevo is slow
+   * — without this, a stalled Brevo connection blocks the gate until
    * the serverless function dies, even though the audit is already
    * persisted (the Codex P2 fix on this file). Tests override.
    */
@@ -19,20 +19,20 @@ interface SendAuditEmailParams {
 const DEFAULT_TIMEOUT_MS = 5_000;
 
 /**
- * Send the post-audit transactional email via Resend.
+ * Send the post-audit transactional email via Brevo.
  *
- * Fail-soft contract: when `RESEND_API_KEY` is absent (the most common case
+ * Fail-soft contract: when `BREVO_API_KEY` is absent (the most common case
  * pre-provisioning) this logs a single warning and returns `false`. The
  * caller MUST still surface the audit on-page when this returns `false` —
  * the email is supplementary, not the primary delivery channel.
  */
 export async function sendAuditEmail(params: SendAuditEmailParams): Promise<boolean> {
-  const apiKey = process.env.RESEND_API_KEY;
+  const apiKey = process.env.BREVO_API_KEY;
   const from = process.env.EMAIL_FROM;
 
   if (!apiKey || !from) {
     console.warn(
-      `[sendAuditEmail] missing ${!apiKey ? 'RESEND_API_KEY' : 'EMAIL_FROM'} — skipping email send for ${params.email}`,
+      `[sendAuditEmail] missing ${!apiKey ? 'BREVO_API_KEY' : 'EMAIL_FROM'} — skipping email send for ${params.email}`,
     );
     return false;
   }
@@ -41,25 +41,25 @@ export async function sendAuditEmail(params: SendAuditEmailParams): Promise<bool
   const timeoutMs = params.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   const timeoutHandle = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const resp = await fetch('https://api.resend.com/emails', {
+    const resp = await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${apiKey}`,
+        'api-key': apiKey,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        from,
-        to: [params.email],
+        sender: { email: from, name: 'LinkedInGrade' },
+        to: [{ email: params.email }],
         subject: buildSubject(params.audit),
-        html: buildHtml(params),
-        text: buildText(params),
+        htmlContent: buildHtml(params),
+        textContent: buildText(params),
       }),
       signal: controller.signal,
     });
     if (!resp.ok) {
       const body = await resp.text().catch(() => '');
       console.error(
-        `[sendAuditEmail] resend error status=${resp.status} body=${body.slice(0, 200)}`,
+        `[sendAuditEmail] brevo error status=${resp.status} body=${body.slice(0, 200)}`,
       );
       return false;
     }
@@ -67,9 +67,9 @@ export async function sendAuditEmail(params: SendAuditEmailParams): Promise<bool
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
     if ((err as { name?: string })?.name === 'AbortError') {
-      console.error(`[sendAuditEmail] resend timed out after ${timeoutMs}ms`);
+      console.error(`[sendAuditEmail] brevo timed out after ${timeoutMs}ms`);
     } else {
-      console.error(`[sendAuditEmail] resend request failed: ${reason}`);
+      console.error(`[sendAuditEmail] brevo request failed: ${reason}`);
     }
     return false;
   } finally {
