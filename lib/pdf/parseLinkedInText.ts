@@ -359,6 +359,20 @@ function findHeadersWithBoundary(
         //     publication metadata is absent; Codex R2 P2). The soft signals
         //     require the anchor because a long SKILL can mimic them (Codex
         //     R8 P2: "Machine Learning in" / "Production").
+        //
+        // DELIBERATE TRADE-OFF (Codex R9 P2, operator-decided): with NO
+        // anchor section present, a real title-only Publications/Patents
+        // block is line-for-line identical to a skill literally named
+        // "Publications"/"Patents" followed by multi-word skills — no local
+        // rule distinguishes them. We keep the anchor gate (this branch) and
+        // accept the residual: a real anchor-less title-only block leaks its
+        // label + first title into skills.topThree only when there are fewer
+        // than three real skills. Chosen because the alternative
+        // (promote without an anchor) re-opens R1/R8 and TRUNCATES real
+        // skills — destructive data loss — whereas this residual is a
+        // cosmetic skills-list leak that never touches name / headline /
+        // education. Revisit if a real anchor-less-Publications profile
+        // surfaces the leak in practice.
         if (GATED_SIDEBAR_HEADERS.has(header)) {
           const anchorSeen = found.some((f) => GATE_ANCHOR_HEADERS.has(f.header));
           const gateOpen =
