@@ -37,6 +37,21 @@ const SECTION_HEADERS = [
   'Honors and awards',
   'Honors & Awards',
   'Honors & awards',
+  // Bare-noun contact-column sections. These render in the SAME left column
+  // as Contact / Top Skills / Languages / Certifications and, when present,
+  // sit BELOW Certifications and ABOVE the identity block. Recognising them
+  // as boundaries is what stops the Certifications / Top-Skills slice from
+  // over-running into the Publications/Patents content and the name+headline
+  // (the "certs contains publication titles + the person's name" bug class).
+  //
+  // The bare nouns collide with sidebar ITEMS literally named the same string
+  // (a Top Skill called "Patents", a certification called "Publications"), so
+  // they are GATED — see GATED_SIDEBAR_HEADERS / hasSectionEvidence below.
+  // Only a label followed by genuine section content (a year line, a patent
+  // number, an Authors/Inventors line, or a mid-phrase wrapped title line) is
+  // promoted to a header; a lone list item of the same text is not.
+  'Publications',
+  'Patents',
   'Summary',
   'Experience',
   'Education',
@@ -56,6 +71,49 @@ const SIDEBAR_HEADERS: ReadonlySet<SectionHeader> = new Set([
   // Bare `Publications` / `Publication` / `Patents` / `Patent` removed
   // — see SECTION_HEADERS comment. Honors-Awards compound variants
   // stay; they're unambiguous.
+  'Honors-Awards',
+  'Honors and Awards',
+  'Honors and awards',
+  'Honors & Awards',
+  'Honors & awards',
+  // Bare-noun sidebar sections (gated — see GATED_SIDEBAR_HEADERS). When a
+  // real Publications / Patents block sits below Certifications, IT becomes
+  // the trailing sidebar header before the identity block, so the cert slice
+  // (and Top Skills slice) stop cleanly at it instead of swallowing the
+  // publication titles and the name.
+  'Publications',
+  'Patents',
+]);
+
+/**
+ * Sidebar headers whose label is also a plausible single sidebar ITEM
+ * ("Patents" as a Top Skill, "Publications" as a certification). Matching one
+ * of these requires positive evidence that it heads a real section — see
+ * `hasSectionEvidence`. The compound Honors-Awards variants are NOT gated:
+ * nobody names a skill "Honors & Awards", so they stay unambiguous.
+ */
+const GATED_SIDEBAR_HEADERS: ReadonlySet<SectionHeader> = new Set([
+  'Publications',
+  'Patents',
+]);
+
+/**
+ * Headers whose presence EARLIER in the order-aware scan anchors a gated
+ * bare-noun label to the lower contact column. The realistic label collision
+ * — a Top Skill literally named "Patents" — sits in the Top Skills block,
+ * which renders ABOVE Languages / Certifications / Honors in every LinkedIn
+ * export. Once one of these anchors has been matched, the scan cursor is
+ * already past the skills region, so a later "Publications" / "Patents" line
+ * with title-shaped content below it is overwhelmingly a real section even
+ * without year / patent-number / author metadata (Codex R2 P2 on this PR:
+ * title-only Publications blocks — publication metadata beyond the title is
+ * optional on LinkedIn). The residual false positive — a CERTIFICATION
+ * literally named "Publications"/"Patents" followed by multi-word cert
+ * titles — is accepted as vanishingly rare.
+ */
+const GATE_ANCHOR_HEADERS: ReadonlySet<SectionHeader> = new Set([
+  'Languages',
+  'Certifications',
   'Honors-Awards',
   'Honors and Awards',
   'Honors and awards',
@@ -141,6 +199,129 @@ function normalizeLines(text: string): NormalizedLines {
   return { lines, isBlankAbove };
 }
 
+/** A line that is nothing but a 4-digit calendar year (publication / patent /
+ * award year). The single strongest signal that the lines below a bare-noun
+ * label are real section content rather than the label being a stray list
+ * item of the same name. */
+const STANDALONE_YEAR_LINE = /^(?:19|20)\d{2}$/;
+
+/**
+ * Final tokens that signal a MID-PHRASE line wrap. Publication / patent
+ * titles are long enough that the PDF column hard-wraps them, and the wrap
+ * point routinely lands after a preposition / article / conjunction
+ * ("Navigating Data Privacy in" / "How To Balance Innovation With"). A
+ * complete sidebar item — a skill or certification NAME — is a finished noun
+ * phrase and essentially never ends on one of these words, which is what
+ * separates real wrapped-title section content from a list of multi-word
+ * skills (Codex R1 P2 on this PR: `Patents` / `Intellectual Property
+ * Strategy` / `Technology Transfer Negotiations` must NOT count as
+ * evidence). Stored lowercase for case-insensitive comparison ("With" at a
+ * Title-Case wrap point still matches).
+ */
+const WRAP_BREAK_FINAL_WORDS = new Set([
+  'a', 'an', 'and', 'at', 'by', 'for', 'from', 'in', 'into', 'of', 'on',
+  'or', 'the', 'to', 'with', 'via', 'over', 'under', 'across', 'through',
+  'between', 'during', 'within', 'without', 'onto', 'toward', 'towards',
+  '&', '+',
+]);
+
+/** All recognised section-header labels, for fast membership tests. */
+const SECTION_HEADER_LABELS: ReadonlySet<string> = new Set(SECTION_HEADERS);
+
+/**
+ * HARD evidence that the block below `labelIdx` is a real Publications /
+ * Patents / Honors section — signals that essentially never appear inside a
+ * Top Skills / Certifications list, so they promote a gated bare-noun label
+ * WITHOUT needing an anchor header:
+ *   - a standalone year line ("2023") — every publication/patent/award has one;
+ *   - a patent-number / "Patent ..." line with digits;
+ *   - an "Authors:" / "Co-Inventors" style attribution line.
+ *
+ * The scan stops only at the NEXT SECTION HEADER (Summary / Experience /
+ * Education or another sidebar header) — that boundary already prevents the
+ * window from reaching summary / main-section prose (Codex R7 P2). Unlike the
+ * soft scan it does NOT stop at a name-shaped line: a hard signal (standalone
+ * year, patent number, authors line) can never occur inside a name / headline
+ * / location, so a real block that OPENS with a short Title-Case title which
+ * happens to pass `looksLikeName` ("Publications" / "Data Privacy" / "2023")
+ * must still be allowed to reach the year/patent/author line below it (Codex
+ * R10 P2).
+ */
+function hasHardSectionEvidence(lines: string[], labelIdx: number): boolean {
+  const end = Math.min(lines.length, labelIdx + 1 + 8);
+  for (let k = labelIdx + 1; k < end; k++) {
+    const t = lines[k]!.trim();
+    if (!t) continue;
+    if (SECTION_HEADER_LABELS.has(t)) return false;
+    if (STANDALONE_YEAR_LINE.test(t)) return true;
+    if (/patent/i.test(t) && /\d/.test(t)) return true;
+    if (/^(?:co-?)?(?:authors?|inventors?)\b/i.test(t)) return true;
+  }
+  return false;
+}
+
+/**
+ * SOFT evidence: a 3+ word line that breaks MID-PHRASE (final token is a
+ * preposition / article / conjunction — see WRAP_BREAK_FINAL_WORDS), the
+ * signature of a long wrapped publication/patent title. Complete skill/cert
+ * names never end on those tokens, but a long SKILL can ("Machine Learning
+ * in" / "Production"), so this signal is ambiguous on its own and callers
+ * gate it behind an anchor header (Codex R8 P2: without that, a no-anchor
+ * Top Skill named "Publications" followed by a stop-word-wrapping skill
+ * would be promoted, truncating Top Skills). Same sidebar-block stop
+ * boundary as the hard scan.
+ */
+function hasWrappedTitleEvidence(lines: string[], labelIdx: number): boolean {
+  const end = Math.min(lines.length, labelIdx + 1 + 8);
+  for (let k = labelIdx + 1; k < end; k++) {
+    const t = lines[k]!.trim();
+    if (!t) continue;
+    if (SECTION_HEADER_LABELS.has(t) || looksLikeName(t)) return false;
+    const words = t.split(/\s+/);
+    if (
+      words.length >= 3 &&
+      WRAP_BREAK_FINAL_WORDS.has(words[words.length - 1]!.toLowerCase())
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * Weaker, position-dependent evidence for a gated bare-noun label: is the
+ * line directly below it title-shaped (3+ words, no sentence-ending
+ * punctuation, not a location, and NOT name-shaped)? On its own this would
+ * re-admit the "multi-word skill names below a skill named Patents" false
+ * positive (Codex R1 P2), so callers only consult it once a
+ * GATE_ANCHOR_HEADERS header has already been matched — i.e. the scan is
+ * provably past the Top Skills region where that collision lives. Together
+ * the two checks admit real title-only Publications/Patents blocks (Codex
+ * R2 P2) without re-opening the skills-truncation hole.
+ *
+ * The `looksLikeName` rejection is what stops the scan at IDENTITY content
+ * (Codex R3 P2): for a certification literally named "Publications" sitting
+ * at the end of the cert list, the line below the label is the person's
+ * name — that line must not open the gate, or the phantom header would
+ * truncate the certifications slice. Only the line immediately below is
+ * consulted (normalizeLines already dropped blank lines), so headline /
+ * summary content further down can never be reached. Residual accepted
+ * false positive: a certification named "Publications"/"Patents" MID-list,
+ * where the line below is another multi-word cert title — indistinguishable
+ * from a real title-only section without a content classifier, and
+ * vanishingly rare.
+ */
+function hasTitleShapedContent(lines: string[], labelIdx: number): boolean {
+  if (labelIdx + 1 >= lines.length) return false;
+  const t = lines[labelIdx + 1]!.trim();
+  return (
+    t.split(/\s+/).length >= 3 &&
+    !/[.?!]$/.test(t) &&
+    !looksLikeLocationLine(t) &&
+    !looksLikeName(t)
+  );
+}
+
 /**
  * Match section headers in canonical LinkedIn-PDF order. For each header in
  * `SECTION_HEADERS`, take the first occurrence that appears *after* the
@@ -169,6 +350,42 @@ function findHeadersWithBoundary(
       // / etc. from being recorded as the real header — adjacent list items
       // don't carry the blank-above marker that real section headers do.
       if (lines[i]!.trim() === header && (!isBlankAbove || isBlankAbove[i])) {
+        // Bare-noun sidebar labels ("Publications", "Patents") only count as
+        // a header when real section content follows — otherwise a sidebar
+        // item literally named that string would be promoted, truncating its
+        // parent section. Two tiers clear the gate:
+        //   - HARD evidence below the label (year / patent-number / authors
+        //     line) — unambiguous section content, promotes anchor-free; or
+        //   - an anchor header (Languages / Certifications / Honors) already
+        //     matched — the cursor is past the Top Skills collision zone —
+        //     PLUS a soft signal: a mid-phrase wrapped title
+        //     (hasWrappedTitleEvidence) or title-shaped content immediately
+        //     below (hasTitleShapedContent, covers title-only blocks whose
+        //     publication metadata is absent; Codex R2 P2). The soft signals
+        //     require the anchor because a long SKILL can mimic them (Codex
+        //     R8 P2: "Machine Learning in" / "Production").
+        //
+        // DELIBERATE TRADE-OFF (Codex R9 P2, operator-decided): with NO
+        // anchor section present, a real title-only Publications/Patents
+        // block is line-for-line identical to a skill literally named
+        // "Publications"/"Patents" followed by multi-word skills — no local
+        // rule distinguishes them. We keep the anchor gate (this branch) and
+        // accept the residual: a real anchor-less title-only block leaks its
+        // label + first title into skills.topThree only when there are fewer
+        // than three real skills. Chosen because the alternative
+        // (promote without an anchor) re-opens R1/R8 and TRUNCATES real
+        // skills — destructive data loss — whereas this residual is a
+        // cosmetic skills-list leak that never touches name / headline /
+        // education. Revisit if a real anchor-less-Publications profile
+        // surfaces the leak in practice.
+        if (GATED_SIDEBAR_HEADERS.has(header)) {
+          const anchorSeen = found.some((f) => GATE_ANCHOR_HEADERS.has(f.header));
+          const gateOpen =
+            hasHardSectionEvidence(lines, i) ||
+            (anchorSeen &&
+              (hasWrappedTitleEvidence(lines, i) || hasTitleShapedContent(lines, i)));
+          if (!gateOpen) continue;
+        }
         found.push({ header, line: i });
         cursor = i + 1;
         break;
@@ -471,6 +688,31 @@ function obviouslyNotAName(line: string): boolean {
 }
 
 /**
+ * Minimum length for a SINGLE-pipe line to be treated as a headline L1 that
+ * wrapped (vs. a short stray-pipe cert title). A headline only spills its
+ * tail onto a second physical line when the text up to the pipe nearly fills
+ * the PDF column — observed wrap points in real exports run 50–66 chars, so
+ * 40 sits safely below the shortest real wrap and well above stray-pipe
+ * certs like "Some Program |" (14) / "Strategic Advisor |" (19).
+ */
+const WRAP_L1_MIN_LENGTH = 40;
+
+/**
+ * Is this pipe-separated line an acronym-dominant PRODUCT list ("AWS |
+ * Azure | GCP |") rather than a headline of Title-Case role/domain labels
+ * ("Speaker | Investor | Author |")? Majority rule over the segments: a
+ * lone acronym in an otherwise wordy headline ("CEO | Investor | Speaker |")
+ * doesn't flip it. Used to withhold the wrapped-headline continuation skip
+ * for pipe-rich trailing certs in no-headline profiles (Codex R4/R5 P2).
+ */
+function isAcronymPipeList(line: string): boolean {
+  const segments = line.split('|').map((s) => s.trim()).filter(Boolean);
+  if (segments.length < 2) return false;
+  const acronyms = segments.filter((s) => /^[A-Z0-9.&-]{2,6}$/.test(s)).length;
+  return acronyms * 2 > segments.length;
+}
+
+/**
  * Identity (NAME / HEADLINE / LOCATION) sits between the last sidebar
  * section and the first main section. Three shapes have to be handled:
  *
@@ -534,13 +776,73 @@ function extractIdentity(
   // "automation", "learning", etc.), which makes `looksLikeName` correctly
   // reject the wrap target. The walk-backwards then naturally finds the
   // real name above the headline.
+  //
+  // Headline-continuation guard (the "never derive the name from a headline
+  // segment" invariant): a LinkedIn headline that wraps across physical lines
+  // splits on its `|` separator, so the wrap-target line below sits directly
+  // under a line that ENDS WITH `|`. Such a continuation line is part of the
+  // headline, never the name — even when it happens to read like a 2-word
+  // Title-Case name ("Digital Transformation", "Quiet Confidence"). We skip
+  // those candidates and keep walking up to the real name.
+  //
+  // The skip is deliberately constrained to the wrapped-headline SHAPE
+  // (Codex R1 P2 on this PR — an unconstrained "prev ends with |" check
+  // skipped real names sitting below pipe-ended cert titles):
+  //   - position: only the line at `slice.length - 2` can be the final wrap
+  //     target (the location is always the last line; anything higher that
+  //     reads like a name is identity or sidebar content, not a wrap tail);
+  //   - wrap plausibility: the line above must look like a headline L1 that
+  //     actually wrapped. Two sufficient shapes:
+  //       (a) PIPE-RICH — ≥ 2 pipes ("Founder | Speaker | Investor |
+  //           Author |"). No certification title carries two internal pipes,
+  //           so this is unambiguously a headline.
+  //       (b) LONG single-pipe — exactly one pipe but the line is long enough
+  //           to have filled the PDF column before wrapping (observed
+  //           headline wrap points run 50–66 chars; see
+  //           WRAP_L1_MIN_LENGTH). This covers single-pipe headlines whose
+  //           tail is NOT in the disqualifier vocabulary ("Helping founders
+  //           build calm companies |" / "Quiet Confidence" — Codex R6 P2).
+  //     A STRAY-pipe cert title ("Some Program |", 14 chars) is short and
+  //     single-pipe, so it satisfies neither shape and does not trigger the
+  //     skip — the real name below it is preserved (Codex R1 P2). A
+  //     single-pipe headline short enough to dodge (b) (e.g. "Founder |
+  //     Quiet Confidence") would not wrap at all — the PDF keeps it on one
+  //     line — so the two-physical-line shape can't arise for it.
+  //   - segment shape: the line must NOT be an acronym-dominant product list.
+  //     A real headline L1 pipes Title-Case words ("Executive Leader |
+  //     Motorsports | …" — Codex R5 P2: requiring title VOCABULARY here was
+  //     too narrow, since common headline labels fall outside any enumerable
+  //     word list). A trailing CERT that happens to be pipe-rich is typically
+  //     a product/technology list whose segments are short all-caps acronyms
+  //     ("AWS | Azure | GCP |" — Codex R4 P2); when a majority of segments
+  //     are acronyms the skip is withheld so a no-headline profile's real
+  //     name below such a cert isn't traded for an earlier name-shaped cert.
+  // Residual: a pipe-rich / long cert of ordinary Title-Case words directly
+  // above the name in a no-headline profile with a name-shaped cert higher up
+  // — line-for-line identical to a real wrapped headline, so no structural
+  // rule can split the pair; accepted.
+  //
+  // If EVERY name-shaped candidate turns out to be a continuation (degenerate
+  // slice), we fall back to the closest-to-bottom one so a name is still
+  // surfaced rather than nulled.
   let nameIdx = -1;
+  let continuationFallback = -1;
   for (let k = slice.length - 2; k >= 0; k--) {
-    if (looksLikeName(slice[k]!)) {
-      nameIdx = k;
-      break;
+    if (!looksLikeName(slice[k]!)) continue;
+    const prev = k > 0 ? slice[k - 1]! : '';
+    const pipeCount = (prev.match(/\|/g) ?? []).length;
+    const looksLikeWrappedL1 =
+      /\|\s*$/.test(prev) &&
+      (pipeCount >= 2 || prev.length >= WRAP_L1_MIN_LENGTH) &&
+      !isAcronymPipeList(prev);
+    if (k === slice.length - 2 && looksLikeWrappedL1) {
+      if (continuationFallback === -1) continuationFallback = k;
+      continue;
     }
+    nameIdx = k;
+    break;
   }
+  if (nameIdx === -1) nameIdx = continuationFallback;
   if (nameIdx !== -1) {
     const name = slice[nameIdx]!;
     const sidebarItems = slice.slice(0, nameIdx);
@@ -954,18 +1256,66 @@ function toExperienceEntry(raw: RawExperience): ExperienceEntry {
 const STANDALONE_EDU_DATES =
   /^(?:(?:[A-Za-z]{3,9}\s+)?(?:19|20)\d{2})\s*[-–—]\s*(?:(?:[A-Za-z]{3,9}\s+)?(?:19|20)\d{2}|Present|Current)$/i;
 
+/** Parenthesised tail on a degree line — "Degree (Dates)". The captured
+ * groups are the degree text and the in-paren text. */
+const PAREN_TAIL = /^(.*?)\s*\(([^)]+)\)\s*$/;
+
+/** Does the parenthesised tail of a degree line actually hold a date range
+ * ("(2001 - 2003)", "(December 2022 - March 2023)") rather than some other
+ * parenthetical? Used to decide whether a wrapped degree's continuation line
+ * really terminates the entry. */
+function parenHoldsDates(detail: string): boolean {
+  const m = detail.match(PAREN_TAIL);
+  return !!m && STANDALONE_EDU_DATES.test(m[2]!.trim());
+}
+
+/** Institution words that mark a line as a SCHOOL name. Used to stop the
+ * wrapped-degree fold from consuming the NEXT entry's school line (Codex R2
+ * P2 on this PR: `First University / B.S., Biology / Second University /
+ * 2015 - 2017` must keep "Second University" as its own entry). */
+const SCHOOL_NAME_KEYWORD =
+  /\b(?:university|universit\w*|universidad|college|school|schule|institute|institut\w*|academy|acad[ée]mie|polytechnic|politecnico|conservatory|seminary|lyc[ée]e)\b/i;
+
+/** Is this line plausibly the START of a new education entry (a school name)
+ * rather than the wrapped tail of the previous entry's degree? Catches both
+ * keyword-bearing names ("Second University") and acronym schools ("MIT",
+ * "NYU", "INSEAD") — a degree wrap tail is a phrase fragment, not a lone
+ * all-caps token. */
+function looksLikeSchoolLine(line: string): boolean {
+  const t = line.trim();
+  if (SCHOOL_NAME_KEYWORD.test(t)) return true;
+  if (/^[A-Z][A-Z.&'’-]+$/.test(t)) return true;
+  return false;
+}
+
+/** A degree line only wraps when it ran out of column width — short degree
+ * lines ("B.S., Biology") never produce a continuation, so a multi-word line
+ * after one is the next entry's school, not a wrap tail. The threshold sits
+ * well below the observed wrap points in production exports ("Master of
+ * Business Administration - Business" = 44 chars, "Bachelor of Science in
+ * Software" = 31) and well above real unwrapped short degrees. */
+const MIN_WRAPPED_DEGREE_LENGTH = 25;
+
 /**
- * Education entries come in two shapes:
- *   - Two lines: `School` then `Degree (Dates)` — dates parenthesised into
- *     the degree line.
- *   - Three lines: `School` then `Degree` then a standalone date-range
- *     line.
+ * Education entries come in these shapes, and any of the three fields can
+ * wrap onto an extra physical line in the PDF export:
+ *   - Two lines:   `School` / `Degree (Dates)` — dates parenthesised in.
+ *   - Three lines: `School` / `Degree` / standalone date-range line.
+ *   - Wrapped:     `School` / `Degree-part-1` / `Degree-part-2 (Dates)`, or
+ *                  `School` / `Degree-part-1` / `Degree-part-2` / date-range.
  *
- * The fixed `i += 2` walk treated the standalone date line as the next
- * school, corrupting every subsequent entry (the Codex P2 we're closing).
- * The loop now looks ahead — when the line after the degree matches a
- * date-range pattern, consume it as this entry's dates and skip it before
- * moving on.
+ * The earlier fixed two-line walk shifted every field by one as soon as a
+ * degree wrapped: the wrap continuation ("Management · (2001 - 2003)") was
+ * read as the NEXT school, and a standalone date below a wrapped degree
+ * ("Software Engineering" / "2018 - 2022") landed in the wrong entry. The
+ * loop now folds a single wrap-continuation line into the degree before
+ * consuming the dates, so fields never cross an entry boundary.
+ *
+ * A wrap continuation is only folded when it is anchored by a date terminator
+ * (parenthesised on the continuation, or a standalone date-range line right
+ * after it). Without that anchor the second line is treated as the start of
+ * the next entry — which preserves the plain `School` / `Degree` no-date
+ * shape that real exports also use.
  */
 function parseEducation(lines: string[]): EducationItem[] {
   const items: EducationItem[] = [];
@@ -980,18 +1330,86 @@ function parseEducation(lines: string[]): EducationItem[] {
     }
     const detail = lines[i]!.trim();
     i += 1;
-    const parenMatch = detail.match(/^(.*?)\s*\(([^)]+)\)\s*$/);
-    if (parenMatch) {
-      const degree = parenMatch[1]!.trim() || null;
-      const dates = parenMatch[2]!.trim();
-      items.push({ school, degree, dates });
+
+    // Degree-less entry: the line after the school is already the date range
+    // ("Second University" / "2015 - 2017"). Without this, the dates would be
+    // stored as the degree.
+    if (STANDALONE_EDU_DATES.test(detail)) {
+      items.push({ school, degree: null, dates: detail });
       continue;
     }
+
+    // Shape 1: dates parenthesised directly into the degree line.
+    const parenMatch = detail.match(PAREN_TAIL);
+    if (parenMatch) {
+      items.push({
+        school,
+        degree: parenMatch[1]!.trim() || null,
+        dates: parenMatch[2]!.trim(),
+      });
+      continue;
+    }
+
+    // Shape 2: degree on its own line, dates on the next (standalone) line.
     if (i < lines.length && STANDALONE_EDU_DATES.test(lines[i]!.trim())) {
       items.push({ school, degree: detail || null, dates: lines[i]!.trim() });
       i += 1;
       continue;
     }
+
+    // Wrapped degree: the line after `detail` is a continuation of the degree
+    // (not the next school) when ALL of these hold:
+    //   - `detail` is long enough to have actually wrapped (a short degree
+    //     line never produces a continuation — see MIN_WRAPPED_DEGREE_LENGTH);
+    //   - the candidate line doesn't read like a school name (Codex R2 P2:
+    //     an undated entry followed by a school-only entry with a standalone
+    //     date must not fold the second school into the first degree);
+    //   - the fold is anchored by a date terminator (parenthesised on the
+    //     continuation, or a standalone date-range line right after it).
+    if (i < lines.length && detail.length >= MIN_WRAPPED_DEGREE_LENGTH) {
+      const cont = lines[i]!.trim();
+      if (!looksLikeSchoolLine(cont)) {
+        // Wrap shape A: the continuation line itself ends with "(Dates)".
+        if (parenHoldsDates(cont)) {
+          const contMatch = cont.match(PAREN_TAIL)!;
+          const mergedDegree = `${detail} ${contMatch[1]!.trim()}`.replace(/\s+/g, ' ').trim();
+          items.push({ school, degree: mergedDegree || null, dates: contMatch[2]!.trim() });
+          i += 1;
+          continue;
+        }
+        // Wrap shape B: the continuation line is followed by a standalone
+        // date. Without the parenthesised anchor of shape A, this shape is
+        // ambiguous against `School / long-undated-degree / School2 / Dates2`
+        // for institution names the school-name guard can't recognise
+        // ("General Assembly", "HEC Paris" — Codex R3 P2). Fold the
+        // continuation as a degree tail when EITHER:
+        //   - it's a phrase FRAGMENT — a single word ("Engineering", the
+        //     production Sidra case) or a lowercase run-on ("and Data"); OR
+        //   - the degree line itself ends MID-PHRASE on a stop word
+        //     ("Bachelor of Business Administration in" / "Management
+        //     Information Systems" — Codex R11 P2). A mid-phrase wrap means
+        //     the next line completes the degree, even when that completion
+        //     is a multi-word Title-Case phrase.
+        // A COMPLETE degree line ("...Computer Science") followed by a
+        // multi-word Title-Case line is still treated as the next school —
+        // that line satisfies neither branch, so "General Assembly" / "HEC
+        // Paris" stay their own entries.
+        const detailLastWord = detail.split(/\s+/).pop()!.toLowerCase();
+        const detailWrapsMidPhrase = WRAP_BREAK_FINAL_WORDS.has(detailLastWord);
+        const contIsFragment = !/\s/.test(cont) || /^[a-z]/.test(cont);
+        if (
+          (contIsFragment || detailWrapsMidPhrase) &&
+          i + 1 < lines.length &&
+          STANDALONE_EDU_DATES.test(lines[i + 1]!.trim())
+        ) {
+          const mergedDegree = `${detail} ${cont}`.replace(/\s+/g, ' ').trim();
+          items.push({ school, degree: mergedDegree || null, dates: lines[i + 1]!.trim() });
+          i += 2;
+          continue;
+        }
+      }
+    }
+
     items.push({ school, degree: detail || null, dates: null });
   }
   return items;
