@@ -57,7 +57,7 @@ export function clipPostEducationText(raw: string): string {
   const lines = raw.split(/\r?\n/);
 
   // Canonical LinkedIn PDF order: Summary → Experience → Education →
-  // post-Education siblings. Search Education only after Education (or
+  // post-Education siblings. Search Education only after Experience (or
   // after Summary if Experience is missing) so a sidebar item named
   // "Education" cannot become the clip origin.
   const summaryIdx = indexOfExact(lines, 'Summary', 0);
