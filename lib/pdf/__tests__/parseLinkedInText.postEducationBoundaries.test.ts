@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { parseLinkedInText } from '../parseLinkedInText';
+import { parseLinkedInText as parseInner } from '../parseLinkedInText';
+import { clipPostEducationText } from '../postEducationBoundaries';
+
+function parseLinkedInText(raw: string) {
+  return parseInner(clipPostEducationText(raw));
+}
 
 /**
  * Regression fixtures for post-Education section-boundary overrun.
