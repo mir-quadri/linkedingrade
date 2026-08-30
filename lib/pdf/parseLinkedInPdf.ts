@@ -10,6 +10,7 @@ import { ensurePdfjsWorkerHandler, pdfjsWorkerState } from './disablePdfjsWorker
 
 import type { ProfileData } from '@/lib/engine/types';
 import { parseLinkedInText, type ParseLinkedInOptions } from './parseLinkedInText';
+import { clipPostEducationText } from './postEducationBoundaries';
 
 /**
  * Extract text from a LinkedIn "Save to PDF" export and parse it into a
@@ -61,7 +62,7 @@ export async function parseLinkedInPdf(
   const parser = new PDFParse({ data });
   try {
     const result = await parser.getText();
-    return parseLinkedInText(result.text, options);
+    return parseLinkedInText(clipPostEducationText(result.text), options);
   } finally {
     await parser.destroy().catch(() => {
       // pdfjs occasionally rejects destroy() on transient state; ignore
