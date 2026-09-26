@@ -1,6 +1,13 @@
 import Link from "next/link";
 
-import { WAITLIST_CTA, EXTENSION_COMING_SOON, AUDIT_CTA } from "@/lib/copy";
+import {
+  WAITLIST_CTA,
+  WAITLIST_CTA_SHORT,
+  EXTENSION_COMING_SOON,
+  AUDIT_CTA,
+  AUDIT_CTA_SHORT,
+  AUDIT_CTA_RUN,
+} from "@/lib/copy";
 
 import AuditPreviewCard from "./components/AuditPreviewCard";
 import AuditReportCard from "./components/AuditReportCard";
@@ -51,32 +58,32 @@ function Hero() {
               Brutal where it matters, specific everywhere.
             </p>
 
-            <WaitlistForm
-              buttonLabel={WAITLIST_CTA}
-              fineprint={[
-                "We email you at launch",
-                "Chrome & Edge",
-                "SOC 2 in progress",
-              ]}
-            />
+            <div
+              style={{
+                display: "flex",
+                gap: 10,
+                flexWrap: "wrap",
+                alignItems: "center",
+              }}
+            >
+              <Link href="/audit" className="btn btn-primary btn-lg">
+                {AUDIT_CTA_SHORT}
+              </Link>
+              <Link href="#cta" className="btn btn-ghost btn-lg">
+                {WAITLIST_CTA_SHORT}
+              </Link>
+            </div>
 
             <p
               style={{
-                margin: "10px 0 0",
+                margin: "12px 0 0",
                 fontSize: 13.5,
                 color: "var(--text-2)",
+                maxWidth: "46ch",
               }}
             >
-              Want a grade today?{" "}
-              <Link
-                href="/audit"
-                style={{
-                  color: "var(--text)",
-                  borderBottom: "1px solid var(--border-2)",
-                }}
-              >
-                {AUDIT_CTA}
-              </Link>
+              Live today: drop your LinkedIn PDF for an honest grade on the 4
+              sections recruiters scan first. Extension waitlist emails at launch.
             </p>
 
             <div className="proof-strip">
@@ -96,10 +103,6 @@ function Hero() {
                 </span>
                 <span className="lbl">Letter grade</span>
               </div>
-              <div className="proof-cell">
-                <span className="num">Beta</span>
-                <span className="lbl">Q2 · 2026</span>
-              </div>
             </div>
           </div>
 
@@ -117,13 +120,14 @@ function SampleAudit() {
         <div className="section-head">
           <div className="section-num">§ 01 — SAMPLE</div>
           <h2>
-            One real audit, redacted. The kind you&apos;d{" "}
-            <em>actually pay for.</em>
+            One extension-sample audit, redacted. The depth the full product
+            is built to deliver.
           </h2>
           <p className="deck">
-            No screenshots of dashboards we wish existed. This is a sample
-            report on a working VP profile, with the name and employer scrubbed.
-            The scoring rubric is the same one we&apos;d run on yours.
+            No screenshots of dashboards we wish existed. This is an aspirational
+            sample of the Chrome extension report on a working VP profile, with
+            the name and employer scrubbed. The live free audit grades 4 sections
+            today; Skills, Activity, and Photo land with the extension.
           </p>
         </div>
 
@@ -149,11 +153,11 @@ function SampleAudit() {
                 maxWidth: "46ch",
               }}
             >
-              Six headline grades. Each composed from a sub-rubric, calibrated
-              to the frameworks senior recruiters and hiring managers use. Each
-              cross-checked against the population of profiles at the same
-              seniority, function, and industry — so a B+ for a senior VP means
-              something different than a B+ for a graduate analyst.
+              Six headline grades in the extension sample — including Skills,
+              Activity, and Photo. Each composed from a sub-rubric, calibrated
+              to the frameworks senior recruiters and hiring managers use. The
+              free PDF audit ships four of those sections today; the rest come
+              with the extension.
             </p>
             <div
               style={{
@@ -198,7 +202,7 @@ function SampleAudit() {
             </p>
             <div style={{ display: "flex", gap: 10, marginTop: 8, flexWrap: "wrap" }}>
               <Link href="/audit" className="btn btn-primary">
-                Run yours
+                {AUDIT_CTA_RUN}
               </Link>
               <Link href="#pricing" className="btn btn-ghost">
                 See pricing →
@@ -705,7 +709,7 @@ function Pricing() {
     { label: (<><b>500</b> audits / month</>) },
     { label: (<><b>API</b> & ATS / CRM webhooks</>) },
     { label: "Seats · 5 included" },
-    { label: "SSO · SOC 2 (in progress)" },
+    { label: "SSO" },
     { label: "Slack & CSM support" },
   ];
 
@@ -744,7 +748,8 @@ function Pricing() {
             per="/ month"
             blurb="25 audits per month for one person. The job-search and self-improvement plan."
             features={pro}
-            ctaLabel="Start Pro"
+            ctaLabel={WAITLIST_CTA_SHORT}
+            ctaHref="#cta"
           />
           <PricingTier
             tier="Tier 02 · Coach"
@@ -753,7 +758,8 @@ function Pricing() {
             per="/ month"
             blurb="For solo coaches and small career-services teams. White-label, batch-ready."
             features={coach}
-            ctaLabel="Start Coach"
+            ctaLabel={WAITLIST_CTA_SHORT}
+            ctaHref="#cta"
           />
           <PricingTier
             tier="Tier 03 · Team"
@@ -763,6 +769,7 @@ function Pricing() {
             blurb="Sourcers, recruiters, BD. Volume, API, and audit-trail portability."
             features={team}
             ctaLabel="Talk to sales"
+            ctaHref="/contact"
           />
         </div>
       </div>

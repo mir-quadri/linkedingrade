@@ -1,3 +1,5 @@
+import { EXTENSION_SAMPLE_BADGE } from "@/lib/copy";
+
 type Row = {
   k: string;
   pct: number;
@@ -69,11 +71,14 @@ export default function AuditPreviewCard() {
           style={{
             fontSize: 11,
             letterSpacing: "0.08em",
-            color: "var(--text-3)",
+            color: "var(--accent)",
             textTransform: "uppercase",
+            padding: "4px 8px",
+            border: "1px solid color-mix(in oklab, var(--accent) 45%, transparent)",
+            borderRadius: "var(--r-sm)",
           }}
         >
-          SAMPLE AUDIT
+          {EXTENSION_SAMPLE_BADGE}
         </span>
         <span
           className="font-mono"
@@ -226,7 +231,7 @@ export default function AuditPreviewCard() {
             color: "var(--text-3)",
           }}
         >
-          SAMPLE · NOT REAL DATA
+          EXTENSION SAMPLE · COMING SOON
         </span>
       </div>
     </aside>
