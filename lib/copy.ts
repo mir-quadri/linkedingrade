@@ -10,9 +10,9 @@
 export const WAITLIST_CTA = 'Join the extension waitlist →';
 
 /**
- * Compact waitlist label for tight spaces (e.g. the nav bar). The full
- * WAITLIST_CTA overflows the non-wrapping mobile header on narrow screens, so
- * the nav uses this shorter form while the full copy stays everywhere else.
+ * Compact waitlist label for tight spaces (e.g. secondary hero / pricing).
+ * The full WAITLIST_CTA overflows the non-wrapping mobile header on narrow
+ * screens, so compact surfaces use this shorter form.
  */
 export const WAITLIST_CTA_SHORT = 'Join waitlist';
 
@@ -24,7 +24,24 @@ export const EXTENSION_COMING_SOON =
 
 /**
  * Label for the CTA that points at the live PDF audit (`/audit`). This is the
- * shippable product today, so the homepage links here for anyone who wants a
- * grade now rather than only joining the extension waitlist.
+ * shippable product today, so the homepage + nav lead here.
  */
 export const AUDIT_CTA = 'Audit your profile now →';
+
+/**
+ * Compact primary audit CTA for nav and hero (no trailing arrow — fits the
+ * primary button chrome).
+ */
+export const AUDIT_CTA_SHORT = 'Audit your profile';
+
+/**
+ * Short primary action used on sample / pricing surfaces that already imply
+ * the audit destination.
+ */
+export const AUDIT_CTA_RUN = 'Run yours';
+
+/**
+ * Badge on aspirational sample cards that show Skills/Activity/Photo grades
+ * the live free PDF audit does not yet deliver.
+ */
+export const EXTENSION_SAMPLE_BADGE = 'Extension sample · coming soon';

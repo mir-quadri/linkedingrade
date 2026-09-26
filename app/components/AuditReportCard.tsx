@@ -1,3 +1,5 @@
+import { EXTENSION_SAMPLE_BADGE } from "@/lib/copy";
+
 type Row = {
   t: string;
   d: string;
@@ -74,7 +76,9 @@ export default function AuditReportCard() {
             color: "var(--text-3)",
           }}
         >
-          <b style={{ color: "var(--text)", fontWeight: 500 }}>SAMPLE AUDIT</b>{" "}
+          <b style={{ color: "var(--accent)", fontWeight: 500 }}>
+            {EXTENSION_SAMPLE_BADGE}
+          </b>{" "}
           · ANONYMIZED PROFILE
         </div>
         <span
@@ -89,7 +93,7 @@ export default function AuditReportCard() {
             borderRadius: "var(--r-sm)",
           }}
         >
-          REDACTED · SAMPLE
+          EXTENSION · COMING SOON
         </span>
       </div>
 
