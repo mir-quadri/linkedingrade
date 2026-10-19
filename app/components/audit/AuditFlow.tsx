@@ -11,6 +11,7 @@ import SectionGradeList from './SectionGradeList';
 import ExtensionCallout from './ExtensionCallout';
 import WinsAndFixes from './WinsAndFixes';
 import SelfAssessedBlock from './SelfAssessedBlock';
+import PostResultUpsell from './PostResultUpsell';
 
 type Stage = 'upload' | 'parsing' | 'preview' | 'submitting-email' | 'full';
 
@@ -199,7 +200,7 @@ export default function AuditFlow() {
             </div>
             <SectionGradeList sections={preview.previewSections} />
           </div>
-          <ExtensionCallout />
+          <ExtensionCallout showCta={stage !== 'full'} />
 
           {stage !== 'full' || !fullReport ? (
             <EmailGate
@@ -216,6 +217,7 @@ export default function AuditFlow() {
               audit={fullReport.audit}
               resultUrl={resultUrl}
               emailDelivered={emailDelivered}
+              email={email}
               onReset={reset}
             />
           )}
@@ -413,12 +415,14 @@ function FullReportView({
   audit,
   resultUrl,
   emailDelivered,
+  email,
   onReset,
 }: {
   auditId: string;
   audit: AuditResult;
   resultUrl: string | null;
   emailDelivered: boolean | null;
+  email: string;
   onReset: () => void;
 }) {
   return (
@@ -476,6 +480,8 @@ function FullReportView({
           </button>
         </div>
       </div>
+      {/* Post-result next step: only after the full report is delivered. */}
+      <PostResultUpsell email={email} />
     </div>
   );
 }
