@@ -1,14 +1,16 @@
 import type { Metadata } from "next";
 
 import TextPage from "../components/TextPage";
+import { pageMetadata } from "@/lib/seo";
 
 const LAST_UPDATED = "May 2026";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Terms of Use — LinkedInGrade",
   description:
     "The honest version: what this site is, what it isn't, and what you can expect from the waitlist.",
-};
+  path: "/terms",
+});
 
 export default function TermsPage() {
   return (
