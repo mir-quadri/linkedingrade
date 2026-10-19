@@ -6,6 +6,7 @@ import SiteFooter from '@/app/components/SiteFooter';
 import SiteNav from '@/app/components/SiteNav';
 import ScoreSummary from '@/app/components/audit/ScoreSummary';
 import PdfAuditReport from '@/app/components/audit/PdfAuditReport';
+import PostResultUpsell from '@/app/components/audit/PostResultUpsell';
 import { runPdfAudit } from '@/lib/engine/scoring';
 import { getAuditStore } from '@/lib/storage/auditStore';
 
@@ -92,6 +93,8 @@ export default async function AuditResultPage({ params }: PageProps) {
                 Upload a new PDF →
               </Link>
             </div>
+            {/* Post-result next step: below the report, never above it. */}
+            <PostResultUpsell email={email} />
           </div>
         </div>
       </main>

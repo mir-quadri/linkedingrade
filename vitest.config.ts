@@ -11,10 +11,17 @@ export default defineConfig({
   // Next.js's PostCSS config uses @tailwindcss/postcss which doesn't load
   // through Vite's plugin shape. Tests don't touch CSS, so skip processing.
   css: { postcss: { plugins: [] } },
+  // tsconfig has `jsx: preserve` (Next compiles JSX); tests need it compiled.
+  esbuild: { jsx: 'automatic' },
   test: {
     // API-route tests live under app/api/**/__tests__/. The pattern picks
     // them up too without dragging in unrelated client components.
-    include: ['lib/**/__tests__/**/*.test.ts', 'app/api/**/__tests__/**/*.test.ts'],
+    include: [
+      'lib/**/__tests__/**/*.test.ts',
+      'app/api/**/__tests__/**/*.test.ts',
+      // Server-rendered component tests (renderToStaticMarkup; no DOM env).
+      'app/components/**/__tests__/**/*.test.ts',
+    ],
     environment: 'node',
   },
 });

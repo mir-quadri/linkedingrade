@@ -45,3 +45,16 @@ export const AUDIT_CTA_RUN = 'Run yours';
  * the live free PDF audit does not yet deliver.
  */
 export const EXTENSION_SAMPLE_BADGE = 'Extension sample · coming soon';
+
+/**
+ * Heading for the post-result next step on /audit. Shown only after the free
+ * 4-section grade is delivered — never before or over the results.
+ */
+export const POST_RESULT_UPSELL_HEADING = 'Want the full 12-section audit?';
+
+/**
+ * Body for the post-result next step. No price, no date, no urgency: the
+ * extension isn't shipped, so the only honest ask is the waitlist.
+ */
+export const POST_RESULT_UPSELL_BODY =
+  "Your free grade covers the 4 sections recruiters scan first. The Chrome extension will grade the other 8 too. Join the waitlist and we'll email you when it ships.";

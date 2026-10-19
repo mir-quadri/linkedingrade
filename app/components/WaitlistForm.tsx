@@ -10,15 +10,21 @@ type Props = {
   buttonLabel?: string;
   fineprint?: string[];
   placeholder?: string;
+  /** Prefill for the email field (e.g. the address given on /audit). */
+  initialEmail?: string;
+  /** Accessible label for the email field (visually hidden). */
+  inputLabel?: string;
 };
 
 export default function WaitlistForm({
   buttonLabel = WAITLIST_CTA,
   fineprint,
   placeholder = "you@work.com",
+  initialEmail = "",
+  inputLabel = "Email address",
 }: Props) {
   const inputId = useId();
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(initialEmail);
   const [status, setStatus] = useState<Status>("idle");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -82,7 +88,7 @@ export default function WaitlistForm({
     >
       <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
         <label htmlFor={inputId} className="sr-only">
-          Email address
+          {inputLabel}
         </label>
         <input
           id={inputId}
