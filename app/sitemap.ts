@@ -5,8 +5,11 @@ import { absoluteUrl } from '@/lib/seo';
 /**
  * Public, indexable pages only. `/audit/result/*` are private share links
  * and `/api/*` are endpoints — both are excluded here. `/api/` is
- * disallowed in robots.ts; result pages are noindexed via meta + X-Robots-Tag. No `lastModified`: we don't track real per-page edit dates and
- * won't invent them.
+ * disallowed in robots.ts; result pages are kept out of the index by their
+ * noindex meta plus the X-Robots-Tag header (next.config.ts), not robots.
+ *
+ * No `lastModified`: we don't track real per-page edit dates and won't
+ * invent them.
  */
 export const SITEMAP_PATHS = ['/', '/audit', '/privacy', '/terms', '/contact'] as const;
 

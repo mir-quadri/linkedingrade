@@ -32,12 +32,6 @@ export default function PrivacyPage() {
         <a href="/audit">/audit page</a> (your uploaded LinkedIn PDF and,
         optionally, your email). The details for each are below.
       </p>
-      <p>
-        We also use <b>Vercel Analytics</b> to measure basic, aggregated traffic
-        — page views, country-level location, referrer. It does not set
-        advertising cookies and does not build a profile of you across other
-        sites.
-      </p>
 
       <h2>The waitlist email</h2>
       <p>
@@ -48,8 +42,9 @@ export default function PrivacyPage() {
       </p>
       <p>
         Waitlist emails are stored and sent via <b>Kit</b> (kit.com, the email
-        service formerly known as ConvertKit). For waitlist sign-ups, Kit is
-        the only third party that receives your email — they don&apos;t flow
+        service formerly known as ConvertKit). For waitlist sign-ups, apart
+        from our host, <b>Vercel</b>, which processes the request, Kit is the
+        only third party that receives your email — they don&apos;t flow
         through the audit-flow processors described below.
       </p>
       <p>
@@ -78,7 +73,8 @@ export default function PrivacyPage() {
           <b>email</b> on the audit record so we can send you the report and a
           link back to it. We also store the <b>browser user-agent</b> string,
           and a one-way <b>SHA-256 hash of your IP</b> (peppered with a server
-          secret). We never store your raw IP.
+          secret). We never store your raw IP (our host, <b>Vercel</b>, sees it
+          in transit and in its standard request logs).
         </li>
         <li>
           During each upload, the audit pipeline calls an internal{' '}
@@ -102,16 +98,21 @@ export default function PrivacyPage() {
           analytics or marketing.
         </li>
         <li>
-          Three third parties receive audit-flow data in production:{' '}
+          Four third parties receive audit-flow data in production:{' '}
+          <b>Vercel</b> (vercel.com), which hosts this site and runs the
+          servers that handle every request &mdash; including your PDF upload
+          and email submission &mdash; and keeps standard request logs (which
+          include IP addresses) under its own retention policy;{' '}
           <b>Brevo</b> (brevo.com), which sends the transactional email;{' '}
           <b>Vercel KV</b> backed by <b>Upstash</b> (upstash.com), which
           stores the audit record — including the email association — under
           a 90-day expiry; and <b>Anthropic</b> (anthropic.com), which runs
           the AI review when the judge is enabled. Anthropic receives only
-          the text of your <b>Headline</b> and <b>About</b>, plus a coarse
-          role-family label inferred from your job titles (for example,
-          &ldquo;engineering&rdquo;) &mdash; not your name, email, IP or IP
-          hash, or audit ID. No other third parties are involved.
+          the text of your <b>Headline</b> and <b>About</b> (including
+          anything you&apos;ve written in them), plus a coarse role-family
+          label inferred from your headline and current job title (for
+          example, &ldquo;engineering&rdquo;) &mdash; not your name, email,
+          IP or IP hash, or audit ID. No other third parties are involved.
         </li>
         <li>
           The 90-day expiry on the stored record is enforced by Upstash via
@@ -159,9 +160,10 @@ export default function PrivacyPage() {
 
       <h2>Cookies</h2>
       <p>
-        This site uses cookies and local storage for two things only: remembering
-        your theme preference (light or dark), and the anonymous analytics
-        described above. No advertising trackers, no cross-site profiling.
+        This site uses your browser&apos;s local storage for one thing only:
+        remembering your theme preference (light or dark). We don&apos;t run
+        analytics or advertising cookies, and there&apos;s no cross-site
+        profiling.
       </p>
 
       <h2>Your rights</h2>

@@ -112,11 +112,18 @@ describe('privacy consistency (AI judge processor)', () => {
     const { readFileSync } = await import('node:fs');
     const path = await import('node:path');
     const src = readFileSync(path.resolve(__dirname, '../../app/privacy/page.tsx'), 'utf8');
-    expect(src).toMatch(/Three third parties receive audit-flow data/);
-    expect(src).toMatch(/<b>Anthropic<\/b>/);
-    expect(src).not.toMatch(/Two third parties receive audit-flow data/);
+    expect(src).toMatch(/Four third parties receive audit-flow data/);
+    expect(src).not.toMatch(/(Two|Three) third parties receive audit-flow data/);
+    for (const name of ['Vercel', 'Brevo', 'Upstash', 'Anthropic']) {
+      expect(src).toContain(`<b>${name}</b>`);
+    }
+    expect(src).toMatch(/<b>Vercel<\/b> \(vercel\.com\), which hosts this site/);
+    // No analytics claim: no analytics package or script ships, and the
+    // Vercel project has Web Analytics off (API 404, 2026-10-18).
+    expect(src).not.toMatch(/Vercel Analytics/);
     const faq = AUDIT_FAQ.find((f) => f.id === 'pdf-and-email')!.answer;
     expect(faq).toMatch(/only your Headline and About text .* sent to Anthropic/);
     expect(faq).toMatch(/audit ID or the email you used/);
+    expect(faq).toMatch(/inferred from your headline and current job title/);
   });
 });

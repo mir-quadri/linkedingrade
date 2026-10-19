@@ -44,7 +44,7 @@ export const AUDIT_FAQ: readonly FaqItem[] = [
     id: 'pdf-and-email',
     question: 'What happens to my PDF and email?',
     answer:
-      'We parse your PDF on our server and discard the file itself. The parsed profile fields and your audit report are stored for up to 90 days, then deleted automatically. When the AI review is enabled, only your Headline and About text (plus a coarse role label) is sent to Anthropic to evaluate it. If you enter your email to unlock the full report, it’s used to send you that report and a link back to it — it isn’t added to any marketing list unless you separately join the extension waitlist. The shareable result link shows only a masked version of your email. To delete your audit sooner, email hello@linkedingrade.com with your audit ID or the email you used. Our privacy policy has the full details.',
+      'We parse your PDF on our server and discard the file itself. The parsed profile fields and your audit report are stored for up to 90 days, then deleted automatically. When the AI review is enabled, only your Headline and About text (plus a coarse role label inferred from your headline and current job title) is sent to Anthropic to evaluate it. If you enter your email to unlock the full report, it’s used to send you that report and a link back to it — it isn’t added to any marketing list unless you separately join the extension waitlist. The shareable result link shows only a masked version of your email. To delete your audit sooner, email hello@linkedingrade.com with your audit ID or the email you used. Our privacy policy has the full details.',
   },
   {
     id: 'how-long',
