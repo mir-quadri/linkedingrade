@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import nextConfig from '@/next.config';
 import robots from '@/app/robots';
 import sitemap, { SITEMAP_PATHS } from '@/app/sitemap';
 import { metadata as resultMetadata } from '@/app/audit/result/[auditId]/page';
@@ -20,10 +21,23 @@ describe('robots + sitemap', () => {
   const r = robots();
   const rules = Array.isArray(r.rules) ? r.rules : [r.rules];
 
-  it('disallows private result share links and the API for every crawler', () => {
+  it('disallows the API but NOT result pages (crawlers must see their noindex)', () => {
     const star = rules.find((x) => x.userAgent === '*')!;
-    expect(star.disallow).toEqual(expect.arrayContaining(['/audit/result/', '/api/']));
+    const disallow = ([] as string[]).concat(star.disallow ?? []);
+    expect(disallow).toContain('/api/');
+    expect(disallow.some((d) => d.startsWith('/audit'))).toBe(false);
     expect(r.sitemap).toBe('https://linkedingrade.com/sitemap.xml');
+  });
+
+  it('has no non-standard Host directive', () => {
+    expect(r.host).toBeUndefined();
+  });
+
+  it('sends X-Robots-Tag: noindex, nofollow on every /audit/result/ response', async () => {
+    const rules = await nextConfig.headers!();
+    const rule = rules.find((h) => h.source === '/audit/result/:path*');
+    expect(rule).toBeDefined();
+    expect(rule!.headers).toContainEqual({ key: 'X-Robots-Tag', value: 'noindex, nofollow' });
   });
 
   it('lists only public pages, all absolute on linkedingrade.com, none private', () => {

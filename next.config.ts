@@ -8,6 +8,20 @@ const nextConfig: NextConfig = {
   // Node's resolver at runtime, matching the standalone smoke test.
   serverExternalPackages: ["pdf-parse", "pdfjs-dist"],
 
+  // Per-audit result pages are private share links. They're NOT disallowed
+  // in robots.txt (a crawler must be able to fetch them to see noindex);
+  // instead every response under /audit/result/ — including 404s for
+  // unknown or ungated IDs, which never render the page's own metadata —
+  // carries X-Robots-Tag, alongside the page's <meta name="robots">.
+  async headers() {
+    return [
+      {
+        source: "/audit/result/:path*",
+        headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],
+      },
+    ];
+  },
+
   // Belt-and-suspenders for the pdfjs-dist worker file. The static
   // `import * as pdfjsWorker from 'pdfjs-dist/legacy/build/pdf.worker.mjs'`
   // in `lib/pdf/disablePdfjsWorker.ts` SHOULD already prompt Vercel's

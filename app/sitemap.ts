@@ -4,8 +4,8 @@ import { absoluteUrl } from '@/lib/seo';
 
 /**
  * Public, indexable pages only. `/audit/result/*` are private share links
- * and `/api/*` are endpoints — both are excluded here and disallowed in
- * robots.ts. No `lastModified`: we don't track real per-page edit dates and
+ * and `/api/*` are endpoints — both are excluded here. `/api/` is
+ * disallowed in robots.ts; result pages are noindexed via meta + X-Robots-Tag. No `lastModified`: we don't track real per-page edit dates and
  * won't invent them.
  */
 export const SITEMAP_PATHS = ['/', '/audit', '/privacy', '/terms', '/contact'] as const;
