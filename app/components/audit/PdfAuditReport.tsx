@@ -29,7 +29,8 @@ export default function PdfAuditReport({ auditId, audit, selfReport }: Props) {
     <>
       <SectionGradeList sections={graded} />
       {/* The result page renders PostResultUpsell below the report, so the
-          callout stays informational: one waitlist CTA per page. */}
+          callout drops its button to avoid a competing primary waitlist CTA.
+          (SelfAssessedBlock still carries a small inline waitlist link.) */}
       <ExtensionCallout showCta={false} />
       <WinsAndFixes wins={audit.wins} fixes={audit.fixes} />
       <SelfAssessedBlock auditId={auditId} initial={selfReport} />

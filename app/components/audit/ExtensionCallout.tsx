@@ -16,7 +16,11 @@ export const EXTENSION_URL = '/';
  * depth in the Chrome extension.
  */
 export interface ExtensionCalloutProps {
-  /** Render the waitlist link. Hide it once PostResultUpsell is on the page. */
+  /**
+   * Render the waitlist button. Callers hide it when PostResultUpsell is on
+   * the page so the two blocks don't both push the waitlist; other inline
+   * links (e.g. in SelfAssessedBlock) may still exist.
+   */
   showCta?: boolean;
 }
 
