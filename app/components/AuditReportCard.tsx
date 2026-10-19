@@ -47,7 +47,7 @@ export default function AuditReportCard() {
   return (
     <div
       role="group"
-      aria-label={`Sample audit report (${EXTENSION_SAMPLE_BADGE}). Not a live result.`}
+      aria-label="Sample audit report. Not a live result."
       style={{
         background: "var(--surface)",
         border: "1px solid var(--border-2)",

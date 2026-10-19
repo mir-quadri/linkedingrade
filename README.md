@@ -73,10 +73,10 @@ feature degrades as noted below. `.env.example` has the full notes; summary:
 | `KIT_API_KEY`, `KIT_FORM_ID`                                                | `/api/waitlist` (Kit V4)    | `/api/waitlist` returns a 500 config error                     |
 | `BREVO_API_KEY`, `EMAIL_FROM`                                               | Audit email (Brevo)         | Report still renders; no email sent                            |
 | `KV_REST_API_URL`, `KV_REST_API_TOKEN`                                      | Audit storage, rate limits  | Per-instance in-memory store (lost on cold start)              |
-| `IP_HASH_PEPPER`                                                            | Peppered SHA-256 IP hashes (audit records, rate-limit keys) | IP hashing is disabled (`hashIp` returns `null`; see `lib/audit/hashIp.ts`) |
+| `IP_HASH_PEPPER`                                                            | Peppered SHA-256 IP hashes (audit records, rate-limit keys) | IP hashing is disabled (`hashIp` returns `null`; see `lib/audit/hashIp.ts`); judge rate limits fall back to the raw IP, held in memory only and never written to KV |
 | `ANTHROPIC_API_KEY`, `JUDGE_MODEL`, `JUDGE_MAX_OUTPUT_TOKENS`, `JUDGE_RATE_LIMIT_PER_DAY`, `JUDGE_PRICE_INPUT_USD_PER_MILLION`, `JUDGE_PRICE_OUTPUT_USD_PER_MILLION` | `/api/judge` AI judge | No key → `judge_unavailable`; tuning vars fall back to defaults (see `.env.example`) |
 | `JUDGE_PROXY_SECRET`, `JUDGE_ALLOWED_ORIGINS`, `JUDGE_PROXY_URL`            | Judge auth (`X-Judge-Auth`), CORS, proxy URL | No secret → audits run structural-only; `JUDGE_PROXY_URL` defaults to same-origin `/api/judge` |
-| `EXTENSION_JUDGE_ALLOWED_ORIGINS`, `EXTENSION_JUDGE_RATE_LIMIT_PER_DAY`     | `/api/extension-judge`      | Defaults to the published extension id / 50 per day            |
+| `EXTENSION_JUDGE_ALLOWED_ORIGINS`, `EXTENSION_JUDGE_RATE_LIMIT_PER_DAY`     | `/api/extension-judge`      | Defaults to the extension's id / 50 per day            |
 
 Treat keys and secrets as secrets; never commit `.env.local`. In production, set them on the
 Vercel project (Settings → Environment Variables) for `Production` and `Preview`.

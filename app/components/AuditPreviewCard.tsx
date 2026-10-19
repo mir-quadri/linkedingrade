@@ -45,7 +45,8 @@ const gradeColor = (band?: Row["band"]) => {
 export default function AuditPreviewCard() {
   return (
     <aside
-      aria-label={`Sample audit preview (${EXTENSION_SAMPLE_BADGE}). Not a live result.`}
+      role="group"
+      aria-label="Sample audit preview. Not a live result."
       style={{
         background: "var(--surface)",
         border: "1px solid var(--border-2)",
