@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import { parseLinkedInText as parseInner } from '../parseLinkedInText';
+import {
+  ExtractedTextTooLargeError,
+  MAX_EXTRACTED_TEXT_CHARS,
+  parseExtractedText,
+} from '../parseLinkedInPdf';
 import { clipPostEducationText } from '../postEducationBoundaries';
 
 // Same pipeline as production (parseLinkedInPdf): clip, then parse.
@@ -236,6 +241,137 @@ ${EXPERIENCE}
       ['LedgerWorks', 'Product Manager'],
     ]);
   });
+
+  // --- PR #36 review: false cuts on description sub-headings ---
+
+  it('(i) "Licenses & Certifications" + bullet in role 1, no Education: both roles survive intact', () => {
+    const profile = parseLinkedInText(`${SIDEBAR}
+Experience
+PayCo
+Senior Product Manager
+March 2022 - Present (2 years 8 months)
+Austin, Texas, United States
+Licenses & Certifications
+• PMP, CSPO
+LedgerWorks
+Product Manager
+June 2018 - February 2022 (3 years 9 months)
+Remote
+• Shipped the invoicing API.
+`);
+    const roles = profile.experienceHistory.data ?? [];
+    expect(roles.map((r) => [r.company, r.title])).toEqual([
+      ['PayCo', 'Senior Product Manager'],
+      ['LedgerWorks', 'Product Manager'],
+    ]);
+    expect(roles[0]!.description).toBe('Licenses & Certifications\n• PMP, CSPO');
+    expect(roles[1]!.description).toBe('• Shipped the invoicing API.');
+  });
+
+  it('(ii) "Recommendations" + bullet in role 1, then Education: both roles survive', () => {
+    const profile = parseLinkedInText(`${SIDEBAR}
+Experience
+PayCo
+Senior Product Manager
+March 2022 - Present (2 years 8 months)
+Austin, Texas, United States
+Recommendations
+• Built the recs engine.
+LedgerWorks
+Product Manager
+June 2018 - February 2022 (3 years 9 months)
+Remote
+Education
+State University
+B.S., Economics (2014 - 2018)
+`);
+    const roles = profile.experienceHistory.data ?? [];
+    expect(roles.map((r) => [r.company, r.title])).toEqual([
+      ['PayCo', 'Senior Product Manager'],
+      ['LedgerWorks', 'Product Manager'],
+    ]);
+    expect(roles[0]!.description).toBe('Recommendations\n• Built the recs engine.');
+    expect(profile.education.data).toEqual([
+      { school: 'State University', degree: 'B.S., Economics', dates: '2014 - 2018' },
+    ]);
+  });
+
+  // --- PR #36 review: a bare label followed by prose is not a heading ---
+
+  const ONLY_ROLE_HEAD = `${SIDEBAR}
+Experience
+PayCo
+Senior Product Manager
+March 2022 - Present (2 years 8 months)
+Austin, Texas, United States`;
+
+  it('only role: "Projects" then prose, no Education: description stays intact', () => {
+    const profile = parseLinkedInText(`${ONLY_ROLE_HEAD}
+Led checkout.
+Projects
+Checkout redesign lifted conversion 12%.
+`);
+    expect(profile.currentExperience.data?.description).toBe(
+      'Led checkout.\nProjects\nCheckout redesign lifted conversion 12%.',
+    );
+  });
+
+  it('only role: "Languages" then prose, then Education: description intact and Education parses', () => {
+    const profile = parseLinkedInText(`${ONLY_ROLE_HEAD}
+Led checkout.
+Languages
+Worked with teams in Spanish and Portuguese across LATAM markets.
+Education
+State University
+B.S., Economics (2014 - 2018)
+`);
+    expect(profile.currentExperience.data?.description).toBe(
+      'Led checkout.\nLanguages\nWorked with teams in Spanish and Portuguese across LATAM markets.',
+    );
+    expect(profile.education.data).toEqual([
+      { school: 'State University', degree: 'B.S., Economics', dates: '2014 - 2018' },
+    ]);
+  });
+
+  it('last role: "Projects" then prose: description stays intact', () => {
+    const profile = parseLinkedInText(`${SIDEBAR}\n${EXPERIENCE}
+Projects
+Invoicing API v2 cut reconciliation time in half.
+`);
+    const roles = profile.experienceHistory.data ?? [];
+    expect(roles.map((r) => r.company)).toEqual(['PayCo', 'LedgerWorks']);
+    expect(roles[1]!.description).toBe(
+      '• Shipped the invoicing API.\nProjects\nInvoicing API v2 cut reconciliation time in half.',
+    );
+  });
+
+  // --- PR #36 review: the clip must be linear (untrusted input on /api/audit) ---
+
+  it('clip is linear: 1e4 "Projects / prose" pairs plus one role clip well under 100ms', () => {
+    const raw =
+      'Ravi Example\nSummary\nx\nExperience\n' +
+      'Projects\nprose\n'.repeat(10_000) +
+      'PayCo\nSenior PM\nMarch 2022 - Present (2 years 8 months)\n';
+    clipPostEducationText(raw); // warm up the regex JIT
+    const t0 = performance.now();
+    const out = clipPostEducationText(raw);
+    const ms = performance.now() - t0;
+    // The quadratic version took ~2.5s here; linear is a few ms. The bound
+    // is generous so slow CI boxes don't flake.
+    expect(ms).toBeLessThan(100);
+    // The trailing role makes every "Projects" ambiguous, so nothing is cut.
+    expect(out).toBe(raw);
+  });
+
+  it('extracted text over the cap is rejected before clip/parse', () => {
+    const big = 'x'.repeat(MAX_EXTRACTED_TEXT_CHARS + 1);
+    expect(() => parseExtractedText(big)).toThrow(ExtractedTextTooLargeError);
+    expect(() => parseExtractedText(`${SIDEBAR}\n${EXPERIENCE}\n`)).not.toThrow();
+  });
+
+  // LinkedIn's PDF uses title-case headings; an all-caps "PROJECTS" (some
+  // third-party exporters or OCR) isn't recognised as a terminator yet.
+  it.todo('uppercase "PROJECTS" (and other all-caps sibling headings) after Experience end the slice');
 
   // Ambiguous by construction: "Projects / <name> / <date (duration)>" has
   // exactly the shape of a role at an employer literally named "Projects"
