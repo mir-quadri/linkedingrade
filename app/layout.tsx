@@ -2,6 +2,10 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
+import JsonLd from "./components/JsonLd";
+import { organizationJsonLd, webSiteJsonLd } from "@/lib/jsonLd";
+import { OG_IMAGE, SITE_NAME, SITE_URL } from "@/lib/seo";
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
@@ -23,20 +27,14 @@ const description =
 export const metadata: Metadata = {
   title,
   description,
-  metadataBase: new URL("https://linkedingrade.com"),
+  metadataBase: new URL(SITE_URL),
   openGraph: {
     title,
     description,
     type: "website",
-    url: "https://linkedingrade.com",
-    images: [
-      {
-        url: "/og.png",
-        width: 1200,
-        height: 630,
-        alt: "LinkedInGrade — the honest LinkedIn audit",
-      },
-    ],
+    url: SITE_URL,
+    siteName: SITE_NAME,
+    images: [OG_IMAGE],
   },
   twitter: {
     card: "summary_large_image",
@@ -58,6 +56,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable}`}>
+        <JsonLd data={[organizationJsonLd(), webSiteJsonLd()]} />
         {children}
       </body>
     </html>

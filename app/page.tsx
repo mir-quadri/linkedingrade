@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 
 import {
@@ -15,6 +16,14 @@ import PricingTier, { type Feature } from "./components/PricingTier";
 import SiteFooter from "./components/SiteFooter";
 import SiteNav from "./components/SiteNav";
 import WaitlistForm from "./components/WaitlistForm";
+import { pageMetadata } from "@/lib/seo";
+
+export const metadata: Metadata = pageMetadata({
+  title: "LinkedInGrade — the honest LinkedIn audit",
+  description:
+    "Free LinkedIn profile audit: drop your profile PDF and get a real letter grade on Headline, About, Current Experience, and Career Arc. The full 12-section Chrome extension is coming soon.",
+  path: "/",
+});
 
 export default function Page() {
   return (

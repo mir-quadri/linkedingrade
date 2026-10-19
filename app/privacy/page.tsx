@@ -1,14 +1,16 @@
 import type { Metadata } from "next";
 
 import TextPage from "../components/TextPage";
+import { pageMetadata } from "@/lib/seo";
 
 const LAST_UPDATED = "May 2026";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Privacy Policy — LinkedInGrade",
   description:
     "What LinkedInGrade collects, why, and how to ask for your data back. Plain language.",
-};
+  path: "/privacy",
+});
 
 export default function PrivacyPage() {
   return (

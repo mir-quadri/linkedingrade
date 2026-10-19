@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 
 import TextPage from "../components/TextPage";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Contact — LinkedInGrade",
   description:
     "Get in touch about the waitlist, press, privacy requests, or anything else.",
-};
+  path: "/contact",
+});
 
 export default function ContactPage() {
   return (
