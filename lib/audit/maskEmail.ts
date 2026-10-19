@@ -26,7 +26,22 @@ export function maskEmail(email: string | null | undefined): string | null {
   const tld = labels[labels.length - 1];
   if (!/^[A-Za-z]{2,}$/.test(tld)) return null;
 
-  const maskedLocal = local.length > 1 ? `${local[0]}***` : '***';
-  const maskedDomain = `${labels[0][0]}***`;
+  // Index by code point, not UTF-16 code unit, so an astral/emoji first
+  // character is kept whole instead of leaving a lone surrogate.
+  const localChars = Array.from(local);
+  const maskedLocal = localChars.length > 1 ? `${localChars[0]}***` : '***';
+  const maskedDomain = `${Array.from(labels[0])[0]}***`;
   return `${maskedLocal}@${maskedDomain}.${tld}`;
+}
+
+/** Email-shaped substrings (loose on purpose: over-redaction is fine in logs). */
+const EMAIL_IN_TEXT = /[^\s@<>()[\]{}"',;:=]+@[^\s@<>()[\]{}"',;:]+\.[^\s@<>()[\]{}"',;:]+/gu;
+
+/**
+ * Redact every email-shaped substring in free text before it hits a log —
+ * e.g. a provider error body that echoes the submitted address. Each match is
+ * replaced with its masked form, or `[email]` when it can't be masked.
+ */
+export function redactEmails(text: string): string {
+  return text.replace(EMAIL_IN_TEXT, (m) => maskEmail(m) ?? '[email]');
 }

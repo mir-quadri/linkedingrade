@@ -168,4 +168,37 @@ describe('sendAuditEmail', () => {
     // while still failing if a stuck fetch leaks through.
     expect(elapsed).toBeLessThan(1_000);
   });
+
+  it('never logs the raw recipient address', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      // Unconfigured path.
+      delete process.env.BREVO_API_KEY;
+      process.env.EMAIL_FROM = 'audit@linkedingrade.com';
+      await sendAuditEmail({
+        email: 'zebulon@vexillology.org',
+        fullName: null,
+        audit,
+        resultUrl: 'https://linkedingrade.com/audit/result/abc',
+      });
+      // Provider error path, with a body that echoes the address.
+      process.env.BREVO_API_KEY = 'xkeysib_test';
+      fetchSpy.mockResolvedValueOnce(
+        new Response('{"message":"invalid email zebulon@vexillology.org"}', { status: 400 }),
+      );
+      await sendAuditEmail({
+        email: 'zebulon@vexillology.org',
+        fullName: null,
+        audit,
+        resultUrl: 'https://linkedingrade.com/audit/result/abc',
+      });
+      const logged = [...warn.mock.calls, ...error.mock.calls].flat().join('\n');
+      expect(logged).toContain('z***@v***.org');
+      expect(logged).not.toMatch(/zebulon|vexillology/);
+    } finally {
+      warn.mockRestore();
+      error.mockRestore();
+    }
+  });
 });

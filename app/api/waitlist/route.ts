@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { maskEmail, redactEmails } from "@/lib/audit/maskEmail";
+
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const KIT_TIMEOUT_MS = 10_000;
 const KIT_BASE_URL = "https://api.kit.com/v4";
@@ -50,7 +52,7 @@ export async function POST(request: Request) {
     if (!createResp.ok) {
       const body = await createResp.text().catch(() => "");
       console.error(
-        `[waitlist] kit create-subscriber error status=${createResp.status} body=${body}`,
+        `[waitlist] kit create-subscriber error status=${createResp.status} body=${redactEmails(body)}`,
       );
       return NextResponse.json({ error: GENERIC_KIT_ERROR }, { status: 500 });
     }
@@ -64,12 +66,12 @@ export async function POST(request: Request) {
     if (!attachResp.ok) {
       const body = await attachResp.text().catch(() => "");
       console.error(
-        `[waitlist] kit attach-to-form error status=${attachResp.status} body=${body}`,
+        `[waitlist] kit attach-to-form error status=${attachResp.status} body=${redactEmails(body)}`,
       );
       return NextResponse.json({ error: GENERIC_KIT_ERROR }, { status: 500 });
     }
 
-    console.log(`[waitlist] signup ok: ${email} at ${new Date().toISOString()}`);
+    console.log(`[waitlist] signup ok: ${maskEmail(email) ?? "[email]"} at ${new Date().toISOString()}`);
     return NextResponse.json({ success: true });
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);

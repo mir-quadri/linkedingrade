@@ -1,3 +1,4 @@
+import { maskEmail, redactEmails } from '@/lib/audit/maskEmail';
 import type { AuditResult, FixSuggestion } from '@/lib/engine/types';
 import { TIER_LABEL } from '@/lib/engine/scoring';
 
@@ -44,7 +45,7 @@ export async function sendAuditEmail(params: SendAuditEmailParams): Promise<bool
 
   if (!apiKey || !from) {
     console.warn(
-      `[sendAuditEmail] missing ${!apiKey ? 'BREVO_API_KEY' : 'EMAIL_FROM'} — skipping email send for ${params.email}`,
+      `[sendAuditEmail] missing ${!apiKey ? 'BREVO_API_KEY' : 'EMAIL_FROM'} — skipping email send for ${maskEmail(params.email) ?? '[email]'}`,
     );
     return false;
   }
@@ -71,7 +72,7 @@ export async function sendAuditEmail(params: SendAuditEmailParams): Promise<bool
     if (!resp.ok) {
       const body = await resp.text().catch(() => '');
       console.error(
-        `[sendAuditEmail] brevo error status=${resp.status} body=${body.slice(0, 200)}`,
+        `[sendAuditEmail] brevo error status=${resp.status} body=${redactEmails(body).slice(0, 200)}`,
       );
       return false;
     }
