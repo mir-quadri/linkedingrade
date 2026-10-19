@@ -9,6 +9,7 @@ import PdfAuditReport from '@/app/components/audit/PdfAuditReport';
 import PostResultUpsell from '@/app/components/audit/PostResultUpsell';
 import { runPdfAudit } from '@/lib/engine/scoring';
 import { getAuditStore } from '@/lib/storage/auditStore';
+import { maskEmail } from '@/lib/audit/maskEmail';
 
 export const dynamic = 'force-dynamic';
 
@@ -35,7 +36,11 @@ export default async function AuditResultPage({ params }: PageProps) {
   // flagged. Treat ungated records as not-found so the id alone is never
   // sufficient to retrieve the full report.
   if (!record || !record.email) notFound();
-  const { selfReport, createdAt, email } = record;
+  // This permalink is shareable, so never render (or serialize into the RSC
+  // payload) the owner's raw address — only a masked form the owner can
+  // recognize. `record.email` is still used above as the gate check.
+  const { selfReport, createdAt } = record;
+  const maskedEmail = maskEmail(record.email);
   // New records are stamped `auditMode: 'pdf'` and already carry the focused
   // 4-section audit. Legacy records (saved before this renderer shipped) hold
   // a full 12-section composite/wins/fixes that can't reconcile with the
@@ -56,7 +61,7 @@ export default async function AuditResultPage({ params }: PageProps) {
             <div className="meta-line">
               <span>§ A — AUDIT</span>
               <span>RESULT · {new Date(createdAt).toISOString().slice(0, 10)}</span>
-              <span>EMAILED TO {email}</span>
+              <span>EMAILED TO {maskedEmail ?? 'YOUR ADDRESS'}</span>
             </div>
             <h1>
               {nameTrusted ? (
