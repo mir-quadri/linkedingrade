@@ -75,7 +75,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true });
   } catch (error) {
     const reason = error instanceof Error ? error.message : String(error);
-    console.error(`[waitlist] kit request failed: ${reason}`);
+    console.error(`[waitlist] kit request failed: ${redactEmails(reason)}`);
     return NextResponse.json({ error: GENERIC_KIT_ERROR }, { status: 500 });
   } finally {
     clearTimeout(timeout);

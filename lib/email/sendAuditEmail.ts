@@ -82,7 +82,7 @@ export async function sendAuditEmail(params: SendAuditEmailParams): Promise<bool
     if ((err as { name?: string })?.name === 'AbortError') {
       console.error(`[sendAuditEmail] brevo timed out after ${timeoutMs}ms`);
     } else {
-      console.error(`[sendAuditEmail] brevo request failed: ${reason}`);
+      console.error(`[sendAuditEmail] brevo request failed: ${redactEmails(reason)}`);
     }
     return false;
   } finally {
