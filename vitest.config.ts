@@ -23,5 +23,7 @@ export default defineConfig({
       'app/components/**/__tests__/**/*.test.{ts,tsx}',
     ],
     environment: 'node',
+    // Globally stub fetch to fail closed (see vitest.setup.ts).
+    setupFiles: ['./vitest.setup.ts'],
   },
 });

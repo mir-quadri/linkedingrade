@@ -26,21 +26,23 @@ const audit: AuditResult = {
 };
 
 describe('sendAuditEmail', () => {
-  const originalKey = process.env.BREVO_API_KEY;
-  const originalFrom = process.env.EMAIL_FROM;
   const fetchSpy = vi.spyOn(globalThis, 'fetch');
 
   beforeEach(() => {
     fetchSpy.mockReset();
+    // Fail closed: any call a test didn't explicitly mock throws.
+    fetchSpy.mockImplementation(() => {
+      throw new Error('unmocked fetch');
+    });
   });
   afterEach(() => {
-    process.env.BREVO_API_KEY = originalKey;
-    process.env.EMAIL_FROM = originalFrom;
+    // Restores originals exactly (an unset var stays unset, not 'undefined').
+    vi.unstubAllEnvs();
   });
 
   it('returns false and does NOT call fetch when BREVO_API_KEY is missing', async () => {
-    delete process.env.BREVO_API_KEY;
-    process.env.EMAIL_FROM = 'audit@linkedingrade.com';
+    vi.stubEnv('BREVO_API_KEY', undefined);
+    vi.stubEnv('EMAIL_FROM', 'audit@linkedingrade.com');
     const ok = await sendAuditEmail({
       email: 'user@example.com',
       fullName: 'Jane Doe',
@@ -52,8 +54,8 @@ describe('sendAuditEmail', () => {
   });
 
   it('returns false and does NOT call fetch when EMAIL_FROM is missing', async () => {
-    process.env.BREVO_API_KEY = 'xkeysib_test';
-    delete process.env.EMAIL_FROM;
+    vi.stubEnv('BREVO_API_KEY', 'xkeysib_test');
+    vi.stubEnv('EMAIL_FROM', undefined);
     const ok = await sendAuditEmail({
       email: 'user@example.com',
       fullName: null,
@@ -65,8 +67,8 @@ describe('sendAuditEmail', () => {
   });
 
   it('posts to the Brevo API and returns true on success', async () => {
-    process.env.BREVO_API_KEY = 'xkeysib_test';
-    process.env.EMAIL_FROM = 'audit@linkedingrade.com';
+    vi.stubEnv('BREVO_API_KEY', 'xkeysib_test');
+    vi.stubEnv('EMAIL_FROM', 'audit@linkedingrade.com');
     fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify({ messageId: 'em_123' }), { status: 201 }));
     const ok = await sendAuditEmail({
       email: 'user@example.com',
@@ -92,8 +94,8 @@ describe('sendAuditEmail', () => {
   // still carry the display-name EMAIL_FROM format. Brevo requires a
   // bare address in sender.email — the whole string would 400.
   it('extracts the bare address when EMAIL_FROM uses the legacy display-name format', async () => {
-    process.env.BREVO_API_KEY = 'xkeysib_test';
-    process.env.EMAIL_FROM = 'LinkedInGrade <audit@linkedingrade.com>';
+    vi.stubEnv('BREVO_API_KEY', 'xkeysib_test');
+    vi.stubEnv('EMAIL_FROM', 'LinkedInGrade <audit@linkedingrade.com>');
     fetchSpy.mockResolvedValueOnce(new Response(JSON.stringify({ messageId: 'em_123' }), { status: 201 }));
     const ok = await sendAuditEmail({
       email: 'user@example.com',
@@ -108,8 +110,8 @@ describe('sendAuditEmail', () => {
   });
 
   it('returns false (fail-soft) when the Brevo API responds non-2xx', async () => {
-    process.env.BREVO_API_KEY = 'xkeysib_test';
-    process.env.EMAIL_FROM = 'audit@linkedingrade.com';
+    vi.stubEnv('BREVO_API_KEY', 'xkeysib_test');
+    vi.stubEnv('EMAIL_FROM', 'audit@linkedingrade.com');
     fetchSpy.mockResolvedValueOnce(new Response('{"error":"unauthorized"}', { status: 401 }));
     const ok = await sendAuditEmail({
       email: 'user@example.com',
@@ -121,8 +123,8 @@ describe('sendAuditEmail', () => {
   });
 
   it('returns false (fail-soft) when fetch itself rejects', async () => {
-    process.env.BREVO_API_KEY = 'xkeysib_test';
-    process.env.EMAIL_FROM = 'audit@linkedingrade.com';
+    vi.stubEnv('BREVO_API_KEY', 'xkeysib_test');
+    vi.stubEnv('EMAIL_FROM', 'audit@linkedingrade.com');
     fetchSpy.mockRejectedValueOnce(new Error('network down'));
     const ok = await sendAuditEmail({
       email: 'user@example.com',
@@ -138,8 +140,8 @@ describe('sendAuditEmail', () => {
   // though the audit was already persisted. The hard timeout caps the
   // gate response time and lets the route return its full payload.
   it('aborts the fetch after the configured timeout and returns false', async () => {
-    process.env.BREVO_API_KEY = 'xkeysib_test';
-    process.env.EMAIL_FROM = 'audit@linkedingrade.com';
+    vi.stubEnv('BREVO_API_KEY', 'xkeysib_test');
+    vi.stubEnv('EMAIL_FROM', 'audit@linkedingrade.com');
     // Honour the AbortSignal: hang until aborted, then reject. This is
     // what a stuck Brevo connection looks like from this side.
     fetchSpy.mockImplementationOnce((_url: unknown, init?: RequestInit) => {
@@ -167,5 +169,38 @@ describe('sendAuditEmail', () => {
     // until the serverless timeout. 1s is plenty of slack for CI jitter
     // while still failing if a stuck fetch leaks through.
     expect(elapsed).toBeLessThan(1_000);
+  });
+
+  it('never logs the raw recipient address', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      // Unconfigured path.
+      vi.stubEnv('BREVO_API_KEY', undefined);
+      vi.stubEnv('EMAIL_FROM', 'audit@linkedingrade.com');
+      await sendAuditEmail({
+        email: 'zebulon@vexillology.org',
+        fullName: null,
+        audit,
+        resultUrl: 'https://linkedingrade.com/audit/result/abc',
+      });
+      // Provider error path, with a body that echoes the address.
+      vi.stubEnv('BREVO_API_KEY', 'xkeysib_test');
+      fetchSpy.mockResolvedValueOnce(
+        new Response('{"message":"invalid email zebulon@vexillology.org"}', { status: 400 }),
+      );
+      await sendAuditEmail({
+        email: 'zebulon@vexillology.org',
+        fullName: null,
+        audit,
+        resultUrl: 'https://linkedingrade.com/audit/result/abc',
+      });
+      const logged = [...warn.mock.calls, ...error.mock.calls].flat().join('\n');
+      expect(logged).toContain('z***@v***.org');
+      expect(logged).not.toMatch(/zebulon|vexillology/);
+    } finally {
+      warn.mockRestore();
+      error.mockRestore();
+    }
   });
 });
