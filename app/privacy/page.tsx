@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import TextPage from "../components/TextPage";
 import { pageMetadata } from "@/lib/seo";
 
-const LAST_UPDATED = "May 2026";
+const LAST_UPDATED = "October 2026";
 
 export const metadata: Metadata = pageMetadata({
   title: "Privacy Policy — LinkedInGrade",
@@ -102,11 +102,16 @@ export default function PrivacyPage() {
           analytics or marketing.
         </li>
         <li>
-          Two third parties receive audit-flow data in production:{' '}
-          <b>Brevo</b> (brevo.com), which sends the transactional email,
-          and <b>Vercel KV</b> backed by <b>Upstash</b> (upstash.com), which
+          Three third parties receive audit-flow data in production:{' '}
+          <b>Brevo</b> (brevo.com), which sends the transactional email;{' '}
+          <b>Vercel KV</b> backed by <b>Upstash</b> (upstash.com), which
           stores the audit record — including the email association — under
-          a 90-day expiry. No other third parties are involved.
+          a 90-day expiry; and <b>Anthropic</b> (anthropic.com), which runs
+          the AI review when the judge is enabled. Anthropic receives only
+          the text of your <b>Headline</b> and <b>About</b>, plus a coarse
+          role-family label inferred from your job titles (for example,
+          &ldquo;engineering&rdquo;) &mdash; not your name, email, IP or IP
+          hash, or audit ID. No other third parties are involved.
         </li>
         <li>
           The 90-day expiry on the stored record is enforced by Upstash via

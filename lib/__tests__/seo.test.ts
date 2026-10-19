@@ -106,3 +106,17 @@ describe('forbidden claims', () => {
     expect(corpus).not.toMatch(re);
   });
 });
+
+describe('privacy consistency (AI judge processor)', () => {
+  it('privacy page lists Anthropic and what it receives; FAQ agrees', async () => {
+    const { readFileSync } = await import('node:fs');
+    const path = await import('node:path');
+    const src = readFileSync(path.resolve(__dirname, '../../app/privacy/page.tsx'), 'utf8');
+    expect(src).toMatch(/Three third parties receive audit-flow data/);
+    expect(src).toMatch(/<b>Anthropic<\/b>/);
+    expect(src).not.toMatch(/Two third parties receive audit-flow data/);
+    const faq = AUDIT_FAQ.find((f) => f.id === 'pdf-and-email')!.answer;
+    expect(faq).toMatch(/only your Headline and About text .* sent to Anthropic/);
+    expect(faq).toMatch(/audit ID or the email you used/);
+  });
+});
