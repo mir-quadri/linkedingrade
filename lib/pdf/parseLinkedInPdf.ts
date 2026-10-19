@@ -13,6 +13,40 @@ import { parseLinkedInText, type ParseLinkedInOptions } from './parseLinkedInTex
 import { clipPostEducationText } from './postEducationBoundaries';
 
 /**
+ * Upper bound on text extracted from an uploaded PDF. A real LinkedIn
+ * "Save to PDF" export is a few KB to a few tens of KB of text, so 200K
+ * chars leaves a wide margin. Anything bigger is almost certainly not a
+ * LinkedIn profile, or is crafted to make the parser burn CPU on the
+ * request path.
+ *
+ * Over the cap we THROW, which goes through /api/audit's existing parse-
+ * error path (422 + the generic message). We don't truncate: a truncated
+ * text could still be graded and stored, and that would give a confident
+ * report on a document we only read part of.
+ */
+export const MAX_EXTRACTED_TEXT_CHARS = 200_000;
+
+export class ExtractedTextTooLargeError extends Error {
+  constructor(length: number) {
+    super(
+      `Extracted PDF text is ${length} chars, over the ${MAX_EXTRACTED_TEXT_CHARS}-char cap.`,
+    );
+    this.name = 'ExtractedTextTooLargeError';
+  }
+}
+
+/** Cap check, then the production clip and parse pipeline on extracted text. */
+export function parseExtractedText(
+  text: string,
+  options: ParseLinkedInOptions = {},
+): ProfileData {
+  if (text.length > MAX_EXTRACTED_TEXT_CHARS) {
+    throw new ExtractedTextTooLargeError(text.length);
+  }
+  return parseLinkedInText(clipPostEducationText(text), options);
+}
+
+/**
  * Extract text from a LinkedIn "Save to PDF" export and parse it into a
  * `ProfileData`. Server-only — `pdf-parse` (and its underlying
  * `pdfjs-dist`) shouldn't be bundled into client code.
@@ -62,7 +96,7 @@ export async function parseLinkedInPdf(
   const parser = new PDFParse({ data });
   try {
     const result = await parser.getText();
-    return parseLinkedInText(clipPostEducationText(result.text), options);
+    return parseExtractedText(result.text, options);
   } finally {
     await parser.destroy().catch(() => {
       // pdfjs occasionally rejects destroy() on transient state; ignore

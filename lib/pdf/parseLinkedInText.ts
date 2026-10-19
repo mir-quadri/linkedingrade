@@ -141,8 +141,8 @@ const PAGE_SEPARATOR = /^\s*-{2,}\s*\d+\s+of\s+\d+\s*-{2,}\s*$/i;
 // real role's description.
 const MONTH_NAME =
   '(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)';
-const DATE_ENDPOINT = `(?:${MONTH_NAME}\\s+)?(?:19|20)\\d{2}|Present|Current`;
-const DATE_LINE = new RegExp(
+export const DATE_ENDPOINT = `(?:${MONTH_NAME}\\s+)?(?:19|20)\\d{2}|Present|Current`;
+export const DATE_LINE = new RegExp(
   `^(${DATE_ENDPOINT})\\s+[-–—]\\s+(${DATE_ENDPOINT})\\s+\\((.+?)\\)\\s*$`,
   'i',
 );
@@ -151,7 +151,7 @@ const DATE_LINE = new RegExp(
 // PDF places the total tenure ("5 years 3 months") on its own line between the
 // company name and the first role's title. The pattern is just years and/or
 // months — no calendar dates — and must occupy the whole line.
-const AGGREGATE_DURATION_LINE =
+export const AGGREGATE_DURATION_LINE =
   /^\d+\s+(?:years?|yrs?)(?:\s+\d+\s+(?:months?|mos?))?$|^\d+\s+(?:months?|mos?)$/i;
 
 const LINKEDIN_URL =
