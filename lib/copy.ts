@@ -57,4 +57,4 @@ export const POST_RESULT_UPSELL_HEADING = 'Want the full 12-section audit?';
  * extension isn't shipped, so the only honest ask is the waitlist.
  */
 export const POST_RESULT_UPSELL_BODY =
-  "Your free grade covers the 4 sections recruiters scan first. The Chrome extension will grade the other 8 too. Join the waitlist and we'll email you when it ships.";
+  "Your free grade covers the 4 sections recruiters scan first. The Chrome extension, coming soon, grades the other 8. Join the waitlist and we'll email you when it ships.";

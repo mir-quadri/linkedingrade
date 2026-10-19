@@ -2,8 +2,12 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+
 import {
   EXTENSION_COMING_SOON,
+  POST_RESULT_UPSELL_BODY,
   POST_RESULT_UPSELL_HEADING,
   WAITLIST_CTA_SHORT,
 } from '@/lib/copy';
@@ -20,7 +24,10 @@ describe('PostResultUpsell', () => {
     expect(labelledBy).toBeTruthy();
     expect(html).toContain(`<h2 id="${labelledBy}"`);
     expect(html).toContain(POST_RESULT_UPSELL_HEADING.replace(/'/g, '&#x27;'));
-    expect(html).toContain(EXTENSION_COMING_SOON);
+    expect(html).toContain(POST_RESULT_UPSELL_BODY.replace(/'/g, '&#x27;'));
+    // The card's own copy says "coming soon" once; the standalone
+    // EXTENSION_COMING_SOON line would be redundant.
+    expect(html).not.toContain(EXTENSION_COMING_SOON);
   });
 
   it('renders a labelled email input wired to the shared waitlist form', () => {
@@ -44,5 +51,17 @@ describe('PostResultUpsell', () => {
   it('makes no price, urgency, or compliance claims', () => {
     const text = render('ada@example.com').replace(/<[^>]+>/g, ' ');
     expect(text).not.toMatch(/\$\d|per month|\/mo\b|limited time|hurry|today only|SOC ?2|Start Pro/i);
+  });
+
+  it('is never prefilled on the shareable permanent result page', () => {
+    // The result page is a public share link: passing the stored owner email
+    // would let any visitor one-click subscribe the owner. Guard the call site.
+    const src = readFileSync(
+      path.resolve(__dirname, '../../../audit/result/[auditId]/page.tsx'),
+      'utf8',
+    );
+    const calls = src.match(/<PostResultUpsell\b[^>]*\/>/g) ?? [];
+    expect(calls.length).toBeGreaterThan(0);
+    for (const call of calls) expect(call).not.toMatch(/email/);
   });
 });

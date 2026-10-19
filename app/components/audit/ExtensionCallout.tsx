@@ -15,7 +15,12 @@ export const EXTENSION_URL = '/';
  * for review" rows with a single honest block: these are audited at full
  * depth in the Chrome extension.
  */
-export default function ExtensionCallout() {
+export interface ExtensionCalloutProps {
+  /** Render the waitlist link. Hide it once PostResultUpsell is on the page. */
+  showCta?: boolean;
+}
+
+export default function ExtensionCallout({ showCta = true }: ExtensionCalloutProps) {
   return (
     <section
       style={{
@@ -45,9 +50,14 @@ export default function ExtensionCallout() {
         Keyword Health — all audited at full depth in the Chrome extension,
         coming soon.
       </p>
-      <Link href={EXTENSION_URL} className="btn btn-primary">
-        {WAITLIST_CTA}
-      </Link>
+      {/* Ghost, not primary: this informational block sits above the email
+          gate and must not compete with it. Callers hide the button once the
+          post-result next step (PostResultUpsell) is on the page. */}
+      {showCta ? (
+        <Link href={EXTENSION_URL} className="btn btn-ghost">
+          {WAITLIST_CTA}
+        </Link>
+      ) : null}
     </section>
   );
 }

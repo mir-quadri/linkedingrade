@@ -20,7 +20,7 @@ export default defineConfig({
       'lib/**/__tests__/**/*.test.ts',
       'app/api/**/__tests__/**/*.test.ts',
       // Server-rendered component tests (renderToStaticMarkup; no DOM env).
-      'app/components/**/__tests__/**/*.test.ts',
+      'app/components/**/__tests__/**/*.test.{ts,tsx}',
     ],
     environment: 'node',
   },

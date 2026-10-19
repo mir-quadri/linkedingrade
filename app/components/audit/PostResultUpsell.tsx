@@ -3,7 +3,6 @@
 import { useId } from 'react';
 
 import {
-  EXTENSION_COMING_SOON,
   POST_RESULT_UPSELL_BODY,
   POST_RESULT_UPSELL_HEADING,
   WAITLIST_CTA_SHORT,
@@ -13,7 +12,11 @@ import { prefillEmail } from '@/lib/audit/prefillEmail';
 import WaitlistForm from '../WaitlistForm';
 
 interface Props {
-  /** Email the visitor gave for this audit, if known. Prefills the form. */
+  /**
+   * Email the visitor gave for this audit, if known. Prefills the form. Pass
+   * it ONLY in the in-session /audit flow — never on the shareable permanent
+   * result page, where a non-owner could one-click subscribe the owner.
+   */
   email?: string | null;
 }
 
@@ -58,7 +61,7 @@ export default function PostResultUpsell({ email }: Props) {
         {POST_RESULT_UPSELL_HEADING}
       </h2>
       <p style={{ margin: 0, color: 'var(--text-2)', fontSize: 14.5, lineHeight: 1.55 }}>
-        {EXTENSION_COMING_SOON} {POST_RESULT_UPSELL_BODY}
+        {POST_RESULT_UPSELL_BODY}
       </p>
       <WaitlistForm
         buttonLabel={WAITLIST_CTA_SHORT}

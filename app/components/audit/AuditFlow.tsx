@@ -200,7 +200,7 @@ export default function AuditFlow() {
             </div>
             <SectionGradeList sections={preview.previewSections} />
           </div>
-          <ExtensionCallout />
+          <ExtensionCallout showCta={stage !== 'full'} />
 
           {stage !== 'full' || !fullReport ? (
             <EmailGate

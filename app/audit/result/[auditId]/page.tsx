@@ -93,8 +93,11 @@ export default async function AuditResultPage({ params }: PageProps) {
                 Upload a new PDF →
               </Link>
             </div>
-            {/* Post-result next step: below the report, never above it. */}
-            <PostResultUpsell email={email} />
+            {/* Post-result next step: below the report, never above it. No
+                email prefill here — this is a shareable permanent link, so a
+                visitor other than the owner must not be able to one-click
+                subscribe the owner's address. */}
+            <PostResultUpsell />
           </div>
         </div>
       </main>
