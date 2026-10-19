@@ -23,7 +23,9 @@ export async function POST(request: Request) {
       ? String((payload as { email: unknown }).email ?? "").trim()
       : "";
 
-  if (!email || !EMAIL_REGEX.test(email)) {
+  // RFC 5321 caps an address at 254 chars; anything longer is rejected the
+  // same way as any other invalid email (and never reaches Kit or the logs).
+  if (!email || email.length > 254 || !EMAIL_REGEX.test(email)) {
     return NextResponse.json({ error: INVALID_EMAIL_ERROR }, { status: 400 });
   }
 
