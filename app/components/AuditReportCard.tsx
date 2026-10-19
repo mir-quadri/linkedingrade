@@ -46,8 +46,8 @@ const gradeColor = (band?: Row["band"]) => {
 export default function AuditReportCard() {
   return (
     <div
-      role="img"
-      aria-label="Sample audit report. Composite grade B minus, 73 out of 100, 64th percentile."
+      role="group"
+      aria-label={`Sample audit report (${EXTENSION_SAMPLE_BADGE}). Not a live result.`}
       style={{
         background: "var(--surface)",
         border: "1px solid var(--border-2)",
@@ -76,9 +76,7 @@ export default function AuditReportCard() {
             color: "var(--text-3)",
           }}
         >
-          <b style={{ color: "var(--accent)", fontWeight: 500 }}>
-            {EXTENSION_SAMPLE_BADGE}
-          </b>{" "}
+          <b style={{ color: "var(--text)", fontWeight: 500 }}>SAMPLE AUDIT</b>{" "}
           · ANONYMIZED PROFILE
         </div>
         <span
@@ -87,13 +85,13 @@ export default function AuditReportCard() {
             fontSize: 10.5,
             letterSpacing: "0.08em",
             textTransform: "uppercase",
-            color: "var(--text-3)",
+            color: "var(--accent)",
             padding: "4px 8px",
-            border: "1px solid var(--border-2)",
+            border: "1px solid color-mix(in oklab, var(--accent) 45%, transparent)",
             borderRadius: "var(--r-sm)",
           }}
         >
-          EXTENSION · COMING SOON
+          {EXTENSION_SAMPLE_BADGE}
         </span>
       </div>
 
